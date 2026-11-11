@@ -1,6 +1,6 @@
-# Dashboard y comisiones Mérida · V2.0.2 Online
+# Dashboard y comisiones Mérida · V2.1 Online
 
-Proyecto completo de Netlify. Incluye las cinco páginas anteriores, la nueva **Visita de coordinación** adaptada a teléfonos, Netlify Identity, Netlify Database (PostgreSQL), funciones de servidor y exportaciones PDF/PNG.
+Proyecto completo de Netlify. Incluye las seis páginas anteriores, la **Visita de coordinación** adaptada a teléfonos, Netlify Identity, Netlify Database (PostgreSQL), funciones de servidor y exportaciones PDF/PNG.
 
 Lee **[INICIAR_AQUI.md](INICIAR_AQUI.md)** para publicar y configurar.
 
@@ -28,3 +28,17 @@ Los cinco apartados muestran un cuadro fijo **Comentarios** a la derecha en PDF 
 ## Versión 2.0.2 · Detalle de comisiones
 
 La Calculadora individual ahora incluye en Base y Simulación un desglose de cada concepto: total pagado, cantidad y tarifa unitaria vigente del escalón. Se incluye en PDF, PNG y CSV. La actualización es visual y no cambia la base de datos ni las reglas de cálculo.
+
+
+## Versión 2.1 · Séptima página: Registros XLS
+
+La pestaña **Registros XLS** permite consultar el conjunto de filas únicas de los archivos XLS activos (todos o los elegidos desde Ajustes → Archivos guardados). Funciona con XLS temporales sin iniciar sesión o con el historial de la cuenta autenticada.
+
+- **Módulo** y **Ejecutivo** permanecen visibles encima de la tabla. La lista de ejecutivos se limita al módulo elegido.
+- **Filtros avanzados** plegados al iniciar: búsqueda general, rango de fechas, pago, incidencia, APP, presencia de código, tipo garantizada/regular, P0, Dental y una columna del XLS con **múltiples valores seleccionables**. Los filtros se pueden combinar.
+- Comparte las columnas visibles configuradas en **Ajustes → 8. Tabla de folios**; las casillas **Incidencia** y **APP** están fijadas en esta vista para validarlas siempre.
+- Muestra 50, 100 o 200 filas por página; los filtros se aplican al conjunto completo, no sólo a la página mostrada.
+- PDF, PNG y CSV usan los filtros actuales y exportan **todas** las filas filtradas. En exportaciones PNG demasiado extensas, usa PDF o CSV para evitar los límites de memoria de los navegadores.
+- **Economía Netlify:** filtrar, buscar, cambiar módulo/ejecutivo y paginar son operaciones completamente locales; no guardan configuraciones ni consultan PostgreSQL. Solo marcar Incidencia o cambiar APP persiste la validación del folio mediante el mecanismo ya existente.
+
+No se modifica el esquema PostgreSQL ni las Netlify Functions. No es necesario volver a cargar XLS ya guardados. Si una tabla contiene demasiadas columnas para una hoja, el PDF reduce tipografía y conserva el encabezado de columnas al continuar en páginas sucesivas.

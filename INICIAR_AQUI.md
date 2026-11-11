@@ -1,4 +1,4 @@
-# Dashboard y comisiones Mérida · Versión 2.0.2
+# Dashboard y comisiones Mérida · Versión 2.1
 
 ## Publicación en Netlify
 
@@ -19,7 +19,7 @@
 - `public/assets/visit-header.png` y `public/assets/visit-signature.png`: imágenes **originales** extraídas de `Visitas del coordinador.xlsx`.
 - `netlify/functions/visits.js`: CRUD de visitas en el servidor, protegido con Netlify Identity.
 - `netlify/database/migrations/20261111190000_create_dashboard_visits.sql`: nueva tabla PostgreSQL `dashboard_visits`.
-- `src/legacy-app.js` y `src/cloud-boot.js`: cinco páginas anteriores y sincronización optimizada.
+- `src/legacy-app.js` y `src/cloud-boot.js`: seis páginas anteriores y sincronización optimizada.
 
 ## Reglas y limitaciones
 
@@ -38,6 +38,19 @@ La compilación de Netlify y el funcionamiento real del entorno remoto requieren
 ### Ajuste de impresión 2.0.1
 Los cinco apartados muestran un cuadro fijo **Comentarios** a la derecha en PDF y PNG, incluso cuando el campo está vacío. Se conserva una hoja carta vertical con reducción proporcional del contenido cuando hay observaciones extensas. No cambia la base de datos ni la puntuación.
 
-## Versión 2.0.2 · Detalle de comisiones
+## Versión 2.1 · Detalle de comisiones
 
 La Calculadora individual ahora incluye en Base y Simulación un desglose de cada concepto: total pagado, cantidad y tarifa unitaria vigente del escalón. Se incluye en PDF, PNG y CSV. La actualización es visual y no cambia la base de datos ni las reglas de cálculo.
+
+
+## Página 7 · Registros XLS (V2.1)
+
+1. Después de desplegar, entra a **Registros XLS** en la navegación del Dashboard.
+2. Importa archivos desde **Cargar XLS** o selecciona los que ya guardaste en **Ajustes → 1. Archivos XLS guardados**.
+3. Filtra por **Módulo** y **Ejecutivo** usando los dos desplegables siempre visibles.
+4. Abre **Filtros avanzados** si necesitas rango de fechas, estado de pago, incidencias, APP, búsqueda textual, P0, Dental o seleccionar varios valores de una columna.
+5. Revisa las casillas **Incidencia** y **APP**. Esas casillas sí actualizan las marcas compartidas con la calculadora; no son filtros de solo lectura.
+6. Para mostrar otras columnas: **⚙ Ajustes → 8. Tabla de folios → Columnas visibles**. Ambas páginas comparten esa selección. Incidencia y APP permanecen fijas en la vista de registros.
+7. Cambia la cantidad de filas por página abajo de la tabla. El botón global **Exportar CSV** y las exportaciones **PDF / PNG** usan todas las filas que cumplan los filtros, no sólo las que ves en la página actual.
+
+Esta nueva página no requiere migraciones SQL adicionales. La navegación y los filtros se ejecutan en el navegador, por lo que no incrementan el consumo de Netlify Database. Los XLS históricos siguen en la base existente.

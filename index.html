@@ -361,6 +361,36 @@ body[data-page="weekly"] #quickFilters{display:none!important}
 #comparisonTable .rate-inline{display:block;font-size:10px;white-space:nowrap;color:#60758a;font-weight:450;margin-top:3px}
 @media(max-width:400px){.summary-calc .concept-pay-row{font-size:11px}.summary-calc .concept-amount small{font-size:10px}}
 </style>
+
+<style id="allRecordsStyles">
+/* Consulta completa XLS: filtros combinables, diseño móvil y sin almacenamiento remoto */
+#allRecordsPage[hidden]{display:none!important}
+body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #quickFilters,body[data-page="allrecords"] #teamPage,body[data-page="allrecords"] #dailyPage,body[data-page="allrecords"] #accumulatedPage,body[data-page="allrecords"] #weeklyPage,body[data-page="allrecords"] #visitPage,body[data-page="allrecords"] #printRecordsSection,body[data-page="allrecords"] #printContext{display:none!important}
+.all-records-page{padding:20px;min-width:0}
+.all-records-hero{display:flex;align-items:start;justify-content:space-between;gap:14px;margin-bottom:12px;flex-wrap:wrap}
+.all-records-hero h2{margin:3px 0 5px;font-size:23px;color:var(--blue-deep)}.all-records-hero p{max-width:730px;font-size:12px;color:var(--sub);margin:0;line-height:1.5}
+.all-records-advanced{border:1px solid var(--line);border-radius:12px;background:var(--card,#fff);margin:13px 0 15px}
+.all-records-advanced>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:13px 15px;font-weight:800;color:var(--blue-deep)}.all-records-advanced>summary::-webkit-details-marker{display:none}.all-records-advanced>summary:before{content:'▸';margin-right:3px}.all-records-advanced[open]>summary:before{content:'▾'}
+.all-records-active{color:var(--sub);font-size:11px;font-weight:650;margin-left:auto}
+.all-records-advanced-body{padding:13px;border-top:1px solid var(--line)}
+.all-records-filter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.all-records-primary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin:13px 0}
+.all-records-page .field{min-width:0}.all-records-page .field label{display:block;font-size:11px;font-weight:800;color:var(--sub);margin-bottom:5px}
+.all-records-page .field select,.all-records-page .field input,.all-records-page select{height:40px;max-width:100%;width:100%;box-sizing:border-box;border:1px solid #cddae7;border-radius:8px;background:#fff;color:var(--ink);padding:8px 10px;font:inherit;font-size:13px}
+.all-records-column-filter{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;padding:13px;border:1px solid var(--line);border-radius:9px;background:#f8fafc}
+.all-records-values{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;max-height:170px;overflow-y:auto}
+.all-records-values label{display:flex;align-items:center;gap:6px;background:white;border:1px solid #d7e1ed;border-radius:7px;padding:6px 9px;font-size:11px;cursor:pointer;max-width:100%;overflow-wrap:anywhere}
+.all-records-values label:has(input:checked){background:#e1f0fb;border-color:#80b4dc;color:#145282;font-weight:800}
+.all-records-values input{width:16px;height:16px;flex:none;accent-color:#1768aa}
+.all-records-advanced-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:13px}.all-records-advanced-actions span,.all-records-help{font-size:11px;color:var(--sub)}
+.all-records-summary{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.all-records-summary span{background:#edf4fa;border:1px solid #d5e5f2;border-radius:8px;padding:6px 9px;font-size:11px;font-weight:700;color:#315e80}
+.all-records-help{margin:10px 0}.all-records-table-wrap{overflow:auto;max-height:65vh;border:1px solid var(--line);border-radius:9px;background:#fff}
+.all-records-table{min-width:max-content;width:100%;font-size:11px}.all-records-table thead{position:sticky;top:0;z-index:1}.all-records-table th{background:#eaf2f9;white-space:nowrap}.all-records-table td{white-space:nowrap}.all-records-table tbody tr:nth-child(even):not(.flagged):not(.unpayable){background:#f4f8fc}
+.all-records-pagination{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-top:13px;font-size:11px;color:var(--sub)}.all-records-page-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.all-records-page-actions select{width:80px}
+@media(max-width:800px){.all-records-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.all-records-page{padding:12px}.all-records-filter-grid,.all-records-primary,.all-records-column-filter{grid-template-columns:1fr}.all-records-primary{gap:8px}.all-records-hero h2{font-size:20px}.all-records-page .field select,.all-records-page .field input{font-size:16px;height:44px}.all-records-table-wrap{max-height:63vh}.all-records-pagination{align-items:stretch}.all-records-page-actions{width:100%;justify-content:flex-start}}
+@media print{#allRecordsPage{display:none!important}}
+</style>
 </head>
 <body>
 <main class="shell">
@@ -385,6 +415,7 @@ body[data-page="weekly"] #quickFilters{display:none!important}
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="accumulatedPage" data-page-tab="accumulated" hidden>Acumulado general</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="weeklyPage" data-page-tab="weekly" hidden>Comparativa semanal</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="visitPage" data-page-tab="visits" hidden>Visitas de coordinación</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="allRecordsPage" data-page-tab="allrecords">Registros XLS</button>
 </nav>
 <details class="settings-panel section-card" id="settingsPanel">
 <summary class="settings-panel-title"><span><span class="settings-icon">⚙</span> Ajustes de la calculadora</span><small>Archivos · Tarifas · Temas · Impresión · Folios</small></summary>
@@ -419,7 +450,7 @@ body[data-page="weekly"] #quickFilters{display:none!important}
 <p class="settings-help">Personaliza título, subtítulo, descripción y nota final que aparecerán en las exportaciones PDF y PNG. El título es general; los otros tres textos son independientes para cada página. Se guardan automáticamente en este navegador.</p>
 <div class="report-text-editor">
 <div class="field"><label for="reportTextTitle">Título general de los reportes</label><input type="text" id="reportTextTitle" maxlength="140" placeholder="Reporte de avances merida"/></div>
-<div class="field"><label for="reportTextPage">Editar textos de la página</label><select id="reportTextPage"><option value="individual">Calculadora individual</option><option value="team">Comparativo de ejecutivos</option><option value="daily">Comparativa diaria</option><option value="accumulated">Acumulado general</option><option value="weekly">Comparativa semanal</option></select></div>
+<div class="field"><label for="reportTextPage">Editar textos de la página</label><select id="reportTextPage"><option value="individual">Calculadora individual</option><option value="team">Comparativo de ejecutivos</option><option value="daily">Comparativa diaria</option><option value="accumulated">Acumulado general</option><option value="weekly">Comparativa semanal</option><option value="allrecords">Registros XLS</option></select></div>
 <div class="field"><label for="reportTextSubtitle">Subtítulo del reporte</label><input type="text" id="reportTextSubtitle" maxlength="160"/></div>
 <div class="field"><label for="reportTextDescription">Descripción del reporte</label><textarea id="reportTextDescription" rows="3" maxlength="700"></textarea></div>
 <div class="field"><label for="reportTextFootnote">Nota de pie de página — cómo interpretar los resultados</label><textarea id="reportTextFootnote" rows="4" maxlength="1200"></textarea></div>
@@ -657,19 +688,60 @@ body[data-page="weekly"] #quickFilters{display:none!important}
 </details>
 </section></div></details></div>
 
+
+<section class="all-records-page section-card" id="allRecordsPage" hidden aria-label="Consulta completa de registros XLS">
+  <div class="all-records-hero">
+    <div><div class="eyebrow">BASE DE REGISTROS</div><h2>Registros XLS</h2>
+    <p>Consulta todas las filas de los XLS activos. Las casillas de Incidencia y APP son editables; los filtros son locales y no generan consultas a Netlify.</p></div>
+    <span class="pill" id="allRecordsCount" role="status" aria-live="polite">0 registros</span>
+  </div>
+  <details id="allRecordsAdvanced" class="all-records-advanced">
+    <summary>Filtros avanzados <span class="all-records-active" id="allRecordsActiveFilters">Ningún filtro adicional</span></summary>
+    <div class="all-records-advanced-body">
+      <div class="all-records-filter-grid">
+        <div class="field"><label for="allRecordsSearch">Buscar en todos los campos</label><input id="allRecordsSearch" type="search" autocomplete="off" placeholder="Folio, fecha, código, producto…"></div>
+        <div class="field"><label for="allRecordsFrom">Fecha desde</label><input id="allRecordsFrom" type="date"></div>
+        <div class="field"><label for="allRecordsTo">Fecha hasta</label><input id="allRecordsTo" type="date"></div>
+        <div class="field"><label for="allRecordsPay">Validación de pago</label><select id="allRecordsPay"><option value="">Todas</option><option value="payable">Comisionable</option><option value="notpayable">No pagable</option><option value="nocode">Sin código</option></select></div>
+        <div class="field"><label for="allRecordsInc">Incidencias</label><select id="allRecordsInc"><option value="">Todas</option><option value="yes">Con incidencia</option><option value="no">Sin incidencia</option></select></div>
+        <div class="field"><label for="allRecordsApp">Activación APP</label><select id="allRecordsApp"><option value="">Todas</option><option value="yes">APP activa</option><option value="no">APP inactiva</option></select></div>
+        <div class="field"><label for="allRecordsCode">Código de barras</label><select id="allRecordsCode"><option value="">Todos los trámites</option><option value="yes">Con código</option><option value="no">Sin código</option></select></div>
+        <div class="field"><label for="allRecordsGuaranteed">Tipo de venta</label><select id="allRecordsGuaranteed"><option value="">Todas</option><option value="yes">Garantizadas</option><option value="no">Regulares</option></select></div>
+        <div class="field"><label for="allRecordsP0">Programa Cero</label><select id="allRecordsP0"><option value="">Todos</option><option value="yes">Con P0</option><option value="no">Sin P0</option></select></div>
+        <div class="field"><label for="allRecordsDental">Plan Dental</label><select id="allRecordsDental"><option value="">Todos</option><option value="yes">Con Dental</option><option value="no">Sin Dental</option></select></div>
+      </div>
+      <div class="all-records-column-filter">
+        <div class="field"><label for="allRecordsColumn">Filtrar por otra columna del XLS</label><select id="allRecordsColumn"><option value="">Sin columna adicional</option></select></div>
+        <div class="field"><label for="allRecordsValueSearch">Buscar valores de la columna</label><input id="allRecordsValueSearch" type="search" autocomplete="off" placeholder="Buscar entre las opciones" disabled></div>
+        <div class="all-records-values" id="allRecordsValues" aria-label="Selecciona varios valores de una columna"><span class="muted">Selecciona una columna para elegir uno o varios valores.</span></div>
+      </div>
+      <div class="all-records-advanced-actions"><button class="btn small" id="allRecordsReset" type="button">Limpiar filtros avanzados</button><span>Los filtros se pueden combinar entre sí y no se guardan en PostgreSQL.</span></div>
+    </div>
+  </details>
+  <div class="all-records-primary">
+    <div class="field"><label for="allRecordsModule">Módulo</label><select id="allRecordsModule"><option value="">Todos los módulos</option></select></div>
+    <div class="field"><label for="allRecordsExecutive">Ejecutivo</label><select id="allRecordsExecutive"><option value="">Todos los ejecutivos</option></select></div>
+  </div>
+  <div class="all-records-summary" id="allRecordsSummary"></div>
+  <div class="all-records-help">Las columnas se muestran según <strong>Ajustes → Tabla de folios</strong>. Incidencia y APP permanecen a la vista para validarlas. Desliza horizontalmente para ver más columnas.</div>
+  <div class="table-wrap all-records-table-wrap"><table id="allRecordsTable" class="record-table all-records-table"><thead id="allRecordsHead"></thead><tbody id="allRecordsBody"><tr><td>Importa un XLS para mostrar registros.</td></tr></tbody></table></div>
+  <div class="all-records-pagination"><span id="allRecordsPageStatus">0 registros</span><div class="all-records-page-actions"><label for="allRecordsPageSize">Filas por página</label><select id="allRecordsPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" type="button" id="allRecordsPrev">Anterior</button><button class="btn small" type="button" id="allRecordsNext">Siguiente</button></div></div>
+  <footer class="foot">Consulta de registros XLS · Versión 2.1</footer>
+</section>
+
 <section id="visitPage" class="visit-page" hidden aria-label="Acuse de visita de coordinación">
   <div class="visit-hero"><div><div class="eyebrow">AUDITORÍA OPERATIVA</div><h2>Visitas de coordinación</h2><p>Acuse de visita · Captura móvil · Semana en curso</p></div><span id="visitCloudInfo" class="visit-state">Disponible al iniciar sesión</span></div>
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 2.0.2</footer>
+  <footer class="foot">Acuse de coordinación · Versión 2.1</footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 2.0.2</footer>
+<footer class="foot">Final de la presentacion · Versión 2.1</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 

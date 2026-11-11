@@ -1,3 +1,15 @@
+# Versión 2.1 · Consulta de registros XLS
+
+- Nueva página 7 con tabla completa de los registros XLS activos, sin limitar por semana ni ejecutivo de la calculadora.
+- Filtros principales Módulo y Ejecutivo siempre visibles; filtros avanzados contraídos por defecto y combinables.
+- Búsqueda general, rango de fechas, pago, incidencia, APP, código, regulares/garantizadas, P0, Dental, filtrado por columna y selección de múltiples valores.
+- Misma configuración de columnas ocultas de página 1; Incidencia y APP fijadas a la vista para validarlas.
+- Paginación eficiente de 50/100/200 filas con filtros aplicados al total.
+- Los cambios de casillas se reflejan en la calculadora y persisten por cuenta conforme a las reglas existentes.
+- Exportación PDF, PNG y CSV del conjunto filtrado completo.
+- Filtrar/paginar no crea escrituras ni llamadas a la nube.
+- Sin cambios de esquema PostgreSQL ni de Netlify Functions.
+
 # Cambios en la versión 2.0.2
 
 - Calculadora individual: los escenarios Base y Simulación muestran el pago de Ventas, Plan Dental, APP, Plan Cero y Bono semanal como **importe total (cantidad × tarifa del escalón)**.

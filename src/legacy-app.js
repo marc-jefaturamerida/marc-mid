@@ -304,6 +304,9 @@ function refreshArchiveData(forceImportMode=false){
   renderArchiveList();
   renderAccumulated();
   renderWeekly();
+  allRecordsView.selectedValues.clear();
+  el('allRecordsColumn').value='';el('allRecordsValueSearch').value='';
+  populateAllRecordsMainFilters();populateAllRecordsColumns();allRecordsView.page=1;renderAllRecords();
 }
 async function importXlsFiles(files){
   if(!files?.length)return;
@@ -417,7 +420,7 @@ function restoreTableView(){
 }
 function resetTableView(){
   const base=['FOLIO','GARANTIZADA','FECHA','PROGRAMA CERO','SALUD DENTAL'];
-  tableView.visible=new Set(tableView.columns.filter(c=>['incident','payment'].includes(c.key)||(c.key.startsWith('raw:')&&base.includes(normalize(c.name)))).map(c=>c.key));
+  tableView.visible=new Set(tableView.columns.filter(c=>['incident','app','payment'].includes(c.key)||(c.key.startsWith('raw:')&&base.includes(normalize(c.name)))).map(c=>c.key));
   tableView.showNoCode=true;
   for(const [id,value] of [['tableScope','filtered'],['tableFilter',''],['tablePaymentFilter',''],['tableIncFilter',''],['tableAppFilter',''],['tableColumnFilter',''],['tableColumnValue','']]){const elem=el(id);if(elem)elem.value=value;}
   if(el('showNoCode'))el('showNoCode').checked=true;
@@ -461,6 +464,131 @@ function tableCellMarkup(r,c,forPrint=false){
   if(c.key==='payment')return forPrint?esc(getCellText(r,c.key)):(payable(r)?'<span class="tiny-pill">Comisionable</span>':hasCode(r)?'<span class="tiny-pill bad">No pagable</span>':'<span class="tiny-pill skip">No se completó la venta</span>');
   const val=displayXlsValue(getCellText(r,c.key));
   return `<span title="${esc(val)}">${esc(val)}</span>`;
+}
+
+// V2.1 · Vista de todos los XLS activos. Filtros de consulta: exclusivamente en memoria.
+const allRecordsView={page:1,pageSize:100,selectedValues:new Set()};
+const ALL_RECORDS_FILTER_IDS=['allRecordsSearch','allRecordsFrom','allRecordsTo','allRecordsPay','allRecordsInc','allRecordsApp','allRecordsCode','allRecordsGuaranteed','allRecordsP0','allRecordsDental'];
+const allRecordsFilterValue=id=>el(id)?.value||'';
+function allRecordsColumns(){
+  const pinned=new Set(['incident','app']);
+  return tableView.columns.filter(c=>pinned.has(c.key)||tableView.visible.has(c.key));
+}
+function setAllRecordsOptions(select,values,placeholder){
+  if(!select)return;
+  const old=select.value;
+  select.innerHTML=`<option value="">${esc(placeholder)}</option>`+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  select.value=values.includes(old)?old:'';
+}
+function populateAllRecordsMainFilters(){
+  const rows=imported.data?.rows||[];
+  const modules=[...new Set(rows.map(r=>r.module).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+  setAllRecordsOptions(el('allRecordsModule'),modules,'Todos los módulos');
+  const selectedModule=allRecordsFilterValue('allRecordsModule');
+  const executives=[...new Set(rows.filter(r=>!selectedModule||r.module===selectedModule).map(r=>r.executive).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+  setAllRecordsOptions(el('allRecordsExecutive'),executives,'Todos los ejecutivos');
+}
+function populateAllRecordsColumns(){
+  const select=el('allRecordsColumn');if(!select)return;
+  const previous=select.value;
+  select.innerHTML='<option value="">Sin columna adicional</option>'+tableView.columns.filter(c=>c.key.startsWith('raw:')).map(c=>`<option value="${esc(c.key)}">${esc(c.name)}</option>`).join('');
+  select.value=tableView.columns.some(c=>c.key===previous)?previous:'';
+  if(select.value!==previous)allRecordsView.selectedValues.clear();
+  renderAllRecordsValueChoices();
+}
+function renderAllRecordsValueChoices(){
+  const key=allRecordsFilterValue('allRecordsColumn'),host=el('allRecordsValues'),search=normalize(allRecordsFilterValue('allRecordsValueSearch'));
+  el('allRecordsValueSearch').disabled=!key;
+  if(!key){host.innerHTML='<span class="muted">Selecciona una columna para elegir uno o varios valores.</span>';return;}
+  const source=imported.data?.rows||[];
+  const values=[...new Set(source.map(r=>getCellText(r,key)))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+  const show=values.filter(v=>!search||normalize(v||'(vacío)').includes(search)).slice(0,150);
+  host.innerHTML=show.map(v=>`<label><input type="checkbox" data-record-value="${esc(v)}" ${allRecordsView.selectedValues.has(v)?'checked':''}><span>${esc(displayXlsValue(v)||'(Vacío)')}</span></label>`).join('')||'<span class="muted">No hay valores coincidentes.</span>';
+  if(values.length>150){host.insertAdjacentHTML('beforeend',`<span class="muted">${show.length} de ${values.length} valores. Usa la búsqueda para encontrar otros.</span>`);}
+}
+function getAllRecordsFiltered(){
+  let rows=imported.data?.rows||[];
+  const module=allRecordsFilterValue('allRecordsModule'),exec=allRecordsFilterValue('allRecordsExecutive');
+  const from=allRecordsFilterValue('allRecordsFrom'),to=allRecordsFilterValue('allRecordsTo');
+  const pay=allRecordsFilterValue('allRecordsPay'),inc=allRecordsFilterValue('allRecordsInc'),app=allRecordsFilterValue('allRecordsApp');
+  const code=allRecordsFilterValue('allRecordsCode'),guar=allRecordsFilterValue('allRecordsGuaranteed'),p0=allRecordsFilterValue('allRecordsP0'),dental=allRecordsFilterValue('allRecordsDental');
+  const col=allRecordsFilterValue('allRecordsColumn'),chosen=allRecordsView.selectedValues;
+  const q=normalize(allRecordsFilterValue('allRecordsSearch'));
+  if(module)rows=rows.filter(r=>r.module===module);
+  if(exec)rows=rows.filter(r=>r.executive===exec);
+  if(from)rows=rows.filter(r=>r.fecha&&r.fecha>=from);
+  if(to)rows=rows.filter(r=>r.fecha&&r.fecha<=to);
+  if(pay==='payable')rows=rows.filter(payable);
+  if(pay==='notpayable')rows=rows.filter(r=>hasCode(r)&&!payable(r));
+  if(pay==='nocode')rows=rows.filter(r=>!hasCode(r));
+  if(inc==='yes')rows=rows.filter(selectedIncident);
+  if(inc==='no')rows=rows.filter(r=>!selectedIncident(r));
+  if(app==='yes')rows=rows.filter(appEnabled);
+  if(app==='no')rows=rows.filter(r=>!appEnabled(r));
+  if(code==='yes')rows=rows.filter(hasCode);
+  if(code==='no')rows=rows.filter(r=>!hasCode(r));
+  if(guar==='yes')rows=rows.filter(r=>isYes(r.guaranteed));
+  if(guar==='no')rows=rows.filter(r=>isNo(r.guaranteed));
+  if(p0==='yes')rows=rows.filter(r=>isYes(r.p0));
+  if(p0==='no')rows=rows.filter(r=>isNo(r.p0));
+  if(dental==='yes')rows=rows.filter(r=>isYes(r.dental));
+  if(dental==='no')rows=rows.filter(r=>isNo(r.dental));
+  if(col&&chosen.size)rows=rows.filter(r=>chosen.has(getCellText(r,col)));
+  if(q)rows=rows.filter(r=>normalize([...r.raw,getCellText(r,'incident'),getCellText(r,'app'),getCellText(r,'payment')].join(' ')).includes(q));
+  return [...rows].sort((a,b)=>Number(hasCode(b))-Number(hasCode(a))||a.i-b.i);
+}
+function allRecordsActiveFilterCount(){return ALL_RECORDS_FILTER_IDS.filter(id=>allRecordsFilterValue(id)).length+(allRecordsFilterValue('allRecordsColumn')&&allRecordsView.selectedValues.size?1:0);}
+function renderAllRecords(){
+  const data=imported.data,host=el('allRecordsBody');if(!host)return;
+  const rows=getAllRecordsFiltered(),cols=allRecordsColumns(),total=data?.rows.length||0,count=rows.length;
+  const pages=Math.max(1,Math.ceil(count/allRecordsView.pageSize));allRecordsView.page=Math.min(Math.max(1,allRecordsView.page),pages);
+  const start=(allRecordsView.page-1)*allRecordsView.pageSize,visible=rows.slice(start,start+allRecordsView.pageSize);
+  el('allRecordsCount').textContent=`${number.format(count)} / ${number.format(total)} registros`;
+  el('allRecordsActiveFilters').textContent=allRecordsActiveFilterCount()?`${allRecordsActiveFilterCount()} filtro(s) activo(s)`:'Ningún filtro adicional';
+  el('allRecordsSummary').innerHTML=`<span>${number.format(count)} visibles</span><span>${rows.filter(hasCode).length} con código</span><span>${rows.filter(selectedIncident).length} incidencias</span><span>${rows.filter(appEnabled).length} APP activas</span>`;
+  el('allRecordsHead').innerHTML='<tr>'+cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')+'</tr>';
+  host.innerHTML=visible.length?visible.map(r=>{
+    const classes=[selectedIncident(r)?'flagged':'',excluded(r)?'unpayable':'',!appEnabled(r)?'app-disabled':''].filter(Boolean).join(' ');
+    return `<tr class="${classes}">`+cols.map(c=>`<td>${tableCellMarkup(r,c)}</td>`).join('')+'</tr>';
+  }).join(''):`<tr><td class="empty-table" colspan="${Math.max(1,cols.length)}">${total?'No hay registros que coincidan con estos filtros.':'No hay XLS cargados. Usa «Cargar XLS».'}</td></tr>`;
+  el('allRecordsPageStatus').textContent=count?`Filas ${number.format(start+1)}–${number.format(Math.min(start+allRecordsView.pageSize,count))} de ${number.format(count)} · Página ${allRecordsView.page} de ${pages}`:`0 registros · Página 1 de 1`;
+  el('allRecordsPrev').disabled=allRecordsView.page<=1;
+  el('allRecordsNext').disabled=allRecordsView.page>=pages;
+}
+function resetAllRecordsAdvanced(){
+  for(const id of ALL_RECORDS_FILTER_IDS){const control=el(id);if(control)control.value='';}
+  el('allRecordsColumn').value='';el('allRecordsValueSearch').value='';allRecordsView.selectedValues.clear();allRecordsView.page=1;
+  renderAllRecordsValueChoices();renderAllRecords();
+}
+function applyFolioValidationChange(target){
+  const id=target.dataset.incidentId??target.dataset.appId;if(id===undefined)return false;
+  if(target.matches('input[data-incident-id]')){if(target.checked)imported.flags.add(id);else imported.flags.delete(id);}
+  else if(target.matches('input[data-app-id]')){if(target.checked)imported.appDisabled.delete(id);else imported.appDisabled.add(id);}
+  else return false;
+  saveFolioFlags();
+  if(importActive()){computeImportedBase();renderRecords();renderTeam();}
+  drawImportMeta(imported.sourceName||'Reporte.xls');
+  renderAllRecords();
+  return true;
+}
+function initAllRecordsPage(){
+  el('allRecordsModule').addEventListener('change',()=>{populateAllRecordsMainFilters();allRecordsView.page=1;renderAllRecords();});
+  el('allRecordsExecutive').addEventListener('change',()=>{allRecordsView.page=1;renderAllRecords();});
+  for(const id of ALL_RECORDS_FILTER_IDS){
+    el(id).addEventListener(id==='allRecordsSearch'?'input':'change',()=>{allRecordsView.page=1;renderAllRecords();});
+  }
+  el('allRecordsColumn').addEventListener('change',()=>{allRecordsView.selectedValues.clear();el('allRecordsValueSearch').value='';allRecordsView.page=1;renderAllRecordsValueChoices();renderAllRecords();});
+  el('allRecordsValueSearch').addEventListener('input',renderAllRecordsValueChoices);
+  el('allRecordsValues').addEventListener('change',e=>{
+    if(!e.target.matches('input[data-record-value]'))return;
+    const value=e.target.dataset.recordValue;if(e.target.checked)allRecordsView.selectedValues.add(value);else allRecordsView.selectedValues.delete(value);
+    allRecordsView.page=1;renderAllRecords();
+  });
+  el('allRecordsReset').addEventListener('click',resetAllRecordsAdvanced);
+  el('allRecordsPageSize').addEventListener('change',e=>{allRecordsView.pageSize=Number(e.target.value)||100;allRecordsView.page=1;renderAllRecords();});
+  el('allRecordsPrev').addEventListener('click',()=>{allRecordsView.page--;renderAllRecords();});
+  el('allRecordsNext').addEventListener('click',()=>{allRecordsView.page++;renderAllRecords();});
+  el('allRecordsTable').addEventListener('change',e=>applyFolioValidationChange(e.target));
 }
 function renderRecords(){
   if(!imported.data)return;
@@ -809,19 +937,21 @@ function refreshAuthorizedPages(){
 }
 
 function switchPage(page){
-  activePage=['individual','team','daily','accumulated','weekly','visits'].includes(page)&&!(['accumulated','weekly','visits'].includes(page)&&!isAuthorized())?page:'individual';
+  activePage=['individual','team','daily','accumulated','weekly','visits','allrecords'].includes(page)&&!(['accumulated','weekly','visits'].includes(page)&&!isAuthorized())?page:'individual';
   document.body.dataset.page=activePage;
   el('teamPage').hidden=activePage!=='team';
   el('dailyPage').hidden=activePage!=='daily';
   el('accumulatedPage').hidden=activePage!=='accumulated';
   el('weeklyPage').hidden=activePage!=='weekly';
   el('visitPage').hidden=activePage!=='visits';
+  el('allRecordsPage').hidden=activePage!=='allrecords';
   for(const b of document.querySelectorAll('[data-page-tab]')){const yes=b.dataset.pageTab===activePage;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));}
   if(activePage==='team')renderTeam();
   if(activePage==='daily')renderDaily();
   if(activePage==='accumulated')renderAccumulated();
   if(activePage==='weekly')renderWeekly();
   if(activePage==='visits')window.VISITS?.open();
+  if(activePage==='allrecords')renderAllRecords();
   if(el('settingsPanel').open){el('settingsPanel').open=false;el('toggleSettings').setAttribute('aria-expanded','false');}
 }
 for(const b of document.querySelectorAll('[data-page-tab]'))b.addEventListener('click',()=>switchPage(b.dataset.pageTab));
@@ -937,7 +1067,7 @@ el('teamTable').addEventListener('click',e=>{
   function persist(){try{localStorage.setItem(storageKey,JSON.stringify(state));}catch(_){}}
   function restore(){try{const saved=JSON.parse(localStorage.getItem(storageKey)||'null');if(saved&&saved.base&&saved.sim){for(const s of ['base','sim'])for(const k of KEYS){if(Number.isFinite(saved[s][k]))state[s][k]=saved[s][k];}}}catch(_){}}
   function update(which){setForm(which);render();persist();}
-  // V2.0.2: el desglose utiliza exclusivamente los conteos comisionables y las
+  // V2.1: el desglose utiliza exclusivamente los conteos comisionables y las
   // tarifas del escalón aplicado. Es solo presentación: no modifica calculate().
   const PAYMENT_CONCEPTS=[
     ['Ventas','salePay','validSales','sale'],
@@ -1058,6 +1188,12 @@ el('teamTable').addEventListener('click',e=>{
   el('nextTier').addEventListener('click',()=>{simDirty=true;const r=calculate(state.sim);if(!r.ok||!r.nextTarget)return;state.sim.reg+=r.needed;state.sim.app+=r.needed;update('sim');});
   el('print').addEventListener('click',()=>{refreshAuthorizedPages();buildReport();window.print();});
   el('export').addEventListener('click',()=>{
+    if(activePage==='allrecords'){
+      const columns=allRecordsColumns(),rows=getAllRecordsFiltered();
+      const records=[columns.map(columnLabel),...rows.map(r=>columns.map(c=>c.key.startsWith('raw:')?displayXlsValue(getCellText(r,c.key)):getCellText(r,c.key)))];
+      const csv='\ufeff'+records.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
+      saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),`registros_xls_${dateIso(new Date())}.csv`);return;
+    }
     if(activePage==='weekly'){
       if(!isAuthorized()){alert('Inicia sesión para consultar la comparativa semanal.');return;}
       const {primary,previous,main,older}=weeklyVarianceData();
@@ -1123,18 +1259,7 @@ el('weekSelect').addEventListener('change',e=>{
 el('executiveSelect').addEventListener('change',e=>{
   imported.executive=e.target.value;chooseExecutive();drawImportMeta(imported.sourceName||'Reporte.xls');
 });
-el('recordsTable').addEventListener('change',e=>{
-  const idx=e.target.dataset.incidentId??e.target.dataset.appId;
-  if(!idx)return;
-  if(e.target.matches('input[data-incident-id]')){
-    if(e.target.checked)imported.flags.add(idx);else imported.flags.delete(idx);
-  }else if(e.target.matches('input[data-app-id]')){
-    if(e.target.checked)imported.appDisabled.delete(idx);else imported.appDisabled.add(idx);
-  }else return;
-  saveFolioFlags();
-  if(importActive()){computeImportedBase();renderRecords();renderTeam();}
-  drawImportMeta(imported.sourceName||'Reporte.xls');
-});
+el('recordsTable').addEventListener('change',e=>applyFolioValidationChange(e.target));
 for(const id of ['tableScope','tablePaymentFilter','tableIncFilter','tableAppFilter','tableColumnValue'])el(id).addEventListener('change',()=>{saveTableFilters();renderRecords();});
 el('tableFilter').addEventListener('input',()=>{saveTableFilters();renderRecords();});
 el('tableColumnFilter').addEventListener('change',()=>{refreshValueFilter();saveTableFilters();renderRecords();});
@@ -1144,9 +1269,9 @@ el('columnChooser').addEventListener('change',e=>{
   if(e.target.checked)tableView.visible.add(e.target.dataset.column);
   else if(tableView.visible.size>1)tableView.visible.delete(e.target.dataset.column);
   else e.target.checked=true;
-  redrawColumnSettings();saveTableView();renderRecords();
+  redrawColumnSettings();saveTableView();renderRecords();renderAllRecords();
 });
-el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTableFilters();saveTableView();renderRecords();});
+el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTableFilters();saveTableView();renderRecords();renderAllRecords();});
 
 
 
@@ -1252,14 +1377,15 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     el('imageScale').addEventListener('change',e=>{uiLayout.scale=[1,2,3,4].includes(Number(e.target.value))?Number(e.target.value):3;saveLayout();});
     el('previewReport').addEventListener('click',()=>{buildReport();window.print();});
   }
-  // Versión 2.0.2: textos comunes a PDF y PNG. El título es global y el resto es por página.
+  // Versión 2.1: textos comunes a PDF y PNG. El título es global y el resto es por página.
   const REPORT_TEXT_STORAGE='wmSamsMeridaReportTextsV17';
   const REPORT_TEXT_DEFAULTS={
     individual:{subtitle:'Calculadora individual',description:'Comisiones simuladas: pueden existir variaciones respecto al monto final a pagar.',footer:'Lee los importes del escenario base y de la simulación. El desglose muestra tarifas, bono, incidencias, descuentos y pago neto estimado; los folios no comisionables no generan pago.'},
     team:{subtitle:'Comparativo de ejecutivos',description:'Comisiones simuladas: pueden existir variaciones respecto al monto final a pagar.',footer:'Cada fila corresponde a un ejecutivo. Compara su meta, ventas comisionables, nivel de cumplimiento y comisión estimada. Las incidencias y ajustes pueden modificar el importe final.'},
     daily:{subtitle:'Comparativa diaria',description:'Actividad operativa del XLS · Totales y variación entre fechas seleccionadas.',footer:'Cada cifra presenta el resultado del día principal y entre paréntesis su diferencia contra el día comparado: + indica aumento, − indica disminución y 0 indica que no cambió. Las tablas se agrupan por módulo y ejecutivo.'},
     accumulated:{subtitle:'Acumulado general',description:'Resultados consolidados del historial XLS guardado.',footer:'Las cantidades son totales acumulados del periodo elegido sobre todos los XLS guardados, sin contar duplicados. Revisa la fila TOTAL para identificar el consolidado; no se comparan fechas ni se muestran variaciones.'},
-    weekly:{subtitle:'Comparativa semanal',description:'Objetivos, resultados y cumplimiento por semana completa de lunes a domingo.',footer:'Compara las dos semanas mediante la sección de variaciones. En cada tabla, OBJETIVOS indica la meta de cada indicador, TOTAL muestra lo logrado y CUMPLIMIENTO representa lo logrado dividido entre el objetivo.'}
+    weekly:{subtitle:'Comparativa semanal',description:'Objetivos, resultados y cumplimiento por semana completa de lunes a domingo.',footer:'Compara las dos semanas mediante la sección de variaciones. En cada tabla, OBJETIVOS indica la meta de cada indicador, TOTAL muestra lo logrado y CUMPLIMIENTO representa lo logrado dividido entre el objetivo.'},
+    allrecords:{subtitle:'Consulta de registros XLS',description:'Vista íntegra de los registros cargados, con filtros operativos combinados.',footer:'Se muestran las filas de los XLS activos que cumplen todos los filtros seleccionados. La columna Incidencia excluye pagos del folio; APP refleja la activación habilitada en el Dashboard. Filtrar no altera los cálculos.'}
   };
   const REPORT_TITLE_DEFAULT='Reporte de avances merida';
   const reportTextState={title:REPORT_TITLE_DEFAULT,pages:{}};
@@ -1282,7 +1408,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return `<div class="report-heading"><div><h1>${esc(content.title)}</h1><p class="report-subtitle">${esc(content.subtitle)}</p><p class="report-disclaimer">${esc(content.description)}</p><p class="report-meta">${meta}</p></div><div class="report-brand">${brand}</div></div>`;
   }
   function reportFootMarkup(page){
-    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 2.0.2</div></footer>`;
+    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 2.1</div></footer>`;
   }
   function initReportTextEditor(){
     loadReportTexts();
@@ -1327,6 +1453,8 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
 .report-page .report-note{margin:8px 0 0;font-size:10px;color:#596d81}.report-page .report-input-info{border:1px solid var(--rline);border-radius:9px;padding:10px 13px;font-size:11px}.report-page .report-input-info p{margin:2px 0 5px}
 .report-page .report-section-records{break-inside:auto}.report-page .report-section-records table{table-layout:fixed}.report-page .report-section-records table th,.report-page .report-section-records table td{padding:5px 6px;text-align:left;white-space:normal;overflow-wrap:anywhere;font-size:9px}.report-page .report-section-records table thead{display:table-header-group}.report-page .report-section-records table tr{break-inside:avoid}.report-page .record-export-table tbody tr:nth-child(odd) td{background:#fff}.report-page .record-export-table tbody tr:nth-child(even) td{background:#edf3fa}.report-page .report-foot{border-top:1px solid var(--rline);padding-top:15px;margin-top:72px;font-size:10px;color:#566879;text-align:left;break-inside:avoid;page-break-inside:avoid;clear:both}.report-page .report-footnote{line-height:1.55}.report-page .report-footnote strong{display:block;color:var(--rdeep);font-size:9px;letter-spacing:.65px;margin-bottom:5px}.report-page .report-footnote p{margin:0;overflow-wrap:anywhere;white-space:pre-wrap}.report-page .report-foot-version{text-align:right;margin-top:18px;font-size:9px;color:#778698}
 @media print{.report-page{padding:0!important;width:100%!important}.report-page .report-section-records{break-before:page;page-break-before:always}.report-page .report-section{break-inside:auto}.report-page .report-section:not(.report-section-records):not(.report-section-comparison){break-inside:avoid;page-break-inside:avoid}.report-page .report-section-records:first-of-type{break-before:auto;page-break-before:auto}}
+.report-page .report-section-allrecords{break-inside:auto;page-break-inside:auto}.report-page .report-section-allrecords table{table-layout:fixed}.report-page .report-section-allrecords th,.report-page .report-section-allrecords td{font-size:8px;padding:5px 6px;text-align:left;white-space:normal;overflow-wrap:anywhere}.report-page .report-section-allrecords thead{display:table-header-group}.report-page .report-section-allrecords tr{break-inside:avoid;page-break-inside:avoid}
+@media print{.report-page .report-section.report-section-allrecords{break-inside:auto!important;page-break-inside:auto!important;}.report-page .report-section-allrecords table{break-inside:auto!important;page-break-inside:auto!important;}}
 `;
   function buildTeamReport(){
     const entries=filteredTeamEntries();
@@ -1397,8 +1525,26 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return el('printPage');
   }
 
+  function buildAllRecordsReport(){
+    const rows=getAllRecordsFiltered(),cols=allRecordsColumns();
+    const [,accent,deep]=THEME_COLORS[uiLayout.theme];
+    const module=allRecordsFilterValue('allRecordsModule')||'Todos',person=allRecordsFilterValue('allRecordsExecutive')||'Todos';
+    const details=`Módulo: ${esc(module)} · Ejecutivo: ${esc(person)} · ${number.format(rows.length)} registros · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`;
+    const head=cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('');
+    const body=rows.map(r=>'<tr>'+cols.map(c=>`<td>${tableCellMarkup(r,c,true)}</td>`).join('')+'</tr>').join('');
+    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">
+      ${reportHeaderMarkup('allrecords',details)}
+      <section class="report-section report-section-allrecords" data-report-section="allrecords"><h2>Registros XLS · ${number.format(rows.length)} filas</h2>
+      <p class="report-note">Las columnas coinciden con la configuración de la tabla de la calculadora. Los filtros pueden combinarse; Incidencia y APP reflejan las casillas seleccionadas.</p>
+      <table class="record-export-table"><thead><tr>${head}</tr></thead><tbody>${body||`<tr><td colspan="${Math.max(1,cols.length)}">Sin registros coincidentes.</td></tr>`}</tbody></table>
+      </section>${reportFootMarkup('allrecords')}</div>`;
+    el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}</style>${html}`;
+    return el('printPage');
+  }
+
   function buildReport(){
     if(activePage==='visits')return window.VISITS?.buildReport();
+    if(activePage==='allrecords')return buildAllRecordsReport();
     if(activePage==='weekly')return buildWeeklyReport();
     if(activePage==='accumulated')return buildAccumulatedReport();
     if(activePage==='daily')return imported.data?buildDailyReport():buildDailyEmptyReport();
@@ -1499,11 +1645,11 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=8;
     y=paragraph(reportTexts.subtitle,margin,y,content,16,21,accent)+6;
     y=paragraph(reportTexts.description,margin,y,content,12,18,deep)+8;
-    const selection=activePage==='weekly'?`${weekLabel(weeklySelection().primary)} vs. ${weekLabel(weeklySelection().previous)} · Calculo manual desde google forms`:activePage==='accumulated'?`${accumulatedPeriodText()} · ${archive.reports.length} XLS guardados · Calculo manual desde google forms`:activePage==='daily'&&imported.data?`Día principal ${fmtDay(dailyDates().latest)} · Día comparado ${fmtDay(dailyDates().previous)} · Calculo manual desde google forms`:activePage==='team'&&imported.data?`Semana ${weekLabel(imported.week)} · ${filteredTeamEntries().length} ejecutivos · Calculo manual desde google forms`:importActive()?`Semana ${weekLabel(imported.week)} · ${imported.executive} · Objetivo ${state.base.goal}`:`Modo manual · Objetivo ${state.base.goal}`;
+    const selection=activePage==='allrecords'?`${getAllRecordsFiltered().length} registros · Módulo ${allRecordsFilterValue('allRecordsModule')||'Todos'} · Ejecutivo ${allRecordsFilterValue('allRecordsExecutive')||'Todos'}`:activePage==='weekly'?`${weekLabel(weeklySelection().primary)} vs. ${weekLabel(weeklySelection().previous)} · Calculo manual desde google forms`:activePage==='accumulated'?`${accumulatedPeriodText()} · ${archive.reports.length} XLS guardados · Calculo manual desde google forms`:activePage==='daily'&&imported.data?`Día principal ${fmtDay(dailyDates().latest)} · Día comparado ${fmtDay(dailyDates().previous)} · Calculo manual desde google forms`:activePage==='team'&&imported.data?`Semana ${weekLabel(imported.week)} · ${filteredTeamEntries().length} ejecutivos · Calculo manual desde google forms`:importActive()?`Semana ${weekLabel(imported.week)} · ${imported.executive} · Objetivo ${state.base.goal}`:`Modo manual · Objetivo ${state.base.goal}`;
     y=paragraph(selection,margin,y,content,10,15)+6;
     line(margin,y,content,accent);y+=9;
     for(const section of sections){
-      const key=section.dataset.reportSection;heading(key==='weekly-variance'?'Variación de resultados':SECTION_LABELS[key]||(key==='daily'?'Por módulo y ejecutivo':key==='team'?'Comparativo por ejecutivo':'Resumen del equipo'));
+      const key=section.dataset.reportSection;heading(key==='allrecords'?'Registros XLS filtrados':key==='weekly-variance'?'Variación de resultados':SECTION_LABELS[key]||(key==='daily'?'Por módulo y ejecutivo':key==='team'?'Comparativo por ejecutivo':'Resumen del equipo'));
       if(key==='weekly-variance'){
         y=tableAt(section.querySelector('.daily-report-table'),margin,y,content,{fontSize:11,rowMin:29,widths:[2.8,1,1,1],striped:true})+9;
       }
@@ -1585,7 +1731,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
         y=tableAt(table,margin,y,content,{fontSize:11,rowMin:28,widths:[2.25,1,1,1]});
         const note=section.querySelector('.report-note');if(note){y+=8;y=paragraph(note.textContent,margin,y,content,10,14)+5;}
       }
-      else if(key==='records'){
+      else if(key==='records'||key==='allrecords'){
         const note=section.querySelector('.report-note');if(note){y=paragraph(note.textContent,margin,y,content,10,15)+8;}
         const table=section.querySelector('.record-export-table');
         if(table){const heads=[...table.querySelectorAll('thead th')].map(z=>normalize(z.textContent));const weights=heads.map(h=>h==='INCIDENCIA'?8:h==='APP'?6:h==='CODIGO'?18:h==='VALIDACION DE PAGO'?14:h==='PRODUCTO'?13:h==='FECHA'?11:h==='ESTATUS'?11:h==='GARANTIZADA'?12:12);
@@ -1598,7 +1744,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=70;line(margin,y,content);y+=16;
     write('NOTA PARA LEER EL REPORTE',margin,y,10,true,deep);y+=20;
     y=paragraph(reportTexts.footer,margin,y,content,11,17,'#4b5c70')+19;
-    write('Versión 2.0.2',margin+content-84,y,10,false,'#6b7b8e');y+=32;
+    write('Versión 2.1',margin+content-84,y,10,false,'#6b7b8e');y+=32;
     return Math.ceil(y);
   }
   function exportPng(){
@@ -1617,7 +1763,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
       paintReportCanvas(ctx,true);
       canvas.toBlob(blob=>{
         button.disabled=false;button.textContent=before;
-        if(blob)saveBlob(blob,activePage==='weekly'?`comparativa_semanal_${weeklySelection().primary}_vs_${weeklySelection().previous}.png`:activePage==='accumulated'?`acumulado_general_${el('accumulatedFrom').value||'todo'}_${el('accumulatedTo').value||'todo'}.png`:activePage==='daily'?`comparativa_diaria_${imported.data?dailyDates().latest:'sin_datos'}.png`:activePage==='team'?`comisiones_equipo_${imported.week}.png`:`comisiones_simuladas_${importActive()?imported.week:'manual'}.png`);
+        if(blob)saveBlob(blob,activePage==='allrecords'?`registros_xls_${dateIso(new Date())}.png`:activePage==='weekly'?`comparativa_semanal_${weeklySelection().primary}_vs_${weeklySelection().previous}.png`:activePage==='accumulated'?`acumulado_general_${el('accumulatedFrom').value||'todo'}_${el('accumulatedTo').value||'todo'}.png`:activePage==='daily'?`comparativa_diaria_${imported.data?dailyDates().latest:'sin_datos'}.png`:activePage==='team'?`comisiones_equipo_${imported.week}.png`:`comisiones_simuladas_${importActive()?imported.week:'manual'}.png`);
         else alert('No se pudo guardar la imagen PNG. Prueba un periodo con menos folios.');
       },'image/png');
     }catch(err){button.disabled=false;button.textContent=before;alert('No se pudo generar el PNG: '+err.message);}
@@ -1627,6 +1773,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   window.addEventListener('beforeprint',buildReport);
   window.CALC_REPORT={buildReport,layout:uiLayout};
 
+  initAllRecordsPage();
   restore();setForm('base');setForm('sim');render();initializeWeeklyDates();refreshAuthorizedPages();initArchive();
   window.APP_CLOUD?.registerRefresh(async()=>{
     if(!isAuthorized())return;
