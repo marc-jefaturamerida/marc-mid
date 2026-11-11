@@ -1,3 +1,12 @@
+# Cambios V1.9.1 — Filtros sin sincronización
+
+- Los filtros de la tabla de folios (`tableScope`, texto, pago, incidencias, APP, columna y valor) no generan ya ninguna escritura a PostgreSQL.
+- Los filtros se conservan en `sessionStorage` mientras dura la pestaña, sin enviarse a otras sesiones o dispositivos.
+- La opción “Mostrar folios sin código” también se aplica sólo localmente.
+- La selección de columnas visibles sigue sincronizándose como una preferencia permanente.
+- Se mantiene el ahorro de v1.9 (sin sondeo cada minuto; ajustes por lotes).
+- Sin cambios de esquema SQL ni en las reglas de cálculo de comisiones.
+
 # Cambios V1.9 — Ahorro de créditos
 
 - Eliminada la revisión periódica de PostgreSQL cada 60 segundos.

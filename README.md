@@ -1,4 +1,4 @@
-# Dashboard y comisiones Mérida — V1.9 Online (modo ahorro)
+# Dashboard y comisiones Mérida — V1.9.1 Online (modo ahorro)
 
 Esta versión actualiza el proyecto V1.8 de Netlify con **menos consultas y escrituras**, conservando los cinco apartados, los datos de PostgreSQL y el ingreso por correo mediante Netlify Identity.
 
@@ -15,7 +15,7 @@ Esta versión actualiza el proyecto V1.8 de Netlify con **menos consultas y escr
 
 ## ¿Qué ahorra créditos?
 
-| Antes (V1.8) | Ahora (V1.9) |
+| Antes (V1.8) | Ahora (V1.9.1) |
 | --- | --- |
 | Verificación automática cada 60 segundos, incluso si no hay cambios | No existe intervalo de consultas a PostgreSQL |
 | Al volver a la ventana se consultaban ajustes y metadatos de XLS en dos peticiones | Única consulta `GET /api/sync` solo si hubo una ausencia de **10 minutos o más** |
@@ -78,3 +78,7 @@ Las consultas pueden reactivarse ocasionalmente al retornar después de una inac
 ## Compilación
 
 Netlify debe utilizar **Build command:** `npm run build`, **Publish directory:** `dist`, **Functions directory:** `netlify/functions`. `netlify.toml` ya contiene la configuración. Las dependencias se instalan con `npm install` en Netlify. Verifica la sintaxis con `npm run check`.
+
+## Nota de mantenimiento V1.9.1
+
+Los filtros de búsqueda de la tabla de folios y “Mostrar folios sin código” son locales a la pestaña del navegador; no utilizan Netlify Functions ni la base de datos. La selección de columnas visibles sigue sincronizada entre dispositivos.

@@ -1,4 +1,4 @@
-# INICIAR AQUÍ — Dashboard y comisiones Mérida v1.9
+# INICIAR AQUÍ — Dashboard y comisiones Mérida v1.9.1
 
 Esta carpeta reúne **todos los archivos necesarios** para crear un repositorio nuevo y publicarlo con **otra cuenta de Netlify**. No es necesario combinarla con archivos de versiones anteriores.
 
@@ -25,7 +25,7 @@ Esta carpeta reúne **todos los archivos necesarios** para crear un repositorio 
 - **Los usuarios de Identity también son nuevos**: hay que volver a invitar y activar el correo.
 - Nunca publiques XLS con datos de clientes dentro del repositorio.
 - No borres la base de datos anterior hasta comprobar que recuperaste lo necesario.
-- La versión 1.9 evita el sondeo continuo de PostgreSQL y realiza los cálculos y exportaciones en cada navegador. El consumo de créditos sigue dependiendo del uso real.
+- La versión 1.9.1 evita el sondeo continuo de PostgreSQL y realiza los cálculos y exportaciones en cada navegador. El consumo de créditos sigue dependiendo del uso real.
 
 ## Comprobación de estructura
 
@@ -55,3 +55,7 @@ netlify/
 ```
 
 Para detalles de funcionamiento y ahorro de créditos consulta `README.md` y `CHANGELOG.md`.
+
+## Ahorro adicional v1.9.1
+
+Filtrar, buscar, cambiar fecha o cambiar el estado visible de los folios no manda datos a PostgreSQL. Los filtros de folios se guardan sólo en la pestaña actual (sessionStorage). Las columnas visibles sí se sincronizan.

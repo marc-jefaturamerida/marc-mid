@@ -50,6 +50,10 @@ let simDirty=false;
   const imported={data:null,week:'',executive:'',flags:new Set(),appDisabled:new Set(),recoverManual:0,sourceName:''};
 const tableView={columns:[],visible:new Set(),showNoCode:false};
 const TABLE_VIEW_STORAGE='wmSamsTablaVisualV18';
+// Filtros operativos: sólo en esta pestaña; nunca se envían a PostgreSQL.
+const TABLE_FILTERS_SESSION_PREFIX='wmSamsFiltrosLocalesV191:';
+function tableFilterSessionKey(){return TABLE_FILTERS_SESSION_PREFIX+String(window.APP_CLOUD?.user?.id||'guest');}
+const TABLE_FILTER_CONTROL_IDS=['tableScope','tableFilter','tablePaymentFilter','tableIncFilter','tableAppFilter','tableColumnFilter','tableColumnValue'];
 
 const TEAM_GOALS_STORAGE='wmSamsComisionesMetasEquipoV1';
 const TEAM_RECOVERY_STORAGE='wmSamsComisionesRecuperacionesEquipoV1';
@@ -367,29 +371,45 @@ function initializeTableView(data){
   restoreTableView();
 }
 function saveTableView(){
+  // Sólo las columnas elegidas son una preferencia compartida entre dispositivos.
   if(!isAuthorized())return;
-  const controlIds=['tableScope','tableFilter','tablePaymentFilter','tableIncFilter','tableAppFilter','tableColumnFilter','tableColumnValue'];
   try{localStorage.setItem(TABLE_VIEW_STORAGE,JSON.stringify({
-    visible:[...tableView.visible],showNoCode:tableView.showNoCode,
-    controls:Object.fromEntries(controlIds.map(id=>[id,el(id)?.value||'']))
+    visible:[...tableView.visible]
+  }));}catch(_){}
+}
+function saveTableFilters(){
+  // Buscar, seleccionar o cambiar un filtro no genera solicitudes a Netlify.
+  try{sessionStorage.setItem(tableFilterSessionKey(),JSON.stringify({
+    showNoCode:tableView.showNoCode,
+    controls:Object.fromEntries(TABLE_FILTER_CONTROL_IDS.map(id=>[id,el(id)?.value||'']))
   }));}catch(_){}
 }
 function restoreTableView(){
   try{
-    const saved=JSON.parse(localStorage.getItem(TABLE_VIEW_STORAGE)||'null');
-    if(!saved)return;
-    const keys=new Set(tableView.columns.map(c=>c.key));
-    const selected=Array.isArray(saved.visible)?saved.visible.filter(k=>keys.has(k)):[];
-    if(selected.length)tableView.visible=new Set(selected);
-    tableView.showNoCode=saved.showNoCode!==false;
-    el('showNoCode').checked=tableView.showNoCode;
-    if(saved.controls&&typeof saved.controls==='object'){
-      for(const [key,v] of Object.entries(saved.controls))if(el(key)&&typeof v==='string')el(key).value=v;
-      refreshValueFilter();
-      if(typeof saved.controls.tableColumnValue==='string')el('tableColumnValue').value=saved.controls.tableColumnValue;
+    const shared=JSON.parse(localStorage.getItem(TABLE_VIEW_STORAGE)||'null');
+    if(shared&&typeof shared==='object'){
+      const keys=new Set(tableView.columns.map(c=>c.key));
+      const selected=Array.isArray(shared.visible)?shared.visible.filter(k=>keys.has(k)):[];
+      if(selected.length)tableView.visible=new Set(selected);
     }
-    redrawColumnSettings();
   }catch(err){console.warn('Preferencias visuales inválidas',err);}
+  try{
+    // Los filtros son exclusivos de esta pestaña. No se recuperan desde la nube.
+    const saved=JSON.parse(sessionStorage.getItem(tableFilterSessionKey())||'null');
+    if(saved&&typeof saved==='object'){
+      tableView.showNoCode=saved.showNoCode!==false;
+      el('showNoCode').checked=tableView.showNoCode;
+      if(saved.controls&&typeof saved.controls==='object'){
+        for(const id of TABLE_FILTER_CONTROL_IDS){
+          const value=saved.controls[id];
+          if(typeof value==='string'&&el(id))el(id).value=value;
+        }
+        refreshValueFilter();
+        if(typeof saved.controls.tableColumnValue==='string')el('tableColumnValue').value=saved.controls.tableColumnValue;
+      }
+    }
+  }catch(err){console.warn('Filtros temporales inválidos',err);}
+  redrawColumnSettings();
 }
 function resetTableView(){
   const base=['FOLIO','GARANTIZADA','FECHA','PROGRAMA CERO','SALUD DENTAL'];
@@ -1076,10 +1096,10 @@ el('recordsTable').addEventListener('change',e=>{
   if(importActive()){computeImportedBase();renderRecords();renderTeam();}
   drawImportMeta(imported.sourceName||'Reporte.xls');
 });
-for(const id of ['tableScope','tablePaymentFilter','tableIncFilter','tableAppFilter','tableColumnValue'])el(id).addEventListener('change',()=>{saveTableView();renderRecords();});
-el('tableFilter').addEventListener('input',()=>{saveTableView();renderRecords();});
-el('tableColumnFilter').addEventListener('change',()=>{refreshValueFilter();saveTableView();renderRecords();});
-el('showNoCode').addEventListener('change',e=>{tableView.showNoCode=e.target.checked;saveTableView();renderRecords();});
+for(const id of ['tableScope','tablePaymentFilter','tableIncFilter','tableAppFilter','tableColumnValue'])el(id).addEventListener('change',()=>{saveTableFilters();renderRecords();});
+el('tableFilter').addEventListener('input',()=>{saveTableFilters();renderRecords();});
+el('tableColumnFilter').addEventListener('change',()=>{refreshValueFilter();saveTableFilters();renderRecords();});
+el('showNoCode').addEventListener('change',e=>{tableView.showNoCode=e.target.checked;saveTableFilters();renderRecords();});
 el('columnChooser').addEventListener('change',e=>{
   if(!e.target.matches('input[data-column]'))return;
   if(e.target.checked)tableView.visible.add(e.target.dataset.column);
@@ -1087,7 +1107,7 @@ el('columnChooser').addEventListener('change',e=>{
   else e.target.checked=true;
   redrawColumnSettings();saveTableView();renderRecords();
 });
-el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTableView();renderRecords();});
+el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTableFilters();saveTableView();renderRecords();});
 
 
 
@@ -1193,7 +1213,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     el('imageScale').addEventListener('change',e=>{uiLayout.scale=[1,2,3,4].includes(Number(e.target.value))?Number(e.target.value):3;saveLayout();});
     el('previewReport').addEventListener('click',()=>{buildReport();window.print();});
   }
-  // Versión 1.9: textos comunes a PDF y PNG. El título es global y el resto es por página.
+  // Versión 1.9.1: textos comunes a PDF y PNG. El título es global y el resto es por página.
   const REPORT_TEXT_STORAGE='wmSamsMeridaReportTextsV17';
   const REPORT_TEXT_DEFAULTS={
     individual:{subtitle:'Calculadora individual',description:'Comisiones simuladas: pueden existir variaciones respecto al monto final a pagar.',footer:'Lee los importes del escenario base y de la simulación. El desglose muestra tarifas, bono, incidencias, descuentos y pago neto estimado; los folios no comisionables no generan pago.'},
@@ -1223,7 +1243,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return `<div class="report-heading"><div><h1>${esc(content.title)}</h1><p class="report-subtitle">${esc(content.subtitle)}</p><p class="report-disclaimer">${esc(content.description)}</p><p class="report-meta">${meta}</p></div><div class="report-brand">${brand}</div></div>`;
   }
   function reportFootMarkup(page){
-    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 1.9</div></footer>`;
+    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 1.9.1</div></footer>`;
   }
   function initReportTextEditor(){
     loadReportTexts();
@@ -1312,7 +1332,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
       const cells=group=>`<tr${group.name==='TOTAL'?' class="daily-total-row"':''}><td>${esc(group.name)}</td>${DAILY_METRICS.map(key=>`<td>${group.metrics[key]}</td>`).join('')}</tr>`;
       return `<div><h3>${label} · ${entries.length}</h3><table class="daily-report-table"><thead><tr><th>${groupBy==='module'?'Módulo':'Ejecutivo'}</th>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${entries.map(cells).join('')||'<tr><td colspan="7">Sin registros en el periodo</td></tr>'}</tbody><tfoot>${entries.length?cells(totals):''}</tfoot></table></div>`;
     };
-    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("accumulated",`${esc(accumulatedPeriodText())} · ${archive.reports.length} archivos históricos · ${rows.length} registros · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`)}<section class="report-section report-section-daily" data-report-section="daily"><h2>Acumulados por módulo y ejecutivo</h2><div class="report-daily-grid">${table('module','Módulos')}${table('executive','Ejecutivos')}</div><p class="report-note"></p></section>${reportFootMarkup("accumulated")}</div>`;
+    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("accumulated",`${esc(accumulatedPeriodText())} · ${archive.reports.length} archivos históricos · ${rows.length} registros · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`)}<section class="report-section report-section-daily" data-report-section="daily"><h2>Acumulados por módulo y ejecutivo</h2><div class="report-daily-grid">${table('module','Módulos')}${table('executive','Ejecutivos')}</div><p class="report-note">Datos únicos de todos los XLS guardados en tu cuenta. Se incluyen los registros del periodo indicado. Ventas = registros con código; Programa Cero = ventas regulares con P0; Dental = ventas con PD. Sin comparación ni variaciones diarias.</p></section>${reportFootMarkup("accumulated")}</div>`;
     el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}</style>${html}`;
     return el('printPage');
   }
@@ -1517,7 +1537,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=70;line(margin,y,content);y+=16;
     write('NOTA PARA LEER EL REPORTE',margin,y,10,true,deep);y+=20;
     y=paragraph(reportTexts.footer,margin,y,content,11,17,'#4b5c70')+19;
-    write('Versión 1.9',margin+content-84,y,10,false,'#6b7b8e');y+=32;
+    write('Versión 1.9.1',margin+content-84,y,10,false,'#6b7b8e');y+=32;
     return Math.ceil(y);
   }
   function exportPng(){
