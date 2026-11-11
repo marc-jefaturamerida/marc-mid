@@ -1,3 +1,10 @@
+# Cambios en la versión 2.0.2
+
+- Calculadora individual: los escenarios Base y Simulación muestran el pago de Ventas, Plan Dental, APP, Plan Cero y Bono semanal como **importe total (cantidad × tarifa del escalón)**.
+- La tabla comparativa muestra la cantidad y tarifa debajo del importe en cada concepto.
+- PDF y PNG reproducen los cinco desgloses en las tarjetas de cada escenario, sin recortes, y el CSV agrega filas descriptivas de cantidades y tarifas.
+- No cambian cálculos, reglas, tarifas configuradas, guardado ni sincronización.
+
 # Cambios de versión
 
 ## 2.0 — Nueva página de visitas de coordinación

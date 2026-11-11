@@ -937,6 +937,27 @@ el('teamTable').addEventListener('click',e=>{
   function persist(){try{localStorage.setItem(storageKey,JSON.stringify(state));}catch(_){}}
   function restore(){try{const saved=JSON.parse(localStorage.getItem(storageKey)||'null');if(saved&&saved.base&&saved.sim){for(const s of ['base','sim'])for(const k of KEYS){if(Number.isFinite(saved[s][k]))state[s][k]=saved[s][k];}}}catch(_){}}
   function update(which){setForm(which);render();persist();}
+  // V2.0.2: el desglose utiliza exclusivamente los conteos comisionables y las
+  // tarifas del escalón aplicado. Es solo presentación: no modifica calculate().
+  const PAYMENT_CONCEPTS=[
+    ['Ventas','salePay','validSales','sale'],
+    ['Plan Dental','dentalPay','validDental','dental'],
+    ['Activación APP','appPay','validApp','app'],
+    ['Plan Cero','p0Pay','validP0','p0'],
+    ['Bono semanal','bonus',null,'bonus']
+  ];
+  function paymentConcepts(r){
+    if(!r.ok)return [];
+    return PAYMENT_CONCEPTS.map(([label,totalKey,qtyKey,rateKey])=>({
+      label,totalKey,quantity:qtyKey?r[qtyKey]:(r.inc===0&&r.tier?1:0),
+      rate:r.tier?.[rateKey]||0,total:r[totalKey]
+    }));
+  }
+  function paymentBreakdownHtml(r){
+    if(!r.ok)return '';
+    const items=paymentConcepts(r);
+    return `<div class="commission-detail"><div class="commission-detail-title">Pago por concepto <span>cantidad × tarifa unitaria</span></div><div class="concept-pay-list">${items.map(item=>`<div class="concept-pay-row"><span class="concept-name">${esc(item.label)}</span><span class="concept-amount"><strong>${mx(item.total)}</strong> <small>(${number.format(item.quantity)} × ${mx(item.rate)})</small></span></div>`).join('')}</div><div class="commission-detail-foot">Antes de descuentos: <b>${mx(r.beforePenalty)}</b> · Descuentos: <b>−${mx(r.discounts)}</b>${r.recover?` · Recuperación: <b>−${mx(r.recover)}</b>`:''}</div></div>`;
+  }
   function htmlSummary(r){
     if(!r.ok){return `<div class="hero-line"><strong>Corrige los datos</strong><span class="pill alert">Sin cálculo</span></div><div class="scenario-flag">Verifica las cantidades de folios y sus complementos.</div>`;}
     const bad=r.inc>=4?' · DVL':r.inc>0?' · Sin bono':'';
@@ -945,6 +966,7 @@ el('teamTable').addEventListener('click',e=>{
       <div class="minirow"><span><strong>${r.validSales}</strong> ventas aptas de ${r.goal}</span><span>${r.excludedSales} excluidas</span></div>
       <div class="minirow" style="margin-top:9px"><span>Escalón <strong>${r.tier?esc(r.tier.label):'Sin pago (<50%)'}</strong></span><span class="pill ${r.penalty>0?'warning':''}">−${r.penalty}%${bad}</span></div>
       <div class="minirow" style="margin-top:9px"><span>Programa Cero</span><strong>${r.p0rate===null?'Exento (0 regulares)':pct(r.p0rate)}${r.p0Penalty?' · −15%':''}</strong></div>
+      ${paymentBreakdownHtml(r)}
       <div class="payline"><span class="unit">Comisión neta de la semana</span><span class="net ${r.net<0?'negative':''}">${mx(r.net)}</span></div>
       <div class="scenario-flag">${r.nextTarget?`Para llegar al escalón de ${r.nextTarget.min}%: faltan <strong>${r.needed} venta(s) válida(s)</strong>.`:'Escalón máximo alcanzado.'}</div>`;
   }
@@ -983,7 +1005,10 @@ el('teamTable').addEventListener('click',e=>{
     const renderValue=(r,k,t)=>{
       if(!r.ok)return '—';
       if(t==='tier')return r.tier?esc(r.tier.label):'Sin pago';
-      const v=r[k];if(t==='money')return mx(v);if(t==='negMoney')return v?`−${mx(v)}`:mx(0);if(t==='pct')return pct(v);if(t==='pctExempt')return v===null?'Exento':pct(v);return number.format(v);
+      const v=r[k];if(t==='money'){
+        const part=paymentConcepts(r).find(p=>p.totalKey===k);
+        return part?`${mx(v)}<small class="rate-inline">(${number.format(part.quantity)} × ${mx(part.rate)})</small>`:mx(v);
+      }if(t==='negMoney')return v?`−${mx(v)}`:mx(0);if(t==='pct')return pct(v);if(t==='pctExempt')return v===null?'Exento':pct(v);return number.format(v);
     };
     const diff=(key,type)=>{
       if(!valid||type==='tier'||type==='pctExempt')return '—';
@@ -1070,6 +1095,13 @@ el('teamTable').addEventListener('click',e=>{
     const rows=[['Concepto','Base','Simulación','Diferencia']];
     const measures=[['Meta semanal','goal'],['Ventas regulares válidas','validReg'],['Ventas garantizadas válidas','validGuar'],['Ventas válidas','validSales'],['Cumplimiento %','completion'],['Programa Cero %','p0rate'],['Comisión por ventas','salePay'],['Comisión dental','dentalPay'],['Comisión APP','appPay'],['Comisión P0','p0Pay'],['Subtotal','gross'],['Bono','bonus'],['Penalización P0 %','p0Penalty'],['Penalización incidencias %','incPenalty'],['Descuento total','discounts'],['Descuento previo','recover'],['NETO','net']];
     for(const [label,key] of measures){const x=asNum(a[key]),y=asNum(b[key]);rows.push([label,x===null?'Exento':x,y===null?'Exento':y,x===null||y===null?'':round(y-x)]);}
+    rows.push([],['DETALLE DE PAGO','Escenario base','Simulación','Diferencia']);
+    for(const [label,totalKey] of PAYMENT_CONCEPTS){
+      const basePart=paymentConcepts(a).find(p=>p.totalKey===totalKey);
+      const simPart=paymentConcepts(b).find(p=>p.totalKey===totalKey);
+      const describe=p=>`${mx(p.total)} (${number.format(p.quantity)} x ${mx(p.rate)})`;
+      rows.push([label,describe(basePart),describe(simPart),round(simPart.total-basePart.total)]);
+    }
     for(const key of KEYS)rows.push(['Dato capturado: '+key,state.base[key],state.sim[key],round(state.sim[key]-state.base[key])]);
     if(importActive()) {
       const allView=el('tableScope').value==='all',columnView=tableView.columns.filter(c=>tableView.visible.has(c.key));
@@ -1220,7 +1252,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     el('imageScale').addEventListener('change',e=>{uiLayout.scale=[1,2,3,4].includes(Number(e.target.value))?Number(e.target.value):3;saveLayout();});
     el('previewReport').addEventListener('click',()=>{buildReport();window.print();});
   }
-  // Versión 2.0.1: textos comunes a PDF y PNG. El título es global y el resto es por página.
+  // Versión 2.0.2: textos comunes a PDF y PNG. El título es global y el resto es por página.
   const REPORT_TEXT_STORAGE='wmSamsMeridaReportTextsV17';
   const REPORT_TEXT_DEFAULTS={
     individual:{subtitle:'Calculadora individual',description:'Comisiones simuladas: pueden existir variaciones respecto al monto final a pagar.',footer:'Lee los importes del escenario base y de la simulación. El desglose muestra tarifas, bono, incidencias, descuentos y pago neto estimado; los folios no comisionables no generan pago.'},
@@ -1250,7 +1282,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return `<div class="report-heading"><div><h1>${esc(content.title)}</h1><p class="report-subtitle">${esc(content.subtitle)}</p><p class="report-disclaimer">${esc(content.description)}</p><p class="report-meta">${meta}</p></div><div class="report-brand">${brand}</div></div>`;
   }
   function reportFootMarkup(page){
-    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 2.0.1</div></footer>`;
+    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 2.0.2</div></footer>`;
   }
   function initReportTextEditor(){
     loadReportTexts();
@@ -1288,6 +1320,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
 .report-page .report-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.report-page .report-kpi{padding:14px 15px;border:1px solid var(--rline);border-radius:9px;background:var(--rpale)}
 .report-page .report-kpi .rlabel{font-size:10px;font-weight:bold;text-transform:uppercase;color:#526477;letter-spacing:.4px}.report-page .report-kpi .rval{font-size:25px;font-weight:850;letter-spacing:-.6px;margin-top:6px;color:var(--rdeep)}
 .report-page .report-scenario-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.report-page .report-scenario{border:1px solid var(--rline);border-radius:9px;padding:11px 13px}.report-page .report-scenario strong{font-size:13px;color:var(--rdeep)}.report-page .report-scenario .report-net{color:var(--raccent);font-size:23px;font-weight:850;margin-top:6px}.report-page .report-scenario .small-rows{display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;margin-top:9px}.report-page .report-scenario .small-rows span{color:#53687c}.report-page .report-scenario .small-rows b{color:var(--rdeep);font-weight:800}
+.report-page .commission-detail{margin-top:12px;padding:9px 10px;background:#f5f9fe;border:1px solid var(--rline);border-radius:7px}.report-page .commission-detail-title{font-size:10px;font-weight:800;color:var(--rdeep);margin-bottom:7px}.report-page .commission-detail-title span{font-size:9px;font-weight:400;color:#64758a}.report-page .concept-pay-row{display:flex;justify-content:space-between;gap:8px;align-items:baseline;border-bottom:1px solid #e0e9f2;padding:5px 1px;font-size:10px}.report-page .concept-pay-row:last-child{border-bottom:0}.report-page .concept-amount{white-space:nowrap;color:var(--rdeep);text-align:right}.report-page .concept-amount strong{font-size:11px}.report-page .concept-amount small{font-size:9px;color:#53687c}.report-page .commission-detail-foot{font-size:9px;color:#566879;margin-top:7px;line-height:1.45}.report-page .rate-inline{display:block;color:#587087;font-size:8px;font-weight:400;margin-top:2px}
 .report-page .report-rules{display:grid;grid-template-columns:1.23fr .77fr;gap:17px}.report-page .report-rules h3{font-size:12px;color:var(--rdeep);margin:0 0 7px}.report-page .report-rules ul{padding-left:17px;margin:0;font-size:10px;line-height:1.38;color:#394b60}.report-page .report-rules li{margin-bottom:5px}.report-page .report-rules .tier-overview{font-size:10px;margin:0 0 7px;color:#49647e}.report-page .rate-caption{font-size:9px;color:#66788b}
 .report-page table{width:100%;border-collapse:collapse;table-layout:auto;min-width:0;font-size:10px}.report-page table th{color:#52677d;background:#f2f6fa;font-size:9px;letter-spacing:.2px;font-weight:800;text-transform:uppercase;border-bottom:1px solid var(--rline);text-align:right;padding:7px 8px}.report-page table td{padding:6px 8px;border-bottom:1px solid #e9eef2;text-align:right;color:#314151}.report-page table th:first-child,.report-page table td:first-child{text-align:left}.report-page tr.subtotal td{font-weight:bold}.report-page tr.final td{background:var(--rpale);color:var(--rdeep);font-weight:850}.report-page td.positive{color:#0b7c54;font-weight:800}.report-page td.negative{color:#bf3d42;font-weight:800}
 .report-page .rate-table th,.report-page .rate-table td{text-align:center;padding:7px 5px}.report-page .rate-table th:first-child,.report-page .rate-table td:first-child{text-align:left}.report-page .rate-table .tier-base td{background:var(--rpale)}.report-page .rate-table .tier-sim td{background:#e1f3ed}.report-page .rate-table .tier-both td{background:#d5eee3;font-weight:bold}.report-page .tier-label{font-size:8px;margin-left:3px;padding:1px 4px;background:#dceafb;border-radius:3px;color:#184d86}.report-page .tier-label.sim-label{background:#d5f4e8;color:#166d50}
@@ -1378,7 +1411,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     const sectionHtml={};
     sectionHtml.import=`<div class="report-input-info"><p><strong>Origen:</strong> Calculo manual desde google forms</p>${importActive()?`<p><strong>Semana:</strong> ${esc(weekLabel(imported.week))} · <strong>Ejecutivo:</strong> ${esc(imported.executive)}</p>`:''}<p><strong>Meta individual:</strong> ${esc(String(state.base.goal))}</p></div>`;
     sectionHtml.summary=`<div class="report-kpis"><div class="report-kpi"><div class="rlabel">Escenario base</div><div class="rval">${canMoney(a)}</div><div class="report-note">${a.ok?esc(pct(a.completion))+' cumplimiento':'Revisar datos'}</div></div><div class="report-kpi"><div class="rlabel">Escenario simulado</div><div class="rval">${canMoney(b)}</div><div class="report-note">${b.ok?esc(pct(b.completion))+' cumplimiento':'Revisar datos'}</div></div><div class="report-kpi"><div class="rlabel">Diferencia</div><div class="rval">${difference}</div><div class="report-note">Simulación menos base</div></div></div>`;
-    const scenarioHtml=(name,r)=>`<div class="report-scenario"><strong>${name}</strong><div class="report-net">${canMoney(r)}</div>${r.ok?`<div class="small-rows"><span>Meta: <b>${r.goal}</b></span><span>Ventas válidas: <b>${r.validSales}</b></span><span>Regulares: <b>${r.validReg}</b></span><span>Garantizadas: <b>${r.validGuar}</b></span><span>Dental: <b>${r.validDental}</b></span><span>APP: <b>${r.validApp}</b></span><span>Programa Cero: <b>${r.validP0}</b></span><span>Incidencias: <b>${r.inc}</b></span><span>Cumplimiento: <b>${pct(r.completion)}</b></span><span>Escalón: <b>${r.tier?esc(r.tier.label):'Sin pago'}</b></span><span>Penalización: <b>${r.penalty}%</b></span><span>Bono: <b>${mx(r.bonus)}</b></span></div>`:'<p>Los datos requieren revisión.</p>'}</div>`;
+    const scenarioHtml=(name,r)=>`<div class="report-scenario"><strong>${name}</strong><div class="report-net">${canMoney(r)}</div>${r.ok?`<div class="small-rows"><span>Meta: <b>${r.goal}</b></span><span>Ventas válidas: <b>${r.validSales}</b></span><span>Regulares: <b>${r.validReg}</b></span><span>Garantizadas: <b>${r.validGuar}</b></span><span>Dental: <b>${r.validDental}</b></span><span>APP: <b>${r.validApp}</b></span><span>Programa Cero: <b>${r.validP0}</b></span><span>Incidencias: <b>${r.inc}</b></span><span>Cumplimiento: <b>${pct(r.completion)}</b></span><span>Escalón: <b>${r.tier?esc(r.tier.label):'Sin pago'}</b></span><span>Penalización: <b>${r.penalty}%</b></span><span>Bono: <b>${mx(r.bonus)}</b></span></div>${paymentBreakdownHtml(r)}`:'<p>Los datos requieren revisión.</p>'}</div>`;
     sectionHtml.scenarios=`<div class="report-scenario-grid">${scenarioHtml('Escenario base',a)}${scenarioHtml('Simulación',b)}</div>`;
     const notes=document.querySelector('.section-card[aria-label="Reglas y tarifas"] .notes');
     sectionHtml.tariff=`<div class="report-rules"><div><h3>Importes por escalón</h3><div class="tier-overview">${esc(el('tierOverview').textContent)}</div>${document.querySelector('.rate-table').outerHTML}<div class="rate-caption">Bono semanal único, sujeto a cero incidencias.</div></div><div><h3>Reglas aplicadas</h3>${notes?notes.outerHTML:''}</div></div>`;
@@ -1506,7 +1539,10 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
       }
       else if(key==='scenarios'){
         const cards=[...section.querySelectorAll('.report-scenario')],gap=14,cardW=(content-gap)/2;
-        const height=231;
+        // Crece con los conceptos: no recortar ninguno en el PNG.
+        const metricsCount=Math.max(...cards.map(c=>c.querySelectorAll('.small-rows span').length),0);
+        const detailStart=76+Math.ceil(metricsCount/2)*23+7;
+        const height=detailStart+30+5*22+65;
         cards.forEach((card,i)=>{
           const x=margin+i*(cardW+gap);rect(x,y,cardW,height,'#fff','#d8e3ec');
           write(card.querySelector('strong')?.textContent||'',x+12,y+12,13,true,deep);
@@ -1515,7 +1551,24 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
             const cx=x+12+(k%2)*((cardW-24)/2),cy=y+76+Math.floor(k/2)*23;
             write(fit(m.textContent.trim(),(cardW-34)/2,10),cx,cy,10,false,'#465c75');
           });
-        });y+=height+5;
+          const detail=card.querySelector('.commission-detail');
+          if(detail){
+            const dy=y+detailStart;
+            line(x+12,dy,cardW-24);
+            write('PAGO POR CONCEPTO · CANTIDAD × TARIFA',x+12,dy+9,10,true,deep);
+            const entries=[...detail.querySelectorAll('.concept-pay-row')];
+            entries.forEach((entry,j)=>{
+              const yy=dy+30+j*22;
+              const label=entry.querySelector('.concept-name')?.textContent||'';
+              const amount=entry.querySelector('.concept-amount')?.textContent?.replace(/\s+/g,' ').trim()||'';
+              write(label,x+12,yy,10,false,'#465c75');
+              write(fit(amount,cardW-159,10,true),x+150,yy,10,true,deep);
+            });
+            line(x+12,dy+30+entries.length*22,cardW-24);
+            const foot=detail.querySelector('.commission-detail-foot')?.textContent?.replace(/\s+/g,' ').trim()||'';
+            paragraph(foot,x+12,dy+38+entries.length*22,cardW-24,10,14,'#53687c',2);
+          }
+        });y+=height+8;
       }
       else if(key==='tariff'){
         const table=section.querySelector('.rate-table');
@@ -1545,7 +1598,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=70;line(margin,y,content);y+=16;
     write('NOTA PARA LEER EL REPORTE',margin,y,10,true,deep);y+=20;
     y=paragraph(reportTexts.footer,margin,y,content,11,17,'#4b5c70')+19;
-    write('Versión 2.0.1',margin+content-84,y,10,false,'#6b7b8e');y+=32;
+    write('Versión 2.0.2',margin+content-84,y,10,false,'#6b7b8e');y+=32;
     return Math.ceil(y);
   }
   function exportPng(){

@@ -346,6 +346,21 @@ body[data-page="weekly"] #quickFilters{display:none!important}
   @media(max-width:740px){.cloud-session-label{width:100%;max-width:none}.toolbar{justify-content:flex-start}}
 </style>
 <link rel="stylesheet" href="/assets/visits.css">
+<style id="commission-detail-v202">
+/* Desglose unitario visible en ambos escenarios; sin alterar fórmulas. */
+.summary-calc .commission-detail{margin-top:13px;border-top:1px solid #d8e5f0;padding-top:10px}
+.summary-calc .commission-detail-title{display:flex;flex-wrap:wrap;gap:5px 10px;align-items:baseline;font-size:11px;font-weight:850;letter-spacing:.3px;text-transform:uppercase;color:var(--blue-deep);margin-bottom:6px}
+.summary-calc .commission-detail-title span{font-size:10px;font-weight:500;text-transform:none;letter-spacing:normal;color:var(--sub)}
+.summary-calc .concept-pay-row{display:flex;justify-content:space-between;align-items:baseline;gap:6px 12px;padding:6px 0;border-bottom:1px dashed #dce7f0;font-size:12px}
+.summary-calc .concept-pay-row:last-child{border:0}
+.summary-calc .concept-name{color:#4b6078;white-space:nowrap}
+.summary-calc .concept-amount{text-align:right;white-space:nowrap;color:var(--blue-deep)}
+.summary-calc .concept-amount strong{font-weight:850}
+.summary-calc .concept-amount small{font-size:11px;color:#536b83;white-space:nowrap}
+.summary-calc .commission-detail-foot{font-size:10px;color:#63778a;margin-top:8px;line-height:1.4}
+#comparisonTable .rate-inline{display:block;font-size:10px;white-space:nowrap;color:#60758a;font-weight:450;margin-top:3px}
+@media(max-width:400px){.summary-calc .concept-pay-row{font-size:11px}.summary-calc .concept-amount small{font-size:10px}}
+</style>
 </head>
 <body>
 <main class="shell">
@@ -647,14 +662,14 @@ body[data-page="weekly"] #quickFilters{display:none!important}
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 2.0.1</footer>
+  <footer class="foot">Acuse de coordinación · Versión 2.0.2</footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 2.0.1</footer>
+<footer class="foot">Final de la presentacion · Versión 2.0.2</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 

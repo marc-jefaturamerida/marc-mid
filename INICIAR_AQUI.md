@@ -1,4 +1,4 @@
-# Dashboard y comisiones Mérida · Versión 2.0.1
+# Dashboard y comisiones Mérida · Versión 2.0.2
 
 ## Publicación en Netlify
 
@@ -37,3 +37,7 @@ La compilación de Netlify y el funcionamiento real del entorno remoto requieren
 
 ### Ajuste de impresión 2.0.1
 Los cinco apartados muestran un cuadro fijo **Comentarios** a la derecha en PDF y PNG, incluso cuando el campo está vacío. Se conserva una hoja carta vertical con reducción proporcional del contenido cuando hay observaciones extensas. No cambia la base de datos ni la puntuación.
+
+## Versión 2.0.2 · Detalle de comisiones
+
+La Calculadora individual ahora incluye en Base y Simulación un desglose de cada concepto: total pagado, cantidad y tarifa unitaria vigente del escalón. Se incluye en PDF, PNG y CSV. La actualización es visual y no cambia la base de datos ni las reglas de cálculo.

@@ -1,4 +1,4 @@
-# Dashboard y comisiones Mérida · V2.0.1 Online
+# Dashboard y comisiones Mérida · V2.0.2 Online
 
 Proyecto completo de Netlify. Incluye las cinco páginas anteriores, la nueva **Visita de coordinación** adaptada a teléfonos, Netlify Identity, Netlify Database (PostgreSQL), funciones de servidor y exportaciones PDF/PNG.
 
@@ -24,3 +24,7 @@ Las visitas se almacenan en `dashboard_visits` cuando se pulsa **Guardar visita*
 
 ### Ajuste de impresión 2.0.1
 Los cinco apartados muestran un cuadro fijo **Comentarios** a la derecha en PDF y PNG, incluso cuando el campo está vacío. Se conserva una hoja carta vertical con reducción proporcional del contenido cuando hay observaciones extensas. No cambia la base de datos ni la puntuación.
+
+## Versión 2.0.2 · Detalle de comisiones
+
+La Calculadora individual ahora incluye en Base y Simulación un desglose de cada concepto: total pagado, cantidad y tarifa unitaria vigente del escalón. Se incluye en PDF, PNG y CSV. La actualización es visual y no cambia la base de datos ni las reglas de cálculo.

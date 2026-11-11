@@ -1,4 +1,4 @@
-/* Acuse de visita de coordinación · v2.0.1
+/* Acuse de visita de coordinación · v2.0.2
    Los filtros, la captura y los cálculos son locales. Solo Guardar visita
    envía un acta a PostgreSQL. La configuración personalizable usa el
    sistema existente de preferencias sincronizadas de Netlify.
