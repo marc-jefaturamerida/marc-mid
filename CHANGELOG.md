@@ -1,3 +1,12 @@
+# V1.9.2 — Selección de semana y ejecutivo 100 % local
+
+- Corregido `computeImportedBase()`: ya no llama `persist()` cuando recalcula los importes derivados de XLS al cambiar de semana o ejecutivo. Este `persist()` marcaba un ajuste como modificado y activaba el guardado en PostgreSQL aunque el usuario solo filtraba.
+- Al cargar el historial guardado tampoco se produce ese guardado redundante.
+- Los filtros de fechas en comparativas, módulo, búsqueda y tabla de folios siguen siendo locales y no llaman a la API.
+- Se conservan las escrituras explícitas para **editar** metas, recuperaciones, tarifas, marcas de incidencias, APP y demás ajustes permanentes.
+- No se cambian API, Functions, SQL ni datos existentes; no requiere migración.
+- Nota: las simulaciones que el usuario **edita** deliberadamente todavía pueden guardarse como estado compartido de la calculadora; seleccionar un ejecutivo/semana no.
+
 # Cambios V1.9.1 — Filtros sin sincronización
 
 - Los filtros de la tabla de folios (`tableScope`, texto, pago, incidencias, APP, columna y valor) no generan ya ninguna escritura a PostgreSQL.

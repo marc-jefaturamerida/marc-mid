@@ -174,7 +174,11 @@ function computeImportedBase(){
   const valid=next.reg+next.guar-next.xreg-next.xguar;
   for(const k of KEYS)el('base-'+k).readOnly=!['goal','recover'].includes(k);
   el('baseImportCounts').innerHTML=`<strong>${rows.length}</strong> registros en filtro · <strong>${valid}</strong> ventas comisionables · <strong>${next.app-next.xapp}</strong> APP activas comisionables · <strong>${next.xreg+next.xguar}</strong> ventas descartadas · <strong>${next.inc}</strong> incidencias marcadas`;
-  setForm('base');render();persist();
+  // Derivado del XLS seleccionado: cambiar semana o ejecutivo es navegación local.
+  // NO llamar persist(): éste actualiza wmSamsComisionesV1 y disparaba un PUT
+  // a PostgreSQL por cada cambio de filtro, incluso al cargar el historial.
+  // Las metas y recuperaciones explícitas se guardan mediante sus propios handlers.
+  setForm('base');render();
   renderTeam();
 }
 function chooseWeekAndExecutive(){
@@ -1213,7 +1217,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     el('imageScale').addEventListener('change',e=>{uiLayout.scale=[1,2,3,4].includes(Number(e.target.value))?Number(e.target.value):3;saveLayout();});
     el('previewReport').addEventListener('click',()=>{buildReport();window.print();});
   }
-  // Versión 1.9.1: textos comunes a PDF y PNG. El título es global y el resto es por página.
+  // Versión 1.9.2: textos comunes a PDF y PNG. El título es global y el resto es por página.
   const REPORT_TEXT_STORAGE='wmSamsMeridaReportTextsV17';
   const REPORT_TEXT_DEFAULTS={
     individual:{subtitle:'Calculadora individual',description:'Comisiones simuladas: pueden existir variaciones respecto al monto final a pagar.',footer:'Lee los importes del escenario base y de la simulación. El desglose muestra tarifas, bono, incidencias, descuentos y pago neto estimado; los folios no comisionables no generan pago.'},
@@ -1243,7 +1247,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return `<div class="report-heading"><div><h1>${esc(content.title)}</h1><p class="report-subtitle">${esc(content.subtitle)}</p><p class="report-disclaimer">${esc(content.description)}</p><p class="report-meta">${meta}</p></div><div class="report-brand">${brand}</div></div>`;
   }
   function reportFootMarkup(page){
-    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 1.9.1</div></footer>`;
+    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 1.9.2</div></footer>`;
   }
   function initReportTextEditor(){
     loadReportTexts();
@@ -1332,7 +1336,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
       const cells=group=>`<tr${group.name==='TOTAL'?' class="daily-total-row"':''}><td>${esc(group.name)}</td>${DAILY_METRICS.map(key=>`<td>${group.metrics[key]}</td>`).join('')}</tr>`;
       return `<div><h3>${label} · ${entries.length}</h3><table class="daily-report-table"><thead><tr><th>${groupBy==='module'?'Módulo':'Ejecutivo'}</th>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${entries.map(cells).join('')||'<tr><td colspan="7">Sin registros en el periodo</td></tr>'}</tbody><tfoot>${entries.length?cells(totals):''}</tfoot></table></div>`;
     };
-    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("accumulated",`${esc(accumulatedPeriodText())} · ${archive.reports.length} archivos históricos · ${rows.length} registros · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`)}<section class="report-section report-section-daily" data-report-section="daily"><h2>Acumulados por módulo y ejecutivo</h2><div class="report-daily-grid">${table('module','Módulos')}${table('executive','Ejecutivos')}</div><p class="report-note">Datos únicos de todos los XLS guardados en tu cuenta. Se incluyen los registros del periodo indicado. Ventas = registros con código; Programa Cero = ventas regulares con P0; Dental = ventas con PD. Sin comparación ni variaciones diarias.</p></section>${reportFootMarkup("accumulated")}</div>`;
+    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("accumulated",`${esc(accumulatedPeriodText())} · ${archive.reports.length} archivos históricos · ${rows.length} registros · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`)}<section class="report-section report-section-daily" data-report-section="daily"><h2>Acumulados por módulo y ejecutivo</h2><div class="report-daily-grid">${table('module','Módulos')}${table('executive','Ejecutivos')}</div><p class="report-note"></p></section>${reportFootMarkup("accumulated")}</div>`;
     el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}</style>${html}`;
     return el('printPage');
   }
@@ -1537,7 +1541,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=70;line(margin,y,content);y+=16;
     write('NOTA PARA LEER EL REPORTE',margin,y,10,true,deep);y+=20;
     y=paragraph(reportTexts.footer,margin,y,content,11,17,'#4b5c70')+19;
-    write('Versión 1.9.1',margin+content-84,y,10,false,'#6b7b8e');y+=32;
+    write('Versión 1.9.2',margin+content-84,y,10,false,'#6b7b8e');y+=32;
     return Math.ceil(y);
   }
   function exportPng(){
