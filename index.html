@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+
+<html lang="es-MX">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta content="light" name="color-scheme"/>
+<title>Dashboard y comisiones Mérida</title>
+<style>
+    :root{--blue:#184d86;--blue-deep:#112f56;--blue-soft:#eaf3fb;--ink:#17273b;--sub:#607187;--line:#d9e2ec;--bg:#f4f7fb;--white:#fff;--green:#147e60;--red:#bc4545;--orange:#b96b21;--shadow:0 12px 35px rgba(23,54,92,.08)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}button,input{font:inherit}button{cursor:pointer}a{color:inherit}.shell{max-width:1390px;margin:auto;padding:28px 30px 55px}.topbar{display:flex;align-items:flex-start;gap:20px;justify-content:space-between;margin-bottom:22px}.eyebrow{font-size:11px;letter-spacing:2.4px;text-transform:uppercase;color:var(--blue);font-weight:800;margin-bottom:5px}.topbar h1{font-size:clamp(24px,2.8vw,34px);letter-spacing:-.85px;line-height:1.17;margin:0 0 7px;color:var(--blue-deep)}.subtext{color:var(--sub);margin:0;max-width:780px}.toolbar{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}.btn{border:1px solid var(--line);background:white;color:var(--blue-deep);padding:10px 13px;border-radius:9px;font-weight:750;transition:background .15s,transform .15s;white-space:nowrap}.btn:hover{background:#ebf2f9}.btn:active{transform:scale(.98)}.btn.primary{background:var(--blue);border-color:var(--blue);color:white}.btn.primary:hover{background:#103e71}.btn.soft{background:#e9f2fc;border-color:#d7e6f6}.btn.small{padding:7px 10px;font-size:12px}.btn:disabled{opacity:.45;cursor:not-allowed}
+    .stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px}.stat{background:white;border:1px solid var(--line);border-radius:14px;padding:16px 20px;min-height:110px;box-shadow:var(--shadow)}.stat .label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--sub);font-weight:800}.stat .amount{margin-top:7px;font-size:clamp(24px,2.55vw,34px);letter-spacing:-.7px;font-weight:850;color:var(--blue-deep);line-height:1.05}.stat .desc{display:block;color:var(--sub);margin-top:7px;font-size:12px}.stat.delta{background:var(--blue-deep);border-color:var(--blue-deep)}.stat.delta .amount,.stat.delta .label{color:#fff}.stat.delta .desc{color:#d1e1f1}.stat.delta .amount.negative{color:#ffb8b8}
+    .comparison-track{height:7px;border-radius:10px;background:#dee7f0;display:flex;gap:4px;overflow:hidden;margin:7px 0 21px}.comparison-track span{height:100%;display:block;min-width:0;transition:width .2s}.comparison-track .original{background:#9cb3ca}.comparison-track .simulated{background:#2878ba}
+    .scenario-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}.scenario{background:var(--white);border:1px solid var(--line);border-radius:16px;min-width:0;overflow:hidden;box-shadow:var(--shadow)}.scenario.sim{border-top:3px solid #2c80c4}.scenario.base{border-top:3px solid #8da4bb}.scenario-head{display:flex;align-items:start;justify-content:space-between;gap:14px;padding:19px 20px 9px}.scenario-head h2{font-size:20px;letter-spacing:-.3px;margin:0 0 3px}.scenario-head p{margin:0;color:var(--sub);font-size:12px}.scenario-head .tag{font-size:10px;text-transform:uppercase;letter-spacing:.9px;font-weight:800;border-radius:20px;background:#edf4fa;color:#305e83;padding:6px 9px;white-space:nowrap}.scenario.sim .tag{background:#e5f2ff;color:#115e9a}.scenario-actions{display:flex;gap:7px;flex-wrap:wrap;padding:5px 20px 13px}.scenario-content{padding:0 20px 22px}.group{border-top:1px solid var(--line);padding-top:14px;margin-top:10px}.group-title{font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:1px;color:var(--blue);margin:0 0 9px;display:flex;justify-content:space-between;align-items:center;gap:10px}.group-note{font-weight:500;color:var(--sub);text-transform:none;letter-spacing:0;font-size:11px}.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.fields.two{grid-template-columns:repeat(2,minmax(0,1fr))}.field{min-width:0}.field label{display:block;font-size:11px;font-weight:720;color:#465c75;min-height:19px;margin-bottom:5px}.field input{width:100%;height:39px;padding:7px 10px;border:1px solid #cfdae6;border-radius:8px;background:#fbfdff;font-weight:750;color:var(--ink);outline:none;transition:border .1s,box-shadow .1s}.field input:focus{border-color:#2480c3;box-shadow:0 0 0 3px rgba(33,121,194,.13)}.field .micro{display:block;font-size:10px;color:#76879a;margin-top:4px;line-height:1.2}.disclosure{border:1px solid #dfe6ef;border-radius:11px;background:#f9fbfe;margin-top:15px}.disclosure summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 13px;font-weight:800;color:#355271}.disclosure summary::-webkit-details-marker{display:none}.disclosure summary::after{content:"⌄";font-size:19px;line-height:12px;color:#577c9d}.disclosure[open] summary::after{content:"⌃"}.disclosure .inside{padding:0 12px 13px}.disclosure p{color:var(--sub);font-size:11px;margin:1px 0 10px}.summary-calc{background:#f4f8fd;border:1px solid #deebf8;margin-top:16px;border-radius:12px;padding:15px}.summary-calc .hero-line{display:flex;justify-content:space-between;gap:15px;align-items:center}.summary-calc .hero-line strong{font-size:12px;color:var(--blue-deep)}.summary-calc .hero-line b{font-size:24px;color:var(--blue-deep);white-space:nowrap}.bar{height:8px;background:#dce7f2;border-radius:12px;overflow:hidden;margin:11px 0 6px}.bar>span{display:block;height:100%;background:linear-gradient(90deg,#5da5d7,#185d9e);transition:width .2s}.minirow{display:flex;justify-content:space-between;gap:12px;color:var(--sub);font-size:12px}.minirow strong{color:var(--blue-deep)}.payline{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:12px;border-top:1px solid #d8e5f0;padding-top:11px}.payline .unit{font-size:12px;color:var(--sub)}.payline .net{font-size:25px;font-weight:850;letter-spacing:-.6px;color:var(--blue-deep)}.payline .net.negative{color:var(--red)}.pill{border-radius:100px;padding:4px 8px;font-size:11px;white-space:nowrap;background:#dfeefb;color:#285b85;font-weight:800}.pill.warning{background:#fff1df;color:#996014}.pill.alert{background:#ffe8e8;color:#a13636}.messages{margin-top:10px;display:grid;gap:7px}.message{padding:9px 10px;border-left:3px solid #dda14d;background:#fff8ea;border-radius:5px;font-size:11px;color:#754e17}.message.error{background:#fff0f0;color:#912f2f;border-color:#c45252}
+    .section-card{background:white;border:1px solid var(--line);border-radius:15px;margin-top:19px;padding:19px 21px;box-shadow:var(--shadow)}.section-title{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin:0 0 14px}.section-title h2{margin:0;font-size:19px;letter-spacing:-.3px;color:var(--blue-deep)}.section-title p{margin:0;color:var(--sub);font-size:12px}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:640px;font-size:12px}th{text-transform:uppercase;letter-spacing:.65px;font-size:10px;color:#587087;text-align:right;background:#f4f8fc;border-bottom:1px solid var(--line);padding:11px 12px}th:first-child{text-align:left}td{border-bottom:1px solid #e9eef4;text-align:right;padding:10px 12px}td:first-child{text-align:left;color:#46576a}tr:last-child td{border-bottom:0}tr.subtotal td{font-weight:760}tr.final td{background:#edf5fd;font-weight:850;color:var(--blue-deep);font-size:14px}td.positive{color:var(--green);font-weight:800}td.negative{color:var(--red);font-weight:800}.rules{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}.rules h3{margin:0 0 9px;font-size:13px;color:var(--blue-deep)}.rate-table{min-width:0}.rate-table td,.rate-table th{text-align:center;padding:8px 4px;font-size:11px}.rate-table td:first-child,.rate-table th:first-child{text-align:left}.rate-table tr.selected td{background:#eff7fd}.notes{margin:0;padding-left:17px;font-size:12px;color:#4b5d70}.notes li{margin:0 0 8px}.foot{margin-top:15px;font-size:11px;color:#7c8b99;text-align:center}.sr-only{position:absolute;clip:rect(0,0,0,0);width:1px;height:1px;overflow:hidden}.scenario-flag{font-size:12px;color:var(--sub);margin-top:7px}.rate-caption{font-size:11px;color:var(--sub);margin-top:10px}
+    @media(max-width:1050px){.shell{padding:22px 18px}.topbar{flex-direction:column}.toolbar{justify-content:flex-start}.fields{gap:8px}.scenario-head,.scenario-content{padding-left:15px;padding-right:15px}.scenario-actions{padding-left:15px;padding-right:15px}.section-card{padding:17px}}
+    @media(max-width:830px){.scenario-grid,.rules{grid-template-columns:1fr}.stats{gap:8px}.stat{padding:13px}.stat .amount{font-size:23px}.scenario-head,.scenario-content{padding-left:18px;padding-right:18px}.scenario-actions{padding-left:18px;padding-right:18px}}
+    @media(max-width:530px){.shell{padding:17px 11px}.topbar h1{font-size:25px}.topbar{margin-bottom:15px}.toolbar{width:100%;justify-content:flex-start}.toolbar .btn{font-size:11px;padding:9px 10px}.stats{grid-template-columns:1fr 1fr;gap:8px}.stat{min-height:90px}.stat.delta{grid-column:1/-1;min-height:80px}.stat.delta .amount{font-size:28px}.stats .desc{font-size:11px}.fields{grid-template-columns:repeat(2,minmax(0,1fr))}.fields.two{grid-template-columns:repeat(2,minmax(0,1fr))}.scenario-head h2{font-size:18px}.section-card{padding:13px}.scenario-actions .btn{font-size:11px}}
+    @media print{body{background:#fff}.shell{max-width:none;padding:0}.topbar{margin-bottom:8px}.topbar h1{font-size:21px}.toolbar,.scenario-actions,.scenario-content>.group,.scenario-content>.disclosure,.messages,.foot{display:none!important}.scenario-grid{grid-template-columns:1fr 1fr;gap:12px}.scenario-head{padding:10px 12px 0}.scenario-content{padding:0 10px 10px}.scenario{box-shadow:none}.summary-calc{margin-top:0}.section-card{margin-top:12px;box-shadow:none;break-inside:avoid}.stats{gap:7px;margin-bottom:7px}.stat{min-height:auto;padding:9px;box-shadow:none}.stat .amount{font-size:23px}.comparison-track{margin:5px 0 10px}.rules{grid-template-columns:1.2fr .8fr}.btn{display:none}table{min-width:0}th,td{padding:7px 8px}.section-title{margin:0 0 7px}}
+
+/* Importación de reportes XLS HTML y revisión de folios */
+.import-panel{border-top:3px solid #397eaf}.import-row{display:grid;grid-template-columns:1.4fr 1fr 1.3fr;gap:13px;align-items:end}.upload-area{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.import-panel select,.records-controls select,.records-controls input{height:39px;background:#fbfdff;border:1px solid #cfdae6;border-radius:8px;color:var(--ink);padding:7px 10px;width:100%;font-weight:650}.import-panel input[type=file]{display:none}.import-panel label,.records-controls label{font-size:11px;color:#526982;font-weight:750;display:block;margin-bottom:5px}.import-help{font-size:11px;color:#758398;margin-top:9px}.import-status{margin-top:12px;border-radius:10px;padding:11px 13px;background:#f4f8fc;color:#345273;font-size:12px;border:1px solid #deebf8}.import-status.error{background:#fff0ef;border-color:#f1c9c6;color:#9d3333}.import-status.success{background:#effaf6;border-color:#c5e4d9;color:#23694e}.import-badges{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.import-badges span{background:#f2f6fa;border:1px solid #dde6ed;border-radius:8px;padding:5px 9px;font-weight:750;font-size:11px}.import-mode .scenario.base .scenario-content>.group:not(:first-child),.import-mode .scenario.base .scenario-content>.disclosure:not(#importExtras){display:none}.import-mode .scenario.base .group:first-child .field:not(:first-child){display:none}.import-mode .scenario.base .group:first-child .fields{grid-template-columns:1fr}.import-mode #importExtras{display:block}.import-mode .base-import-summary{display:block}.base-import-summary{display:none;margin:9px 0 0;padding:9px 11px;border-radius:8px;background:#f6f9fc;color:#45637b;font-size:12px}.import-mode .scenario.base .tag{background:#e5f4ee;color:#17654d}.scenario.base #importExtras{display:none}.import-note{margin-top:10px;font-size:12px;color:#855824;background:#fff9ec;border:1px solid #f2e4c8;padding:10px 12px;border-radius:8px}.records-summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:850;color:var(--blue-deep);font-size:18px}.records-summary::-webkit-details-marker{display:none}.records-summary::after{content:'⌄';font-size:22px}.records-disclosure[open] .records-summary::after{content:'⌃'}.records-inner{padding-top:14px}.records-controls{display:grid;grid-template-columns:1fr 1fr 1.2fr;align-items:end;gap:12px;margin-bottom:13px}.record-table{min-width:1550px;font-size:11px}.record-table th{white-space:nowrap;padding:9px 7px;text-align:left}.record-table td{white-space:nowrap;padding:7px 7px;text-align:left}.record-table td.folio{font-weight:750;color:var(--blue-deep)}.record-table td.code{max-width:135px;overflow:hidden;text-overflow:ellipsis}.record-table tr.flagged{background:#fff2f1}.record-table tr.unpayable{background:#fff9ed}.record-table input[type=checkbox]{width:17px;height:17px;accent-color:#b74040;cursor:pointer}.muted{color:#8393a1}.tiny-pill{font-size:10px;border-radius:20px;padding:3px 7px;font-weight:750;background:#e7eff7;color:#375b79}.tiny-pill.bad{background:#fee3df;color:#9e3530}.tiny-pill.skip{background:#fff1d8;color:#815a17}.record-counts{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}.record-counts span{font-size:11px;background:#f0f5fa;border:1px solid #dbe5ed;padding:5px 8px;border-radius:8px}.tier-base td{box-shadow:inset 0 0 0 1px #8ba7c2}.tier-sim td{background:#e3f3ff!important}.tier-both td{background:#d7f3e8!important;box-shadow:inset 0 0 0 1px #5b9980}.tier-label{margin-left:5px;display:inline-block;border-radius:6px;padding:1px 5px;font-size:9px;font-weight:850;color:#13518a;background:#e4f0fd}.tier-label.sim-label{color:#06654d;background:#d7f7e9}.tier-overview{font-size:11px;margin:3px 0 11px;color:#526a80}.print-only{display:none}.mobile-tip{display:none}
+@media(max-width:950px){.import-row{grid-template-columns:1fr 1fr}.import-row>.field:first-child{grid-column:1/-1}.records-controls{grid-template-columns:1fr 1fr}.records-controls>.field:last-child{grid-column:1/-1}}
+@media(max-width:600px){.import-row,.records-controls{grid-template-columns:1fr}.import-row>.field:first-child,.records-controls>.field:last-child{grid-column:auto}.mobile-tip{display:block}}
+@page{size:A4 landscape;margin:10mm}
+@media print{
+  body{-webkit-print-color-adjust:exact;print-color-adjust:exact;color:#111}.import-panel,#recordsSection,.import-note,.import-help,.base-import-summary,#importExtras,.mobile-tip{display:none!important}.print-only{display:block!important}.topbar{margin-bottom:6px}.topbar h1{font-size:19px}.subtext{font-size:10px}.section-card{break-inside:auto}.rules{grid-template-columns:1.25fr .75fr;gap:10px}.rules h3{font-size:10px}.notes{font-size:9px}.notes li{margin-bottom:4px}.rate-table td,.rate-table th{font-size:9px;padding:5px 3px}.rate-caption{font-size:9px}.section-title h2{font-size:15px}.section-title p{font-size:9px}.scenario-grid{grid-template-columns:1fr 1fr}.scenario .scenario-head h2{font-size:14px}.summary-calc{padding:9px}.summary-calc .hero-line b{font-size:17px}.summary-calc .net{font-size:17px}.stats .amount{font-size:18px}.stats .desc{font-size:9px}#comparisonTable th,#comparisonTable td{padding:4px 7px;font-size:9px}#printRecordsSection{margin-top:12px;break-before:page;page-break-before:always}#printRecordsSection table{min-width:0;width:100%;table-layout:fixed;font-size:8px}#printRecordsSection th,#printRecordsSection td{font-size:8px;padding:4px 5px;text-align:left;overflow-wrap:anywhere}#printRecordsSection thead{display:table-header-group}#printRecordsSection tr{break-inside:avoid}#printRecordsSection .section-title{margin-bottom:4px}.print-context{font-size:10px;border-bottom:1px solid #b5c4d3;padding:4px 0;margin:6px 0 8px}.tier-base td{box-shadow:inset 0 0 0 1px #6b93b5} .tier-sim td{background:#d9eeff!important}
+}
+    @media print{#printRecordsSection[hidden]{display:none!important}}
+
+
+/* Ajustes compactos de la tabla y casillas de APP por folio */
+.record-table{width:100%;min-width:0;font-size:11px}
+.record-table td,.record-table th{white-space:nowrap;text-align:left;padding:8px 9px}
+.record-table th{font-size:10px}
+.record-table input[type=checkbox].app-check{accent-color:#167d61}
+.record-table input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
+.record-table tr.app-disabled:not(.flagged):not(.unpayable){background:#f5f7fb}
+.table-intro{color:#51677f;background:#f4f8fc;border:1px solid #e1e9f1;border-radius:9px;padding:10px 12px;margin-bottom:12px;font-size:12px}
+.table-settings{border:1px solid #dae4ee;border-radius:10px;margin:10px 0 13px;background:#fbfcfe}
+.table-settings>summary{list-style:none;cursor:pointer;padding:11px 14px;font-weight:800;color:#1f5685;display:flex;align-items:center;justify-content:space-between}
+.table-settings>summary::-webkit-details-marker{display:none}
+.table-settings>summary::after{content:'⌄';font-size:18px}
+.table-settings[open]>summary::after{content:'⌃'}
+.table-settings .settings-body{border-top:1px solid #e0e7ef;padding:13px}
+.records-controls{grid-template-columns:repeat(3,minmax(0,1fr))}
+.records-controls>.field:last-child{grid-column:auto}
+.records-controls .field select,.records-controls .field input{width:100%}
+.toggle-row{display:flex;align-items:center;gap:8px;font-weight:700;color:#315772;font-size:12px;margin-bottom:12px;cursor:pointer}
+.toggle-row input{height:17px;width:17px;accent-color:#215b8e}
+.columns-label{font-size:11px;font-weight:850;letter-spacing:.5px;text-transform:uppercase;margin:8px 0;color:#4b667f}
+.column-chooser{display:flex;gap:7px 13px;flex-wrap:wrap;margin-bottom:13px}
+.column-chooser label{display:flex;align-items:center;gap:5px;background:#f2f6fb;border:1px solid #dbe5f0;border-radius:7px;padding:6px 9px;font-size:11px;color:#405b76;cursor:pointer;user-select:none}
+.column-chooser label.selected{background:#e3f0fa;border-color:#a8c8e2;color:#20557d;font-weight:800}
+.column-chooser input{height:14px;width:14px;accent-color:#2a6fa5}
+.settings-actions{display:flex;align-items:center;flex-wrap:wrap;gap:11px}
+.settings-actions span{font-size:11px;color:#708398}
+@media(max-width:900px){.records-controls{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:590px){.records-controls{grid-template-columns:1fr}}
+@media print{.table-settings,.table-intro{display:none!important}#printRecordsSection th,#printRecordsSection td{padding:5px 6px}#printRecordsSection{break-before:page;page-break-before:always}}
+
+  
+/* V4 · Panel de ajustes, secciones plegables y temas */
+.simulation-disclaimer{margin:8px 0 6px;font-size:12px;line-height:1.45;color:var(--blue-deep);font-weight:760}
+body[data-theme="graphite"]{--blue:#465161;--blue-deep:#283440;--blue-soft:#ecf0f3;--ink:#202934;--sub:#637181;--line:#d9e0e6;--bg:#f3f5f6;--green:#34795a}
+body[data-theme="emerald"]{--blue:#107c61;--blue-deep:#155943;--blue-soft:#e8f6f0;--ink:#203b34;--sub:#61776c;--line:#d7e8dd;--bg:#f2f9f5;--green:#0d8966}
+body[data-theme="violet"]{--blue:#674cb2;--blue-deep:#403271;--blue-soft:#f0ecfc;--ink:#2e2947;--sub:#746d87;--line:#e0daed;--bg:#f7f5fc;--green:#43816e}
+body[data-theme="terracotta"]{--blue:#b0633e;--blue-deep:#7b422d;--blue-soft:#fcf1e7;--ink:#493429;--sub:#8a756d;--line:#ebdbd2;--bg:#fcf8f5;--green:#477d68}
+body[data-theme] .btn.primary{background:var(--blue);border-color:var(--blue)}body[data-theme] .btn.primary:hover{filter:brightness(.91)}
+body[data-theme] .stat.delta{background:var(--blue-deep);border-color:var(--blue-deep)}body[data-theme] .comparison-track .simulated{background:var(--blue)}body[data-theme] .bar>span{background:linear-gradient(90deg,var(--blue),var(--blue-deep))}
+body[data-theme] .scenario.sim{border-top-color:var(--blue)}body[data-theme] .scenario.base{border-top-color:var(--sub)}
+body[data-theme] .pill{background:var(--blue-soft);color:var(--blue-deep)}body[data-theme] .summary-calc{background:var(--blue-soft);border-color:var(--line)}
+body[data-theme] .tier-sim td{background:var(--blue-soft)!important}
+body[data-theme] .import-panel{border-top-color:var(--blue)}
+.settings-panel{margin:0 0 16px;padding:0;overflow:hidden}
+.settings-panel-title{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;padding:16px 20px;list-style:none;font-size:16px;color:var(--blue-deep);font-weight:850}
+.settings-panel-title::-webkit-details-marker,.layout-summary::-webkit-details-marker,.scenario-fold>.scenario-head::-webkit-details-marker{display:none}
+.settings-panel-title small{font-size:11px;color:var(--sub);font-weight:650}
+.settings-panel-title::after{content:'⌄';font-size:22px;color:var(--blue)}.settings-panel[open]>.settings-panel-title::after{content:'⌃'}
+.settings-icon{margin-right:9px}.settings-panel-content{padding:0 20px 19px;border-top:1px solid var(--line)}
+.settings-group{padding:15px 0;border-bottom:1px solid var(--line)}.settings-group:last-child{border-bottom:0;padding-bottom:0}
+.settings-group h3{font-size:14px;margin:0 0 7px;color:var(--blue-deep);display:flex;align-items:center;gap:9px}
+.settings-number{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:var(--blue-soft);color:var(--blue-deep);border-radius:7px;font-size:11px}
+.settings-help{margin:0 0 11px;font-size:12px;color:var(--sub)}.settings-important{margin:9px 0 0}
+.theme-choices{display:flex;flex-wrap:wrap;gap:9px}.theme-choice{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:9px 13px;background:#fff;color:var(--ink);font-weight:760;font-size:12px;cursor:pointer}
+.theme-choice.selected{outline:2px solid var(--blue);outline-offset:1px;background:var(--blue-soft)}.theme-swatch{display:inline-block;width:15px;height:15px;border-radius:50%;background:var(--swatch)}
+.settings-row-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.section-order{border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.order-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:9px 12px;border-bottom:1px solid var(--line)}.order-row:last-child{border-bottom:0}
+.order-name{font-size:12px;font-weight:750;color:var(--ink)}.order-tools{display:flex;gap:4px}.order-tools button{border:1px solid var(--line);border-radius:7px;padding:5px 9px;background:#fff;font-weight:800;color:var(--blue-deep);cursor:pointer}.order-tools button:disabled{opacity:.35;cursor:default}
+.order-print{display:flex;align-items:center;gap:6px;color:var(--sub);font-size:12px;white-space:nowrap;cursor:pointer}.order-print input{accent-color:var(--blue);width:15px;height:15px}
+.settings-inline{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.settings-inline .field{min-width:180px}.settings-inline select{height:39px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;color:var(--ink);background:#fff;width:100%}.settings-export-actions{display:flex;gap:8px;flex-wrap:wrap}
+#tableSettingsDestination>.table-settings{margin:0}#tableSettingsDestination .settings-body{background:#fff}
+.layout-section{min-width:0;margin-top:16px;border:1px solid var(--line);border-radius:15px;background:var(--white);box-shadow:var(--shadow);overflow:hidden}
+.layout-section>.layout-summary{cursor:pointer;list-style:none;padding:13px 19px;display:flex;justify-content:space-between;align-items:center;gap:15px;font-size:14px;font-weight:850;color:var(--blue-deep);background:#f9fbfd}
+.layout-section>.layout-summary:after{content:'⌄';font-size:20px;color:var(--blue)}.layout-section[open]>.layout-summary:after{content:'⌃'}
+.layout-hint{font-size:11px;color:var(--sub);font-weight:500;margin-left:auto}
+.layout-section>.layout-content{padding:0 13px 13px}.layout-section>.layout-content>.section-card,.layout-section>.layout-content>.stats,.layout-section>.layout-content>.scenario-grid{margin-top:5px}
+.layout-section>.layout-content>.section-card{border:0;box-shadow:none;padding:14px 8px 6px}
+.layout-section>.layout-content>.stats{margin-bottom:5px}
+.layout-section>.layout-content>.comparison-track{margin-bottom:6px}
+.layout-section[hidden]{display:none!important}
+.scenario-fold>.scenario-head{cursor:pointer;list-style:none;align-items:center;padding-bottom:17px}
+.scenario-fold>.scenario-head:after{content:'⌄';color:var(--blue);font-size:19px}.scenario-fold[open]>.scenario-head:after{content:'⌃'}
+.scenario-fold>.scenario-content{padding-top:0}.scenario-fold:not([open]){min-height:0}
+.report-host{position:absolute;left:-100000px;top:0;width:1120px;pointer-events:none;z-index:-1}
+@media(max-width:740px){.layout-section>.layout-summary{padding:12px}.layout-hint{display:none}.settings-panel-content{padding:0 13px 13px}.settings-panel-title{flex-wrap:wrap;padding:13px}.settings-panel-title small{display:none}.order-row{gap:7px;padding:9px}.order-print{font-size:11px}}
+@media print{
+  @page{size:A4 landscape;margin:9mm}
+  body{background:#fff!important}.shell{display:none!important}.report-host{position:static!important;left:auto!important;top:auto!important;width:100%!important;z-index:auto!important;pointer-events:auto!important}
+  .report-page{width:100%!important;margin:0!important;padding:0!important;box-shadow:none!important;border:none!important}
+  .report-page .report-section{break-inside:auto;page-break-inside:auto}.report-page .report-section-records{break-before:page;page-break-before:always}
+}
+
+
+/* V6 · Filas alternadas en la tabla, sin ocultar el estado de incidencia. */
+#recordsTable tbody tr:nth-child(odd) td{background-color:#ffffff!important}
+#recordsTable tbody tr:nth-child(even) td{background-color:#edf3fa!important}
+#recordsTable tbody tr td:first-child{border-left:4px solid transparent}
+#recordsTable tbody tr.flagged td:first-child{border-left-color:#c64c4c}
+#recordsTable tbody tr.unpayable:not(.flagged) td:first-child{border-left-color:#d5a044}
+#recordsTable tbody tr:hover td{filter:brightness(.975)}
+#printRecordsTable tbody tr:nth-child(odd) td{background-color:#fff}
+#printRecordsTable tbody tr:nth-child(even) td{background-color:#edf3fa}
+@media print{#printRecordsTable tbody tr:nth-child(even) td{background-color:#edf3fa!important}}
+/* V5: pantalla despejada, panel de ajustes bajo botón y filtros rápidos */
+#settingsPanel:not([open]){display:none!important}
+#settingsPanel>.settings-panel-title{display:none!important}
+#settingsPanel[open]{display:block;margin:0 0 16px;padding:0;overflow:visible}
+#settingsPanel .settings-panel-content{border-top:0;padding-top:14px}
+.close-settings{display:block;margin:0 0 0 auto}
+.settings-actions-subtitle{font-size:11px;text-transform:uppercase;font-weight:800;letter-spacing:.6px;margin:15px 0 7px;color:var(--blue-deep)}
+.settings-actions-subtitle+.scenario-actions{padding:0;display:flex;gap:8px;flex-wrap:wrap}
+.export-tool-row{margin:12px 0 2px}
+.quick-filters{margin:0 0 17px;padding:13px 17px;border-left:4px solid var(--blue);box-shadow:var(--shadow)}
+.quick-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:13px}
+.quick-row select{width:100%;height:40px;min-width:0;border:1px solid #cddbe8;border-radius:8px;background:var(--white);color:var(--ink);padding:7px 10px;font:inherit}
+.quick-row label{font-weight:800;color:var(--blue-deep);display:block;margin-bottom:6px}
+.quick-import-info .import-status{padding:6px 0 0;font-size:11px;color:var(--sub);background:transparent;border:none;margin:5px 0 0;line-height:1.4}
+.quick-import-info .import-status.error{color:#9d3333}
+.quick-import-info .import-status.success{color:var(--sub)}
+.quick-import-info .import-badges{display:none}
+#xlsInput[hidden]{display:none!important}
+/* Simulación en tono violeta, independiente del tema corporativo azul */
+.scenario.sim{background:#f8f5ff!important;border:1px solid #d9cbfc!important;border-top:4px solid #7858c6!important;box-shadow:0 5px 20px rgba(87,62,149,.09)!important}
+.scenario.sim>.scenario-head{background:#eee7ff!important;border-bottom:1px solid #dfd2fd}
+.scenario.sim .scenario-head h2{color:#543a91!important}
+.scenario.sim .tag{background:#dbcbfc!important;color:#51368d!important}
+.scenario.sim .group-title{color:#6850a1!important}
+.scenario.sim .summary-calc{background:#eee8fa!important;border-color:#d9d0ee!important}
+.scenario.sim input:focus{outline:2px solid #8e70d0;outline-offset:0}
+/* Mantener visible el panel de folios no pagables aun en modo importado; los campos importados se identifican como automáticos */
+.import-mode .scenario.base .scenario-content>.disclosure{display:block!important}
+.import-mode .scenario.base .scenario-content>.group:not(:first-child){display:none}
+.import-mode .scenario.base .scenario-content>.disclosure input[readonly]{background:#f1f4f8;color:#596779}
+.record-table{min-width:550px}
+@media(max-width:650px){.quick-row{grid-template-columns:1fr}.quick-filters{padding:12px 13px}.settings-panel .settings-panel-content{padding:14px}.scenario.sim{margin-top:2px}}
+@media print{.quick-filters,#settingsPanel{display:none!important}}
+
+/* V7: panel comparativo de todos los ejecutivos, sin alterar calculadora individual */
+.app-navigation{display:flex;gap:9px;flex-wrap:wrap;margin:-3px 0 17px;padding:5px;background:#e8edf4;border:1px solid var(--line);border-radius:12px;width:max-content;max-width:100%}
+.app-tab{border:0;background:transparent;color:var(--sub);font-weight:800;border-radius:9px;padding:10px 17px;transition:.15s}
+.app-tab:hover{background:#f8fbfe;color:var(--blue-deep)}.app-tab.active{background:var(--white);color:var(--blue-deep);box-shadow:0 2px 9px #153e641a}
+.team-page{margin:0 0 24px}.team-page[hidden]{display:none!important}
+body[data-page="team"] #sectionsContainer,body[data-page="team"] #printContext,body[data-page="team"] #printRecordsSection{display:none!important}
+.team-heading{display:flex;justify-content:space-between;gap:18px;align-items:flex-end;margin:11px 0 17px}.team-heading h2{font-size:23px;letter-spacing:-.5px;color:var(--blue-deep);margin:0 0 5px}.team-heading p{font-size:12px;color:var(--sub);margin:0}.team-period{background:var(--blue-soft);color:var(--blue-deep);padding:9px 12px;border-radius:9px;font-size:12px;font-weight:750;white-space:nowrap}
+.team-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-bottom:15px}.team-kpi{border-radius:12px;border:1px solid var(--line);background:var(--white);padding:16px;box-shadow:var(--shadow)}.team-kpi span{display:block;color:var(--sub);font-size:10px;text-transform:uppercase;letter-spacing:.65px;font-weight:800}.team-kpi b{display:block;font-size:25px;color:var(--blue-deep);margin-top:6px}.team-kpi small{font-size:11px;color:var(--sub)}
+.team-help{border-left:3px solid var(--blue);background:var(--blue-soft);color:var(--blue-deep);font-size:12px;padding:12px 14px;border-radius:6px;margin-bottom:14px}
+.team-filters{display:grid;grid-template-columns:1fr 1.15fr 1.1fr;gap:12px;background:var(--white);border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:13px}.team-filters input,.team-filters select{height:39px;width:100%;border:1px solid #cfdae6;border-radius:8px;padding:7px 10px;color:var(--ink);background:var(--white)}
+.team-table-wrap{background:var(--white);border:1px solid var(--line);border-radius:13px;overflow-x:auto;box-shadow:var(--shadow)}.team-table{min-width:1210px;width:100%;border-collapse:collapse}.team-table th{font-size:10px;color:#526a83;white-space:nowrap;text-align:right;padding:11px 8px;background:#ecf3f9}.team-table th:first-child{text-align:left;min-width:200px;padding-left:16px}.team-table td{padding:11px 8px;font-size:12px;text-align:right}.team-table td:first-child{text-align:left;padding-left:16px}.team-table tbody tr:nth-child(even){background:#f2f6fb}.team-table tbody tr:hover{background:#eaf2f9}.team-table tbody .executive-name{font-weight:800;color:var(--blue-deep);font-size:12px}.team-table tbody .executive-module{font-size:11px;color:var(--sub)}.team-table .goal-mini{width:67px;height:34px;border:1px solid #b7cbdc;background:#fff;border-radius:7px;text-align:center;font-weight:800;color:var(--blue-deep)}.team-table .money-val{font-weight:850;color:var(--blue-deep);font-size:13px}.team-table .money-val.neg{color:var(--red)}.team-table tfoot td{background:#e6f0fa;font-weight:800;color:var(--blue-deep);border-top:2px solid #c4d8ea}.team-table .th-sub{font-size:9px;letter-spacing:0;text-transform:none;font-weight:500}.team-table .progress-value{display:block;font-weight:850;color:var(--blue-deep)}.team-table .progress-meter{display:block;margin:4px 0 0 auto;height:4px;background:#dce7f1;border-radius:20px;max-width:74px;overflow:hidden}.team-table .progress-meter i{display:block;background:var(--blue);height:100%}.team-table .tier-chip{font-size:10px;padding:4px 6px;border-radius:6px;background:#ebf3fb;color:#345a82;font-weight:700;white-space:nowrap}.team-table .tier-chip.none{background:#f5eced;color:#97454c}.team-table .btn.small{padding:6px 8px}.team-empty{text-align:center!important;padding:35px!important;color:var(--sub)}
+.team-note{font-size:11px;color:var(--sub);line-height:1.55;margin:12px 2px}.team-table .inc-count{font-weight:750;color:#bd4b42}
+@media(max-width:820px){.team-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.team-filters{grid-template-columns:1fr}.team-heading{align-items:flex-start;flex-direction:column}.team-period{white-space:normal}}
+@media(max-width:520px){.app-navigation{width:100%}.app-tab{flex:1;font-size:12px;padding:10px 8px}.team-kpi b{font-size:20px}.team-heading h2{font-size:20px}}
+@media print{.app-navigation,.team-page{display:none!important}}
+
+/* V11 · Selección de fechas independiente, sin alterar el modo automático. */
+.daily-date-controls{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:12px;align-items:end;background:var(--white);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin:0 0 13px;box-shadow:var(--shadow)}
+.daily-date-controls label{display:block;font-size:11px;color:var(--sub);font-weight:750;margin-bottom:5px}
+.daily-date-controls select,.daily-date-controls input{height:38px;width:100%;background:#fff;color:var(--ink);border:1px solid #c9d7e6;border-radius:8px;padding:6px 9px;font:inherit;font-size:12px}
+.daily-date-controls :is(select,input):disabled{background:#edf2f6;color:#6c7b8a}
+@media(max-width:750px){.daily-date-controls{grid-template-columns:1fr 1fr}.daily-date-controls>.field:first-child{grid-column:1/-1}}
+@media print{.daily-date-controls{display:none!important}}
+/* V8 · Comparativa diaria operacional: paneles de módulos y ejecutivos en paralelo. */
+.daily-page{margin:0 0 25px}.daily-page[hidden]{display:none!important}
+body[data-page="daily"] #sectionsContainer,body[data-page="daily"] #printContext,body[data-page="daily"] #printRecordsSection,body[data-page="daily"] #quickFilters{display:none!important}
+.daily-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:12px 0 11px}
+.daily-heading h2{font-size:24px;letter-spacing:-.6px;color:var(--blue-deep);margin:0 0 5px}.daily-heading p{font-size:12px;color:var(--sub);margin:0}
+.daily-period{background:var(--blue-soft);color:var(--blue-deep);font-size:12px;font-weight:800;border-radius:9px;padding:10px 12px;white-space:nowrap}
+.daily-guide{font-size:11px;color:#516b82;line-height:1.6;background:var(--white);border:1px solid var(--line);border-radius:9px;padding:9px 13px;margin:10px 0 13px}
+.daily-legend{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.daily-legend .up{color:#157b5a;font-weight:800}.daily-legend .down{color:#bb424b;font-weight:800}.daily-legend .same{color:#718399;font-weight:800}
+.daily-scroll{overflow-x:auto;overscroll-behavior-inline:contain;padding:2px 1px 11px}
+.daily-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:13px;min-width:1230px;align-items:start}
+.daily-panel{background:var(--white);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow);overflow:hidden;min-width:0}
+.daily-panel-title{padding:11px 13px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--line);background:#f8fbff}
+.daily-panel-title h3{font-size:14px;color:var(--blue-deep);margin:0}.daily-panel-title span{font-size:10px;font-weight:750;color:var(--sub)}
+.daily-table{width:100%;table-layout:fixed;min-width:0;border-collapse:collapse}
+.daily-table th{padding:9px 3px 8px;font-size:9px;letter-spacing:0;text-transform:none;text-align:center;background:#eff5fa;color:#4b667e;white-space:nowrap}
+.daily-table td{padding:8px 3px;text-align:center;border-bottom:1px solid #e6edf4;vertical-align:middle}
+.daily-table th:first-child,.daily-table td:first-child{text-align:left;width:30%;padding-left:11px;padding-right:7px}
+.daily-table th:not(:first-child),.daily-table td:not(:first-child){width:11.666%}
+.daily-table tbody tr:nth-child(odd){background:#fff}.daily-table tbody tr:nth-child(even){background:#f0f5fa}
+.daily-table .daily-entity{display:block;font-size:10px;font-weight:750;color:#304e68;line-height:1.22;overflow-wrap:anywhere}
+.daily-table .daily-val{font-weight:850;font-size:13px;line-height:1.1;color:var(--blue-deep);display:block}
+.daily-table .daily-diff{font-size:10px;font-weight:750;line-height:1.2;display:block;margin-top:3px;white-space:nowrap}
+.daily-table .daily-diff.up{color:#117b53}.daily-table .daily-diff.down{color:#b63e46}.daily-table .daily-diff.same{color:#8491a0}
+.daily-table tfoot td{background:#e0ebf6!important;border-top:2px solid #bfd0e0}.daily-table tfoot .daily-entity{font-weight:900}
+.daily-empty{padding:30px!important;text-align:center!important;font-size:12px;color:var(--sub)}
+.daily-method{margin:3px 2px 12px;font-size:11px;line-height:1.5;color:var(--sub)}
+@media(max-width:820px){.daily-heading{flex-direction:column;align-items:flex-start}.daily-period{white-space:normal}}
+@media(max-width:530px){.daily-heading h2{font-size:21px}.daily-scroll{margin-right:-10px}.app-tab{font-size:11px!important}}
+@media print{.daily-page{display:none!important}}
+
+/* V9 · Historial XLS local y bloqueo de Ajustes */
+.file-archive{margin-top:9px}
+.archive-controls{display:flex;gap:13px;flex-wrap:wrap;align-items:center;margin:10px 0 13px}
+.archive-controls label{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--blue-deep);cursor:pointer}
+.archive-controls input,.archive-list input{accent-color:var(--blue)}
+.archive-list{border:1px solid var(--line);border-radius:10px;max-height:345px;overflow-y:auto;background:var(--white)}
+.archive-item{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 13px;border-bottom:1px solid var(--line)}
+.archive-item:last-child{border-bottom:0}
+.archive-choice{display:flex;align-items:center;min-width:0;gap:10px;cursor:pointer}
+.archive-choice input{width:16px;height:16px;flex:none}
+.archive-choice b{display:block;font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.archive-choice small{display:block;font-size:10px;color:var(--sub);margin-top:3px}
+.archive-empty{padding:16px;color:var(--sub);font-size:12px}
+.archive-active{color:var(--blue-deep);font-weight:800;font-size:12px;padding:10px 12px;background:var(--blue-soft);border-radius:9px}
+.archive-footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin:10px 0}
+.archive-warning{font-size:11px;color:var(--sub);line-height:1.55;margin-top:8px}
+.auth-modal[hidden]{display:none!important}
+.auth-modal{position:fixed;inset:0;background:rgba(12,28,49,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px}
+.auth-card{width:min(420px,100%);background:var(--white);border-radius:17px;padding:25px;box-shadow:0 20px 70px #081c3d70}
+.auth-card h2{font-size:20px;color:var(--blue-deep);margin:0 0 7px}
+.auth-card p{font-size:12px;color:var(--sub);margin:0 0 14px;line-height:1.5}
+.auth-card input{display:block;width:100%;height:43px;border:1px solid var(--line);border-radius:8px;padding:0 12px;font:inherit;margin-bottom:9px}
+.auth-error{color:#b53b3b;font-size:12px;min-height:19px;margin-bottom:9px}
+.auth-buttons{display:flex;justify-content:flex-end;gap:8px}
+.auth-card .btn{display:inline-flex}
+@media print{.auth-modal{display:none!important}}
+/* V12 · Vista de acumulados, restringida a sesión autorizada. */
+.app-tab[data-page-tab="accumulated"][hidden],#accumulatedPage[hidden]{display:none!important}
+body[data-page="accumulated"] #sectionsContainer,
+body[data-page="accumulated"] #printContext,
+body[data-page="accumulated"] #printRecordsSection,
+body[data-page="accumulated"] #quickFilters{display:none!important}
+.accumulated-page{margin:0 0 25px}
+.accumulated-controls{grid-template-columns:minmax(0,1fr) minmax(160px,1fr) minmax(160px,1fr) auto}
+.accumulated-controls .btn{height:38px;white-space:nowrap}
+.accumulated-notice{margin:0 0 13px;font-size:11px;color:var(--sub);line-height:1.55}
+.accumulated-page .daily-table .daily-val{font-size:14px}
+@media(max-width:860px){.accumulated-controls{grid-template-columns:1fr 1fr}.accumulated-controls>.field:first-child{grid-column:1/-1}.accumulated-controls .btn{align-self:end}}
+@media(max-width:510px){.accumulated-controls{grid-template-columns:1fr 1fr}.accumulated-controls>.field:first-child{grid-column:1/-1}}
+@media print{.accumulated-page{display:none!important}}
+
+/* V13 · Comparación semanal con objetivos editables, solo sesión autorizada. */
+.app-tab[data-page-tab="weekly"][hidden],#weeklyPage[hidden]{display:none!important}
+body[data-page="weekly"] #sectionsContainer,
+body[data-page="weekly"] #printContext,
+body[data-page="weekly"] #printRecordsSection,
+body[data-page="weekly"] #quickFilters{display:none!important}
+.weekly-page{margin:0 0 26px}
+.weekly-date-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(185px,1fr) minmax(185px,1fr);gap:14px;align-items:end;padding:14px 16px;background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);margin:0 0 15px}
+.weekly-date-controls .field label{font-size:11px;font-weight:800;color:var(--sub);display:block;margin-bottom:5px}
+.weekly-date-controls input{height:39px;width:100%;padding:7px 10px;border:1px solid #c9d7e6;border-radius:8px;color:var(--ink);background:var(--white);font:inherit;font-size:12px}
+.weekly-control-note{font-size:11px;color:var(--sub);line-height:1.5}
+.weekly-control-date{margin-top:5px;font-size:11px;font-weight:800;color:var(--blue-deep)}
+.weekly-variance-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:6px 0 10px;flex-wrap:wrap}
+.weekly-variance-head h3{font-size:16px;color:var(--blue-deep);margin:0}
+.weekly-variance-head span{font-size:10px;color:var(--sub)}
+.weekly-variance-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin-bottom:18px}
+.weekly-variance-card{background:var(--white);border:1px solid var(--line);border-radius:11px;padding:12px 10px;box-shadow:var(--shadow);min-width:0}
+.weekly-variance-card .label{font-size:10px;min-height:28px;color:var(--sub);font-weight:800;line-height:1.35}
+.weekly-variance-card .value{font-size:20px;font-weight:850;color:var(--blue-deep);display:block;margin:7px 0 4px}
+.weekly-variance-card .delta{font-size:11px;font-weight:800;display:block}
+.weekly-variance-card .delta.up{color:#10794e}.weekly-variance-card .delta.down{color:#b64550}.weekly-variance-card .delta.same{color:#718298}
+.weekly-variance-card .secondary{font-size:10px;color:var(--sub);margin-top:4px}
+.weekly-comparison-scroll{overflow-x:auto;padding:2px 1px 13px;overscroll-behavior-inline:contain}
+.weekly-comparison-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));min-width:1240px;gap:13px;align-items:start}
+.weekly-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.weekly-table th{padding:10px 3px;text-align:center;font-size:9px;background:#eaf2f9;color:#4b667e;white-space:nowrap}
+.weekly-table th:first-child,.weekly-table td:first-child{text-align:left;width:29%;padding-left:11px;padding-right:6px}
+.weekly-table th:not(:first-child),.weekly-table td:not(:first-child){width:11.83%}
+.weekly-table td{padding:10px 3px;border-bottom:1px solid #e6edf4;text-align:center;font-size:12px;color:var(--blue-deep);font-weight:750}
+.weekly-table tbody tr:nth-child(even){background:#eff5fa}
+.weekly-table tbody tr:nth-child(odd){background:#fff}
+.weekly-table .goal-row td{background:#e9f1ff;border-bottom:2px solid #c1d7ef}
+.weekly-table .goal-row td:first-child{font-weight:850}
+.weekly-goal-input{width:100%;max-width:65px;min-width:36px;height:31px;padding:3px 1px;background:#fff;color:var(--blue-deep);border:1px solid #adcae4;border-radius:6px;text-align:center;font-size:12px;font-weight:800}
+.weekly-goal-input:focus{outline:2px solid var(--blue);outline-offset:1px}
+.weekly-goal-input::placeholder{font-size:9px;color:#8398aa;font-weight:650}
+.weekly-goal-control{display:flex;flex-direction:column;align-items:center;gap:3px}
+.weekly-goal-auto{font-size:8px;font-weight:800;white-space:nowrap;line-height:1;color:#376e98;letter-spacing:.1px}
+.weekly-goal-auto.manual{color:#8b6d39}
+.weekly-table tfoot tr.weekly-total td{background:#dceaf7;font-weight:900;border-top:2px solid #b8cce1}
+.weekly-table tfoot tr.weekly-progress td{background:#e7f4eb;color:#126547;font-size:11px;font-weight:850}
+.weekly-progress .no-goal{font-weight:650;color:#81919d}
+.weekly-panel .daily-panel-title h3{font-size:13px}
+.weekly-disclaimer{margin-top:3px;font-size:11px;color:var(--sub);line-height:1.45}
+@media(max-width:950px){.weekly-variance-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:640px){.weekly-date-controls{grid-template-columns:1fr 1fr}.weekly-date-controls>.field:first-child{grid-column:1/-1}.weekly-variance-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media print{.weekly-page{display:none!important}}
+
+
+/* V14 · Barra de exportación accesible y ajustes desplegables */
+.toolbar .btn{font-size:12px;padding:9px 11px}
+.settings-group{padding:0!important;border-bottom:1px solid var(--line)}
+.settings-group:last-child{border-bottom:0}
+.settings-group-title{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 0;cursor:pointer;font-weight:800;color:var(--blue-deep)}
+.settings-group-title::-webkit-details-marker{display:none}
+.settings-group-title>span{display:flex;align-items:center;gap:8px;font-size:14px}
+.settings-group-title::after{content:'⌄';font-size:20px;font-weight:650;color:var(--blue)}
+.settings-group[open]>.settings-group-title::after{content:'⌃'}
+.settings-group-body{padding:0 0 18px}
+.settings-group-body>.settings-help{margin:0 0 12px}
+.rate-editor-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+.rate-editor{width:100%;min-width:650px;table-layout:fixed;border-collapse:collapse}
+.rate-editor th,.rate-editor td{font-size:11px;padding:9px 7px;text-align:center}
+.rate-editor th:first-child{width:29%;text-align:left;padding-left:12px}
+.rate-editor thead th{background:#edf4fa;color:var(--blue-deep)}
+.rate-editor tbody tr:nth-child(even){background:#f5f8fc}
+.rate-editor tbody th{font-weight:750;text-transform:none;letter-spacing:0}
+.rate-editor input{width:100%;min-width:48px;max-width:98px;text-align:right;height:35px;border:1px solid #c9d8e7;border-radius:7px;padding:4px 5px;font-size:12px;font-weight:750;color:var(--blue-deep);background:white}
+.rate-editor input:focus{outline:2px solid var(--blue);outline-offset:1px}
+.rate-editor-footer{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-top:11px}
+.rate-editor-footer span{font-size:11px;color:var(--sub)}
+@media(max-width:680px){.toolbar .btn{font-size:11px;padding:9px 10px}.rate-editor-wrap{margin:0 -2px}}
+@media print{.settings-panel,.toolbar{display:none!important}}
+
+/* Versión 1.7 · Editor de textos de exportación y separación tipográfica */
+.report-text-editor{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:4px 1px 2px}
+.report-text-editor .field{min-width:0}.report-text-editor .field:nth-child(n+4),.report-text-actions{grid-column:1/-1}
+.report-text-editor label{display:block;font-size:12px;font-weight:780;color:var(--blue-deep);margin-bottom:6px}
+.report-text-editor input,.report-text-editor select,.report-text-editor textarea{width:100%;border:1px solid #c9d7e5;background:#fff;border-radius:8px;color:var(--ink);font:inherit;font-size:13px;line-height:1.45;padding:10px 12px;resize:vertical;min-width:0}
+.report-text-editor input,.report-text-editor select{height:41px}
+.report-text-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px;padding-top:4px}
+#reportTextStatus{font-size:11px;color:var(--sub);margin-right:auto}
+@media(max-width:700px){.report-text-editor{grid-template-columns:1fr}.report-text-editor .field{grid-column:1/-1}}
+</style>
+
+<style>
+  .cloud-session-label{font-size:12px;color:#536984;align-self:center;max-width:210px;line-height:1.25}
+  .cloud-auth-card{max-width:440px}
+  .cloud-auth-card form{display:grid;gap:9px;margin:14px 0}
+  .cloud-auth-card input{width:100%;padding:11px 12px;border:1px solid #cedae7;border-radius:8px}
+  .cloud-auth-tip{font-size:12px;color:#65768a}
+  .cloud-toast{position:fixed;right:18px;bottom:18px;z-index:1200;max-width:380px;padding:12px 16px;background:#1b3657;color:#fff;border-radius:10px;box-shadow:0 10px 32px #132f4b3d}
+  .cloud-toast[hidden]{display:none}
+  @media(max-width:740px){.cloud-session-label{width:100%;max-width:none}.toolbar{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<main class="shell">
+<header class="topbar">
+<div>
+<div class="eyebrow">WM / Sam's · MARC · Septiembre 2026</div>
+<h1>Dashboard y comisiones Mérida</h1><p class="simulation-disclaimer">Comisiones simuladas: los importes son estimaciones y pueden variar respecto al monto final a pagar.</p>
+
+</div>
+<div aria-label="Herramientas" class="toolbar">
+
+
+
+
+
+<button class="btn" id="cloudLoginButton" type="button">Ingresar con correo</button><button class="btn" id="cloudSyncButton" type="button" hidden>↻ Sincronizar</button><span class="cloud-session-label" id="cloudSessionLabel" aria-live="polite" title="La nube se consulta al iniciar sesión, al regresar tras una pausa y al sincronizar manualmente">Sin sesión · XLS temporales</span><button class="btn primary" id="chooseXls" type="button">Cargar XLS</button><button class="btn" id="print" type="button">Imprimir / PDF</button><button class="btn" id="exportImage" type="button">Exportar PNG</button><button class="btn" id="export" type="button">Exportar CSV</button><button aria-controls="settingsPanel" aria-expanded="false" class="btn" id="toggleSettings" type="button">⚙ Ajustes</button><input accept=".xls" aria-label="Seleccionar reportes XLS" multiple hidden="" id="xlsInput" type="file"/></div>
+</header>
+<nav class="app-navigation" role="tablist" aria-label="Vistas de comisiones">
+  <button class="app-tab active" type="button" role="tab" aria-selected="true" aria-controls="sectionsContainer" data-page-tab="individual">Calculadora individual</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="teamPage" data-page-tab="team">Comparativo de ejecutivos</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="dailyPage" data-page-tab="daily">Comparativa diaria</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="accumulatedPage" data-page-tab="accumulated" hidden>Acumulado general</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="weeklyPage" data-page-tab="weekly" hidden>Comparativa semanal</button>
+</nav>
+<details class="settings-panel section-card" id="settingsPanel">
+<summary class="settings-panel-title"><span><span class="settings-icon">⚙</span> Ajustes de la calculadora</span><small>Archivos · Tarifas · Temas · Impresión · Folios</small></summary>
+<div class="settings-panel-content"><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="btn small" id="authLogout" type="button">Cerrar sesión</button><button class="btn small close-settings" id="closeSettings" type="button">Cerrar ajustes ✕</button></div><details class="settings-group" id="settingsArchive"><summary class="settings-group-title"><span><span class="settings-number">1</span> Archivos XLS guardados</span></summary><div class="settings-group-body">
+<p class="settings-help">Los reportes se almacenan en tu cuenta de Netlify Database cuando inicias sesión. Puedes usar un archivo, varios o el total acumulado sin crear páginas adicionales. Los registros duplicados de diferentes reportes se cuentan una sola vez.</p>
+<div class="file-archive"><div class="archive-controls" role="radiogroup" aria-label="Fuente para los cálculos"><label><input type="radio" name="archiveMode" value="all" checked> Total acumulado</label><label><input type="radio" name="archiveMode" value="selected"> Elegir uno o varios archivos</label></div>
+<div class="archive-list" id="archiveList"><div class="archive-empty">No hay archivos guardados.</div></div>
+<div class="archive-footer"><span class="archive-active" id="archiveActive">Sin datos almacenados</span><button class="btn small" id="archiveClear" type="button">Borrar todos los archivos</button></div>
+<p class="archive-warning">Al iniciar sesión, XLS, incidencias y ajustes se guardan por cuenta en Netlify Database y estarán disponibles en otros dispositivos. Si trabajas sin iniciar sesión, los XLS sólo duran mientras esté abierta esta pestaña. En modo «Total acumulado» todos los archivos nuevos se agregan automáticamente; en «Elegir» puedes activar uno o varios.</p></div>
+</div></details><details class="settings-group" id="settingsActions"><summary class="settings-group-title"><span>2 · Acciones de la calculadora</span></summary><div class="settings-group-body"><p class="settings-help">Las operaciones de limpieza, el modo manual y los accesos para la simulación se concentran aquí.</p><div class="settings-actions-subtitle">Datos y escenario base</div><div class="settings-row-actions" id="calculationActions"><button class="btn" id="copySim" type="button">Copiar base → simulación</button><button class="btn" id="example" type="button">Ejemplo</button><button class="btn" id="clear" type="button">Limpiar</button><button class="btn small" id="manualMode" type="button">Modo manual</button></div><div class="settings-actions-subtitle">Simulación rápida</div><div class="scenario-actions">
+<button class="btn small soft" id="plusReg" type="button">+1 regular y APP</button>
+<button class="btn small soft" id="plusGuar" type="button">+1 garantizada y APP</button>
+<button class="btn small soft" id="plusDental" type="button">+1 Dental</button>
+<button class="btn small soft" id="plusP0" type="button">+1 P0</button>
+<button class="btn small" id="nextTier" type="button">Llegar al siguiente escalón</button>
+</div></div></details>
+<details class="settings-group" id="settingsRates"><summary class="settings-group-title"><span><span class="settings-number">3</span> Tarifas de comisiones</span></summary><div class="settings-group-body">
+<p class="settings-help">Ajusta el pago por concepto para cada escalón. Los importes se actualizan en todos los cálculos y en los reportes. Los umbrales y descuentos porcentuales no cambian.</p>
+<div class="rate-editor-wrap"><table class="rate-editor" aria-label="Tarifas editables de comisiones"><thead><tr><th>Escalón</th><th>Venta</th><th>Dental</th><th>APP</th><th>Programa Cero</th><th>Bono semanal</th></tr></thead><tbody id="rateEditorRows"></tbody></table></div>
+<div class="rate-editor-footer"><span id="rateEditorStatus" role="status">Importes actuales en pesos mexicanos (MXN).</span><button class="btn small" type="button" id="restoreDefaultRates">Restaurar tarifas originales</button></div>
+</div></details>
+<details class="settings-group" id="settingsAppearance"><summary class="settings-group-title"><span><span class="settings-number">4</span> Apariencia</span></summary><div class="settings-group-body">
+<p class="settings-help">Selecciona una combinación de colores. El tema se aplica también a la impresión y a la imagen exportada.</p>
+<div aria-label="Temas predeterminados" class="theme-choices" id="themeChoices" role="group"></div>
+</div></details>
+<details class="settings-group" id="settingsSections"><summary class="settings-group-title"><span><span class="settings-number">5</span> Secciones, posición y visibilidad</span></summary><div class="settings-group-body">
+<p class="settings-help">Usa ↑ y ↓ para cambiar el orden en pantalla y en el reporte. Activa «Imprimir» solo en las secciones que quieras incluir en PDF o PNG. Puedes plegar las secciones en pantalla sin ocultarlas del reporte.</p>
+<div class="settings-row-actions"><button class="btn small" id="expandAllSections" type="button">Expandir todas</button><button class="btn small" id="collapseAllSections" type="button">Contraer todas</button><button class="btn small" id="resetLayout" type="button">Restaurar orden y visibilidad</button></div>
+<div class="section-order" id="sectionOrder"></div>
+</div></details>
+<details class="settings-group" id="settingsReportTexts"><summary class="settings-group-title"><span><span class="settings-number">6</span> Textos fijos de los reportes</span></summary><div class="settings-group-body">
+<p class="settings-help">Personaliza título, subtítulo, descripción y nota final que aparecerán en las exportaciones PDF y PNG. El título es general; los otros tres textos son independientes para cada página. Se guardan automáticamente en este navegador.</p>
+<div class="report-text-editor">
+<div class="field"><label for="reportTextTitle">Título general de los reportes</label><input type="text" id="reportTextTitle" maxlength="140" placeholder="Reporte de avances merida"/></div>
+<div class="field"><label for="reportTextPage">Editar textos de la página</label><select id="reportTextPage"><option value="individual">Calculadora individual</option><option value="team">Comparativo de ejecutivos</option><option value="daily">Comparativa diaria</option><option value="accumulated">Acumulado general</option><option value="weekly">Comparativa semanal</option></select></div>
+<div class="field"><label for="reportTextSubtitle">Subtítulo del reporte</label><input type="text" id="reportTextSubtitle" maxlength="160"/></div>
+<div class="field"><label for="reportTextDescription">Descripción del reporte</label><textarea id="reportTextDescription" rows="3" maxlength="700"></textarea></div>
+<div class="field"><label for="reportTextFootnote">Nota de pie de página — cómo interpretar los resultados</label><textarea id="reportTextFootnote" rows="4" maxlength="1200"></textarea></div>
+<div class="report-text-actions"><span id="reportTextStatus" role="status">Los cambios de textos se guardan automáticamente.</span><button class="btn small" id="resetReportTextPage" type="button">Restaurar textos de esta página</button><button class="btn small" id="resetAllReportTexts" type="button">Restaurar todos los textos</button></div>
+</div>
+</div></details>
+<details class="settings-group" id="settingsExport"><summary class="settings-group-title"><span><span class="settings-number">7</span> Impresión y exportación de imagen</span></summary><div class="settings-group-body">
+<p class="settings-help">La impresión y la exportación PNG utilizan exactamente el mismo orden, secciones visibles, columnas y filtros. El plegado en pantalla no afecta el reporte.</p>
+<div class="settings-inline"><div class="field"><label for="imageScale">Resolución de imagen</label><select id="imageScale"><option value="1">Básica (1×)</option><option value="2">Alta (2×)</option><option selected="" value="3">Muy alta (3×)</option><option value="4">Máxima (4×)</option></select></div><div class="settings-export-actions"><button class="btn small" id="previewReport" type="button">Vista previa del reporte</button><button class="btn small" id="resetPrintVisibility" type="button">Restaurar impresión</button></div></div>
+<p class="settings-help settings-important">Formato PDF: A4 horizontal, con textos vectoriales nítidos al imprimir desde el navegador. El PNG utiliza la mayor resolución compatible con el tamaño del reporte; los reportes extensos pueden limitar la escala para evitar recortes.</p>
+</div></details>
+<details class="settings-group" id="settingsFolios"><summary class="settings-group-title"><span><span class="settings-number">8</span> Tabla de folios y filtros</span></summary><div class="settings-group-body">
+<p class="settings-help">Configura la tabla del XLS (columnas visibles, registros sin código y búsqueda). Estos filtros son visuales; las casillas de incidencia y APP sí modifican las comisiones.</p>
+<div id="tableSettingsDestination"><details class="table-settings" id="tableSettings">
+<summary>Ajustes de tabla: mostrar columnas, filas y filtros</summary>
+<div class="settings-body">
+<div class="records-controls">
+<div class="field"><label for="tableScope">Alcance de la vista</label><select id="tableScope"><option value="filtered">Semana y ejecutivo seleccionados</option><option value="all">Todos los registros activos</option></select></div>
+<div class="field"><label for="tableFilter">Buscar en cualquier columna</label><input autocomplete="off" id="tableFilter" placeholder="Folio, fecha, producto, código…"/></div>
+<div class="field"><label for="tablePaymentFilter">Validación de pago</label><select id="tablePaymentFilter"><option value="">Todos</option><option value="payable">Comisionable</option><option value="notpayable">No pagable</option><option value="nocode">Sin código (venta no completada)</option></select></div>
+<div class="field"><label for="tableIncFilter">Incidencia</label><select id="tableIncFilter"><option value="">Todas</option><option value="flagged">Con incidencia</option><option value="unflagged">Sin incidencia</option></select></div>
+<div class="field"><label for="tableAppFilter">Activación APP</label><select id="tableAppFilter"><option value="">Todas</option><option value="on">APP activa</option><option value="off">APP inactiva</option></select></div>
+<div class="field"><label for="tableColumnFilter">Filtrar una columna específica</label><select id="tableColumnFilter"><option value="">Sin filtro de columna</option></select></div>
+<div class="field"><label for="tableColumnValue">Valor a mostrar</label><select disabled="" id="tableColumnValue"><option value="">Todos los valores</option></select></div>
+</div>
+<label class="toggle-row"><input id="showNoCode" type="checkbox" checked/> Mostrar también registros sin código de barras</label>
+<div class="columns-label">Columnas visibles</div>
+<div class="column-chooser" id="columnChooser"></div>
+<div class="settings-actions"><button class="btn small" id="resetTableSettings" type="button">Restaurar vista predeterminada</button><span>Los filtros y columnas cambian solo la visualización; no eliminan ventas del cálculo.</span></div>
+</div>
+</details></div>
+</div></details>
+</div>
+</details><div aria-label="Filtros rápidos de importación" class="quick-filters section-card" id="quickFilters">
+<div class="quick-row">
+<div class="field"><label for="weekSelect">Semana (lunes a domingo)</label><select disabled="" id="weekSelect"><option value="">Importa un archivo</option></select></div>
+<div class="field"><label for="executiveSelect">Ejecutivo</label><select disabled="" id="executiveSelect"><option value="">Importa un archivo</option></select></div>
+</div><div class="quick-import-info"><div class="import-status" id="importStatus">Sin datos disponibles. Usa «Cargar XLS» para guardar reportes o captura los importes manualmente.</div><div class="import-badges" hidden="" id="importBadges"></div></div>
+</div><section id="teamPage" class="team-page" hidden aria-label="Comparativo semanal de todos los ejecutivos">
+  <div class="team-heading"><div><div class="eyebrow">RESULTADOS DEL EQUIPO</div><h2>Comparativo semanal de ejecutivos</h2></div><span class="team-period" id="teamPeriod">Sin datos importados</span></div>
+  <div class="team-summary" id="teamSummary"></div>
+  <div class="team-help" id="teamHelp">Importa un reporte XLS para analizar a todos los ejecutivos. La meta predeterminada es de 10 ventas, porque el XLS no incorpora objetivos individuales.</div>
+  <div class="team-filters"><div class="field"><label for="teamModule">Módulo</label><select id="teamModule"><option value="">Todos los módulos</option></select></div><div class="field"><label for="teamSearch">Buscar ejecutivo</label><input type="search" id="teamSearch" placeholder="Nombre del ejecutivo…"></div><div class="field"><label for="teamSort">Ordenar por</label><select id="teamSort"><option value="commission">Comisión estimada (mayor a menor)</option><option value="completion">Cumplimiento (mayor a menor)</option><option value="sales">Ventas válidas (mayor a menor)</option><option value="name">Nombre (A–Z)</option></select></div></div>
+  <div class="team-table-wrap"><table class="team-table" id="teamTable"><thead><tr><th>Ejecutivo / módulo</th><th>Meta <span class="th-sub">editable</span></th><th>Cumplimiento</th><th>Regulares</th><th>Garantizadas</th><th>Ventas válidas</th><th>APP</th><th>P0</th><th>Dental</th><th>Incidencias</th><th>Escalón</th><th>Comisión estimada</th><th>Detalle</th></tr></thead><tbody id="teamRows"><tr><td colspan="13">Importa un XLS para mostrar el comparativo.</td></tr></tbody><tfoot id="teamTotals"></tfoot></table></div>
+  <p class="team-note">Las comisiones son simuladas. Los registros sin código, con estatus no pagable o marcados con incidencia no se cobran. Cada venta válida incluye APP por defecto, salvo que se desmarque en su folio. El bono y las penalizaciones se calculan individualmente. Los totales corresponden a los ejecutivos visibles.</p>
+</section>
+<section id="dailyPage" class="daily-page" hidden aria-label="Comparativa diaria entre módulos y ejecutivos">
+  <div class="daily-heading"><div><div class="eyebrow">COMPARATIVA OPERATIVA</div><h2>Comparativa diaria</h2><p>Rendimiento por módulo y por ejecutivo, en dos tablas simultáneas.</p></div><span class="daily-period" id="dailyPeriod">Importa un archivo XLS</span></div>
+  <div class="daily-date-controls" aria-label="Elegir fechas para la comparativa diaria">
+    <div class="field"><label for="dailyDateMode">Modo de comparación</label><select id="dailyDateMode"><option value="auto">Automático · último día vs anterior</option><option value="custom">Seleccionar fechas</option></select></div>
+    <div class="field"><label for="dailyCurrentDate">Día principal</label><input type="date" id="dailyCurrentDate" disabled /></div>
+    <div class="field"><label for="dailyPreviousDate">Día a comparar</label><input type="date" id="dailyPreviousDate" disabled /></div>
+  </div>
+  <div class="daily-guide"><div class="daily-legend"><span>En cada indicador: <strong>total del día principal</strong> y variación frente al día comparado.</span><span class="up">▲ Subió</span><span class="down">▼ Bajó</span><span class="same">— Igual</span></div><span id="dailyDataNotice"></span></div>
+  <div class="daily-scroll" aria-label="Desplaza horizontalmente para ver las dos tablas en paralelo">
+    <div class="daily-pair">
+      <article class="daily-panel"><div class="daily-panel-title"><h3>Por módulo</h3><span id="dailyModulesCount">—</span></div><table class="daily-table" id="dailyModuleTable"><thead><tr><th>Módulo</th><th title="Total de registros">Registros</th><th title="Ventas totales con código">Ventas</th><th title="Ventas regulares">Regulares</th><th title="Ventas garantizadas">Garant.</th><th title="Programas Cero">P. Cero</th><th title="Planes Dentales">Dental</th></tr></thead><tbody id="dailyModuleRows"><tr><td colspan="7" class="daily-empty">Importa un XLS para mostrar resultados.</td></tr></tbody><tfoot id="dailyModuleTotal"></tfoot></table></article>
+      <article class="daily-panel"><div class="daily-panel-title"><h3>Por ejecutivo</h3><span id="dailyExecutivesCount">—</span></div><table class="daily-table" id="dailyExecutiveTable"><thead><tr><th>Ejecutivo</th><th title="Total de registros">Registros</th><th title="Ventas totales con código">Ventas</th><th title="Ventas regulares">Regulares</th><th title="Ventas garantizadas">Garant.</th><th title="Programas Cero">P. Cero</th><th title="Planes Dentales">Dental</th></tr></thead><tbody id="dailyExecutiveRows"><tr><td colspan="7" class="daily-empty">Importa un XLS para mostrar resultados.</td></tr></tbody><tfoot id="dailyExecutiveTotal"></tfoot></table></article>
+    </div>
+  </div>
+  
+</section>
+<section id="accumulatedPage" class="daily-page accumulated-page" hidden aria-label="Acumulado por módulos y ejecutivos de los XLS guardados">
+  <div class="daily-heading">
+    <div><div class="eyebrow">HISTÓRICO OPERATIVO</div><h2>Acumulado general</h2><p>Resultados consolidados por módulo y ejecutivo de todos los XLS guardados.</p></div>
+    <span class="daily-period" id="accumulatedPeriod">Histórico completo</span>
+  </div>
+  <div class="daily-date-controls accumulated-controls" aria-label="Filtrar el acumulado por fechas">
+    <div class="field"><label>Periodo consultado</label><strong id="accumulatedPeriodLabel" style="display:block;font-size:12px;color:var(--blue-deep);padding:9px 0">Todos los registros guardados</strong></div>
+    <div class="field"><label for="accumulatedFrom">Fecha inicial (opcional)</label><input type="date" id="accumulatedFrom"></div>
+    <div class="field"><label for="accumulatedTo">Fecha final (opcional)</label><input type="date" id="accumulatedTo"></div>
+    <button class="btn small" type="button" id="accumulatedClearDates">Mostrar todo</button>
+  </div>
+  <p class="accumulated-notice" id="accumulatedDataNotice">Se incluyen exclusivamente los XLS guardados en este navegador, sin duplicar registros repetidos. Los archivos temporales y la selección de las demás páginas no cambian estos acumulados.</p>
+  <div class="daily-scroll" aria-label="Tablas acumuladas por módulo y ejecutivo, una al lado de la otra">
+    <div class="daily-pair">
+      <article class="daily-panel"><div class="daily-panel-title"><h3>Acumulado por módulo</h3><span id="accumulatedModulesCount">—</span></div>
+        <table class="daily-table" id="accumulatedModuleTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th></tr></thead><tbody id="accumulatedModuleRows"><tr><td colspan="7" class="daily-empty">No hay XLS guardados.</td></tr></tbody><tfoot id="accumulatedModuleTotal"></tfoot></table>
+      </article>
+      <article class="daily-panel"><div class="daily-panel-title"><h3>Acumulado por ejecutivo</h3><span id="accumulatedExecutivesCount">—</span></div>
+        <table class="daily-table" id="accumulatedExecutiveTable"><thead><tr><th>Ejecutivo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th></tr></thead><tbody id="accumulatedExecutiveRows"><tr><td colspan="7" class="daily-empty">No hay XLS guardados.</td></tr></tbody><tfoot id="accumulatedExecutiveTotal"></tfoot></table>
+      </article>
+    </div>
+  </div>
+</section>
+<section id="weeklyPage" class="daily-page weekly-page" hidden aria-label="Comparativa semanal de resultados acumulados por módulo">
+  <div class="daily-heading">
+    <div><div class="eyebrow">ANÁLISIS OPERATIVO · SEMANAS FISCALES</div><h2>Comparativa semanal por módulo</h2><p>Objetivos y resultados por módulo: semana principal frente a la semana anterior o elegida.</p></div>
+    <span class="daily-period" id="weeklyPeriod">Última semana completa vs. anterior</span>
+  </div>
+  <div class="weekly-date-controls" aria-label="Seleccionar dos semanas de lunes a domingo">
+    <div class="field"><label>Periodo de comparación</label><div class="weekly-control-note">Selecciona cualquier fecha de cada semana. Se ajustará al lunes correspondiente y se tomarán todos los registros hasta el domingo.</div></div>
+    <div class="field"><label for="weeklyPrimaryDate">Semana principal</label><input type="date" id="weeklyPrimaryDate"/><div class="weekly-control-date" id="weeklyPrimaryLabel">—</div></div>
+    <div class="field"><label for="weeklyPreviousDate">Semana a comparar</label><input type="date" id="weeklyPreviousDate"/><div class="weekly-control-date" id="weeklyPreviousLabel">—</div></div>
+  </div>
+  <section aria-label="Variación total entre las semanas">
+    <div class="weekly-variance-head"><h3>Variación de resultados</h3><span id="weeklyVarianceContext">Semana principal − semana comparada</span></div>
+    <div class="weekly-variance-grid" id="weeklyVarianceGrid"></div>
+  </section>
+  <div class="weekly-variance-head"><h3>Resultados y objetivos por módulo</h3><span>Registros y ventas: metas manuales · Regulares y garantizadas: 0 · Plan Cero: total de regulares · Dental: total de ventas</span></div>
+  <div class="weekly-comparison-scroll" aria-label="Dos tablas de módulos, una por semana, colocadas lado a lado">
+    <div class="weekly-comparison-grid">
+      <article class="daily-panel weekly-panel"><div class="daily-panel-title"><h3 id="weeklyPrimaryTitle">Fecha de comparación 1</h3><span id="weeklyPrimaryModules">—</span></div>
+        <table class="weekly-table" id="weeklyPrimaryTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th></tr></thead>
+        <tbody id="weeklyPrimaryRows"><tr><td colspan="7" class="daily-empty">No hay datos guardados.</td></tr></tbody><tfoot id="weeklyPrimaryFooter"></tfoot></table>
+      </article>
+      <article class="daily-panel weekly-panel"><div class="daily-panel-title"><h3 id="weeklyPreviousTitle">Fecha de comparación 2</h3><span id="weeklyPreviousModules">—</span></div>
+        <table class="weekly-table" id="weeklyPreviousTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th></tr></thead>
+        <tbody id="weeklyPreviousRows"><tr><td colspan="7" class="daily-empty">No hay datos guardados.</td></tr></tbody><tfoot id="weeklyPreviousFooter"></tfoot></table>
+      </article>
+    </div>
+  </div>
+</section>
+<div class="sections-container" id="sectionsContainer"><details class="layout-section" data-section="summary" id="sec-summary" open=""><summary class="layout-summary"><span class="layout-name">Resumen global</span><span class="layout-hint">Mostrar / ocultar</span></summary><div class="layout-content"><section aria-label="Comparativo global" aria-live="polite" class="stats">
+<div class="stat"><span class="label">Escenario base</span><div class="amount" id="baseTotal">$0.00</div><span class="desc" id="baseOverview">—</span></div>
+<div class="stat"><span class="label">Escenario simulado</span><div class="amount" id="simTotal">$0.00</div><span class="desc" id="simOverview">—</span></div>
+<div class="stat delta"><span class="label">Diferencia a favor / en contra</span><div class="amount" id="deltaTotal">$0.00</div><span class="desc" id="deltaOverview">Escenario simulado − base</span></div>
+</section><div aria-hidden="true" class="comparison-track"><span class="original" id="trackBase"></span><span class="simulated" id="trackSim"></span></div></div></details><details class="layout-section" data-section="scenarios" id="sec-scenarios" open=""><summary class="layout-summary"><span class="layout-name">Escenarios base y simulación</span><span class="layout-hint">Mostrar / ocultar</span></summary><div class="layout-content"><section aria-label="Entradas de los escenarios" class="scenario-grid" id="scenarios">
+<details class="scenario base scenario-fold" data-scenario="base" open="">
+<summary class="scenario-head"><div><h2>Escenario base</h2><p>Resultados de referencia de la semana</p></div><span class="tag">Original</span></summary>
+<div class="scenario-content">
+<div class="group"><div class="group-title">Objetivo y ventas registradas</div>
+<div class="fields">
+<div class="field"><label for="base-goal">Meta semanal</label><input data-field="goal" id="base-goal" inputmode="numeric" min="1" step="1" type="number"/></div>
+<div class="field"><label for="base-reg">Regulares</label><input data-field="reg" id="base-reg" inputmode="numeric" min="0" step="1" type="number"/></div>
+<div class="field"><label for="base-guar">Garantizadas</label><input data-field="guar" id="base-guar" inputmode="numeric" min="0" step="1" type="number"/></div>
+</div>
+</div>
+<div class="group"><div class="group-title">Complementos registrados <span class="group-note">Antes de exclusiones</span></div>
+<div class="fields">
+<div class="field"><label for="base-dental">Plan Dental</label><input data-field="dental" id="base-dental" inputmode="numeric" min="0" step="1" type="number"/></div>
+<div class="field"><label for="base-app">ACT APP</label><input data-field="app" id="base-app" inputmode="numeric" min="0" step="1" type="number"/></div>
+<div class="field"><label for="base-p0">Programa Cero</label><input data-field="p0" id="base-p0" inputmode="numeric" min="0" step="1" type="number"/></div>
+</div>
+</div>
+<details class="disclosure"><summary>Folios no comisionables y sus complementos</summary><div class="inside">
+<p>Incluye aquí los folios cancelados, incompletos, rechazados, con incidencia o sin activación que no deben cobrarse. Los complementos asociados también se excluyen.</p>
+<div class="fields two">
+<div class="field"><label for="base-xreg">Regulares excluidas</label><input data-field="xreg" id="base-xreg" min="0" step="1" type="number"/></div>
+<div class="field"><label for="base-xguar">Garantizadas excluidas</label><input data-field="xguar" id="base-xguar" min="0" step="1" type="number"/></div>
+<div class="field"><label for="base-xdental">Dental en excluidos</label><input data-field="xdental" id="base-xdental" min="0" step="1" type="number"/></div>
+<div class="field"><label for="base-xapp">APP en excluidos</label><input data-field="xapp" id="base-xapp" min="0" step="1" type="number"/></div>
+<div class="field"><label for="base-xp0">P0 en excluidos</label><input data-field="xp0" id="base-xp0" min="0" step="1" type="number"/></div>
+</div>
+<div class="group"><div class="group-title">Incidencias y ajustes</div>
+<div class="fields two">
+<div class="field"><label for="base-inc">Número de incidencias</label><input data-field="inc" id="base-inc" min="0" step="1" type="number"/><span class="micro">Afecta bono y descuento porcentual</span></div>
+<div class="field"><label for="base-recover">Descuento por folios previamente pagados ($)</label><input data-field="recover" id="base-recover" min="0" step="0.01" type="number"/><span class="micro">Se resta al final; permite saldo negativo</span></div>
+</div>
+</div></div></details>
+
+<div class="base-import-summary" id="baseImportCounts">—</div>
+
+<div class="summary-calc" id="baseSummary"></div><div class="messages" id="baseMessages"></div>
+</div>
+</details>
+<details class="scenario sim scenario-fold" data-scenario="sim" open="">
+<summary class="scenario-head"><div><h2>Simulación comparativa</h2><p>Prueba cambios sin modificar el escenario base</p></div><span class="tag">Editable</span></summary>
+
+<div class="scenario-content">
+<div class="group"><div class="group-title">Objetivo y ventas registradas</div>
+<div class="fields">
+<div class="field"><label for="sim-goal">Meta semanal</label><input data-field="goal" id="sim-goal" inputmode="numeric" min="1" step="1" type="number"/></div>
+<div class="field"><label for="sim-reg">Regulares</label><input data-field="reg" id="sim-reg" inputmode="numeric" min="0" step="1" type="number"/></div>
+<div class="field"><label for="sim-guar">Garantizadas</label><input data-field="guar" id="sim-guar" inputmode="numeric" min="0" step="1" type="number"/></div>
+</div>
+</div>
+<div class="group"><div class="group-title">Complementos registrados <span class="group-note">Antes de exclusiones</span></div>
+<div class="fields">
+<div class="field"><label for="sim-dental">Plan Dental</label><input data-field="dental" id="sim-dental" inputmode="numeric" min="0" step="1" type="number"/></div>
+<div class="field"><label for="sim-app">ACT APP</label><input data-field="app" id="sim-app" inputmode="numeric" min="0" step="1" type="number"/></div>
+<div class="field"><label for="sim-p0">Programa Cero</label><input data-field="p0" id="sim-p0" inputmode="numeric" min="0" step="1" type="number"/></div>
+</div>
+</div>
+<details class="disclosure"><summary>Folios no comisionables y sus complementos</summary><div class="inside">
+<p>La simulación permite modificar también los folios excluidos. Recuerda registrar los complementos que pertenecían a esos folios.</p>
+<div class="fields two">
+<div class="field"><label for="sim-xreg">Regulares excluidas</label><input data-field="xreg" id="sim-xreg" min="0" step="1" type="number"/></div>
+<div class="field"><label for="sim-xguar">Garantizadas excluidas</label><input data-field="xguar" id="sim-xguar" min="0" step="1" type="number"/></div>
+<div class="field"><label for="sim-xdental">Dental en excluidos</label><input data-field="xdental" id="sim-xdental" min="0" step="1" type="number"/></div>
+<div class="field"><label for="sim-xapp">APP en excluidos</label><input data-field="xapp" id="sim-xapp" min="0" step="1" type="number"/></div>
+<div class="field"><label for="sim-xp0">P0 en excluidos</label><input data-field="xp0" id="sim-xp0" min="0" step="1" type="number"/></div>
+</div>
+<div class="group"><div class="group-title">Incidencias y ajustes</div>
+<div class="fields two">
+<div class="field"><label for="sim-inc">Número de incidencias</label><input data-field="inc" id="sim-inc" min="0" step="1" type="number"/><span class="micro">0 para conservar bono de calidad</span></div>
+<div class="field"><label for="sim-recover">Descuento por folios previamente pagados ($)</label><input data-field="recover" id="sim-recover" min="0" step="0.01" type="number"/><span class="micro">Se descuenta después de penalizaciones</span></div>
+</div>
+</div></div></details>
+
+<div class="summary-calc" id="simSummary"></div><div class="messages" id="simMessages"></div>
+</div>
+</details>
+</section></div></details><details class="layout-section" data-section="tariff" id="sec-tariff" open=""><summary class="layout-summary"><span class="layout-name">Tarifario y reglas aplicadas</span><span class="layout-hint">Mostrar / ocultar</span></summary><div class="layout-content"><section aria-label="Reglas y tarifas" class="section-card">
+<div class="section-title"><h2>Tarifario y reglas aplicadas</h2><p>Primera diapositiva · Esquema WM / Sam's para ejecutivos</p></div>
+<div class="rules">
+<div>
+<h3>Importes por escalón de cumplimiento</h3><div class="tier-overview" id="tierOverview">Se marcarán los escalones alcanzados por cada escenario.</div>
+<div class="table-wrap"><table class="rate-table"><thead><tr><th>Escalón</th><th>Venta</th><th>Dental</th><th>APP</th><th>P0</th><th>Bono*</th></tr></thead><tbody>
+<tr data-tier="50"><td>50% a menos de 61%</td><td>$50</td><td>$50</td><td>$50</td><td>$140</td><td>$300</td></tr>
+<tr data-tier="61"><td>61% a menos de 81%</td><td>$70</td><td>$70</td><td>$70</td><td>$230</td><td>$450</td></tr>
+<tr data-tier="81"><td>81% a menos de 101%</td><td>$90</td><td>$90</td><td>$90</td><td>$290</td><td>$650</td></tr>
+<tr data-tier="101"><td>Desde 101%</td><td>$130</td><td>$100</td><td>$130</td><td>$350</td><td>$800</td></tr>
+</tbody></table></div><div class="rate-caption">* Bono semanal único, únicamente si existen cero incidencias y se alcanza el mínimo de cumplimiento.</div>
+</div>
+<div><h3>Consideraciones del cálculo</h3><ul class="notes">
+<li>Los límites de escalón se aplican <strong>sin redondear</strong> el porcentaje, incluso si falta una fracción para el siguiente nivel.</li>
+<li>Solo cuentan folios y complementos comisionables. Los folios excluidos no suman al cumplimiento.</li>
+<li>Programa Cero: mínimo <strong>30%</strong> sobre regulares comisionables. Sin regulares, queda exento; de lo contrario se descuenta 15% si no alcanza el mínimo.</li>
+<li>Incidencias: 1 elimina el bono; 2 descuentan 10%, 3 el 20%, 4 o más el 30% y aplica DVL.</li>
+<li>Los descuentos de incidencias y P0 se <strong>suman</strong>, no se aplican uno después de otro.</li>
+<li>Los descuentos de folios previamente pagados se aplican <strong>al final</strong>, incluso si el resultado es negativo.</li>
+<li>En modo XLS se presupone una APP activa por venta con Código; la casilla APP permite retirar solo ese concepto, sin marcar incidencia. Valida las activaciones reales y sus evidencias antes de liquidar.</li>
+<li>Esta versión no incorpora arrastre ni pago diferido de ventas pendientes.</li>
+</ul></div>
+</div>
+</section></div></details><details class="layout-section" data-section="comparison" id="sec-comparison" open=""><summary class="layout-summary"><span class="layout-name">Desglose comparativo de comisiones</span><span class="layout-hint">Mostrar / ocultar</span></summary><div class="layout-content"><section aria-label="Detalle comparativo" class="section-card">
+<div class="section-title"><h2>Desglose comparativo de comisiones</h2><p>Comisiones netas calculadas después de excluir folios no pagables</p></div>
+<div class="table-wrap"><table id="comparisonTable"><thead><tr><th>Concepto</th><th>Escenario base</th><th>Simulación</th><th>Diferencia</th></tr></thead><tbody id="comparisonRows"></tbody></table></div>
+<p class="rate-caption" id="comparisonNote">Los porcentajes de penalización se suman y se calculan sobre el subtotal de conceptos más el bono.</p>
+</section></div></details><details class="layout-section" data-section="records" hidden="" id="sec-records" open=""><summary class="layout-summary"><span class="layout-name">Tabla de folios importados</span><span class="layout-hint">Mostrar / ocultar</span></summary><div class="layout-content"><section class="section-card" hidden="" id="recordsSection">
+<details class="records-disclosure" id="recordsDisclosure" open="">
+<summary class="records-summary">Tabla de folios importados <span class="pill" id="recordsCount">0 folios</span></summary>
+<div class="records-inner">
+<div class="table-intro">Por defecto se muestran todos los registros: primero los que tienen código de barras y luego los que no tienen. Solo se muestran las columnas principales. <strong>Incidencia</strong> excluye el folio completo y sus complementos; <strong>APP</strong> está activa inicialmente por venta y puede desmarcarse sin excluir la tarjeta.</div>
+<div class="record-counts" id="recordCounters"></div>
+<div class="mobile-tip import-help">Desliza horizontalmente para consultar más columnas cuando las actives.</div>
+<div class="table-wrap"><table class="record-table" id="recordsTable"><thead id="recordsHead"></thead><tbody id="recordsBody"></tbody></table></div>
+
+</div>
+</details>
+</section></div></details></div>
+<div class="print-only print-context" id="printContext"></div>
+<section class="section-card print-only" hidden="" id="printRecordsSection">
+<div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
+<div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
+</section>
+<footer class="foot">Final de la presentacion · Versión 1.9</footer>
+</main><div aria-hidden="true" class="report-host" id="reportHost"></div>
+<script type="module" src="/src/cloud-boot.js"></script>
+
+<div class="auth-modal" id="cloudModal" hidden role="dialog" aria-modal="true" aria-labelledby="cloudModalTitle">
+  <div class="auth-card cloud-auth-card">
+    <h2 id="cloudModalTitle">Acceso por correo</h2>
+    <p id="cloudModalHelp">Inicia sesión con la cuenta que tengas registrada en Netlify Identity. Los datos se vincularán a esa cuenta.</p>
+    <form id="cloudAuthForm">
+      <label class="field" for="cloudEmail">Correo electrónico</label>
+      <input type="email" id="cloudEmail" autocomplete="email" placeholder="correo@ejemplo.com" required>
+      <label class="field" for="cloudPassword">Contraseña</label>
+      <input type="password" id="cloudPassword" autocomplete="current-password" placeholder="Contraseña" minlength="8" required>
+      <div class="auth-error" id="cloudAuthError" role="alert"></div>
+      <div class="auth-buttons">
+        <button class="btn small" type="button" id="cloudCancel">Cancelar</button>
+        <button class="btn primary" type="submit" id="cloudSubmit">Entrar</button>
+      </div>
+    </form>
+    <p class="cloud-auth-tip">La cuenta se crea mediante invitación desde Netlify Identity. Para recuperar una contraseña, escribe tu correo y selecciona «Recuperar acceso».</p>
+    <button class="btn small" type="button" id="cloudRecovery">Recuperar acceso</button>
+  </div>
+</div>
+<div class="cloud-toast" id="cloudToast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

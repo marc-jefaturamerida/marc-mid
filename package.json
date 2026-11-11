@@ -1,0 +1,19 @@
+{
+  "name": "dashboard-comisiones-merida-netlify",
+  "private": true,
+  "version": "1.9.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "node --check src/cloud-boot.js && node --check src/legacy-app.js && node --check netlify/functions/files.js && node --check netlify/functions/settings.js && node --check netlify/functions/sync.js && node --check netlify/functions/health.js && node --check netlify/lib/_shared.js"
+  },
+  "dependencies": {
+    "@netlify/database": "^2.0.3",
+    "@netlify/identity": "^2.0.1"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
+}
