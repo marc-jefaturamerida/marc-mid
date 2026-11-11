@@ -535,7 +535,11 @@ function getAllRecordsFiltered(){
   if(dental==='no')rows=rows.filter(r=>isNo(r.dental));
   if(col&&chosen.size)rows=rows.filter(r=>chosen.has(getCellText(r,col)));
   if(q)rows=rows.filter(r=>normalize([...r.raw,getCellText(r,'incident'),getCellText(r,'app'),getCellText(r,'payment')].join(' ')).includes(q));
-  return [...rows].sort((a,b)=>Number(hasCode(b))-Number(hasCode(a))||a.i-b.i);
+  
+return [...rows].sort((a,b)=>
+  (b.fecha || '').localeCompare(a.fecha || '') ||
+  b.i - a.i
+);
 }
 function allRecordsActiveFilterCount(){return ALL_RECORDS_FILTER_IDS.filter(id=>allRecordsFilterValue(id)).length+(allRecordsFilterValue('allRecordsColumn')&&allRecordsView.selectedValues.size?1:0);}
 function renderAllRecords(){
