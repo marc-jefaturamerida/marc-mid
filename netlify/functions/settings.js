@@ -10,7 +10,8 @@ const ALLOWED = new Set([
  'wmSamsComparativaSemanalObjetivosV13',
  'wmSamsComisionesLayoutV5',
  'wmSamsMeridaReportTextsV17',
- 'wmSamsTablaVisualV18'
+ 'wmSamsTablaVisualV18',
+ 'wmSamsVisitConfigV20'
 ]);
 const MAX_ENTRIES=12;
 const MAX_TOTAL_BYTES=2_200_000;

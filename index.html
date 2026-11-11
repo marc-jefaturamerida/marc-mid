@@ -345,6 +345,7 @@ body[data-page="weekly"] #quickFilters{display:none!important}
   .cloud-toast[hidden]{display:none}
   @media(max-width:740px){.cloud-session-label{width:100%;max-width:none}.toolbar{justify-content:flex-start}}
 </style>
+<link rel="stylesheet" href="/assets/visits.css">
 </head>
 <body>
 <main class="shell">
@@ -368,6 +369,7 @@ body[data-page="weekly"] #quickFilters{display:none!important}
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="dailyPage" data-page-tab="daily">Comparativa diaria</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="accumulatedPage" data-page-tab="accumulated" hidden>Acumulado general</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="weeklyPage" data-page-tab="weekly" hidden>Comparativa semanal</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="visitPage" data-page-tab="visits" hidden>Visitas de coordinación</button>
 </nav>
 <details class="settings-panel section-card" id="settingsPanel">
 <summary class="settings-panel-title"><span><span class="settings-icon">⚙</span> Ajustes de la calculadora</span><small>Archivos · Tarifas · Temas · Impresión · Folios</small></summary>
@@ -434,6 +436,10 @@ body[data-page="weekly"] #quickFilters{display:none!important}
 <div class="settings-actions"><button class="btn small" id="resetTableSettings" type="button">Restaurar vista predeterminada</button><span>Los filtros y columnas cambian solo la visualización; no eliminan ventas del cálculo.</span></div>
 </div>
 </details></div>
+</div></details>
+<details class="settings-group" id="settingsVisits"><summary class="settings-group-title"><span><span class="settings-number">9</span> Visitas de coordinación</span></summary><div class="settings-group-body">
+<p class="settings-help">Personaliza el acuse, los criterios, sus pesos, el logo y la firma. Estos ajustes se guardan en tu cuenta y se comparten con tus dispositivos. Solo las visitas guardadas explícitamente se envían a PostgreSQL.</p>
+<div id="visitsSettingsEditor"></div>
 </div></details>
 </div>
 </details><div aria-label="Filtros rápidos de importación" class="quick-filters section-card" id="quickFilters">
@@ -635,12 +641,20 @@ body[data-page="weekly"] #quickFilters{display:none!important}
 </div>
 </details>
 </section></div></details></div>
+
+<section id="visitPage" class="visit-page" hidden aria-label="Acuse de visita de coordinación">
+  <div class="visit-hero"><div><div class="eyebrow">AUDITORÍA OPERATIVA</div><h2>Visitas de coordinación</h2><p>Acuse de visita · Captura móvil · Semana en curso</p></div><span id="visitCloudInfo" class="visit-state">Disponible al iniciar sesión</span></div>
+  <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
+  <div id="visitForm" class="visit-main"></div>
+  <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
+  <footer class="foot">Acuse de coordinación · Versión 2.0.1</footer>
+</section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 1.9.2</footer>
+<footer class="foot">Final de la presentacion · Versión 2.0.1</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 

@@ -334,7 +334,7 @@ async function importXlsFiles(files){
     archive.temporaryMode=!persistent;
     // Mantener las marcas de los folios de histórico, pero no persistir cambios temporales.
     loadFolioFlags();
-    refreshArchiveData(true);
+    refreshArchiveData(true);window.VISITS?.refreshSources();
   }
   const stateText=persistent?
     `${added} archivo(s) guardado(s) en el historial · ${duplicated} duplicado(s) omitido(s).`:
@@ -348,7 +348,7 @@ async function initArchive(){
   archiveSelectionRestore();loadFolioFlags();
   try{
     archive.reports=await archiveGetAll();archive.reports.sort((a,b)=>a.addedAt-b.addedAt||a.id.localeCompare(b.id));archive.ready=isAuthorized();
-    refreshArchiveData(true);
+    refreshArchiveData(true);window.VISITS?.refreshSources();
   }catch(err){archive.ready=false;renderArchiveList();statusBox('No se pudo conectar al historial en línea: '+esc(err.message||String(err))+'. Comprueba la conexión, la sesión y Netlify Database.','error');}
 }
 // Columnas configurables y filtros visuales (no alteran las métricas por sí mismos).
@@ -801,24 +801,27 @@ el('weeklyPage').addEventListener('change',event=>{
 
 function refreshAuthorizedPages(){
   const auth=isAuthorized();
-  for(const tab of document.querySelectorAll('[data-page-tab="accumulated"],[data-page-tab="weekly"]'))tab.hidden=!auth;
-  if(!auth&&['accumulated','weekly'].includes(activePage))switchPage('individual');
+  for(const tab of document.querySelectorAll('[data-page-tab="accumulated"],[data-page-tab="weekly"],[data-page-tab="visits"]'))tab.hidden=!auth;
+  if(!auth&&['accumulated','weekly','visits'].includes(activePage))switchPage('individual');
   if(auth&&activePage==='accumulated')renderAccumulated();
   if(auth&&activePage==='weekly')renderWeekly();
+  if(auth&&activePage==='visits')window.VISITS?.refreshSources();
 }
 
 function switchPage(page){
-  activePage=['individual','team','daily','accumulated','weekly'].includes(page)&&!(['accumulated','weekly'].includes(page)&&!isAuthorized())?page:'individual';
+  activePage=['individual','team','daily','accumulated','weekly','visits'].includes(page)&&!(['accumulated','weekly','visits'].includes(page)&&!isAuthorized())?page:'individual';
   document.body.dataset.page=activePage;
   el('teamPage').hidden=activePage!=='team';
   el('dailyPage').hidden=activePage!=='daily';
   el('accumulatedPage').hidden=activePage!=='accumulated';
   el('weeklyPage').hidden=activePage!=='weekly';
+  el('visitPage').hidden=activePage!=='visits';
   for(const b of document.querySelectorAll('[data-page-tab]')){const yes=b.dataset.pageTab===activePage;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));}
   if(activePage==='team')renderTeam();
   if(activePage==='daily')renderDaily();
   if(activePage==='accumulated')renderAccumulated();
   if(activePage==='weekly')renderWeekly();
+  if(activePage==='visits')window.VISITS?.open();
   if(el('settingsPanel').open){el('settingsPanel').open=false;el('toggleSettings').setAttribute('aria-expanded','false');}
 }
 for(const b of document.querySelectorAll('[data-page-tab]'))b.addEventListener('click',()=>switchPage(b.dataset.pageTab));
@@ -1217,7 +1220,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     el('imageScale').addEventListener('change',e=>{uiLayout.scale=[1,2,3,4].includes(Number(e.target.value))?Number(e.target.value):3;saveLayout();});
     el('previewReport').addEventListener('click',()=>{buildReport();window.print();});
   }
-  // Versión 1.9.2: textos comunes a PDF y PNG. El título es global y el resto es por página.
+  // Versión 2.0.1: textos comunes a PDF y PNG. El título es global y el resto es por página.
   const REPORT_TEXT_STORAGE='wmSamsMeridaReportTextsV17';
   const REPORT_TEXT_DEFAULTS={
     individual:{subtitle:'Calculadora individual',description:'Comisiones simuladas: pueden existir variaciones respecto al monto final a pagar.',footer:'Lee los importes del escenario base y de la simulación. El desglose muestra tarifas, bono, incidencias, descuentos y pago neto estimado; los folios no comisionables no generan pago.'},
@@ -1247,7 +1250,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return `<div class="report-heading"><div><h1>${esc(content.title)}</h1><p class="report-subtitle">${esc(content.subtitle)}</p><p class="report-disclaimer">${esc(content.description)}</p><p class="report-meta">${meta}</p></div><div class="report-brand">${brand}</div></div>`;
   }
   function reportFootMarkup(page){
-    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 1.9.2</div></footer>`;
+    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 2.0.1</div></footer>`;
   }
   function initReportTextEditor(){
     loadReportTexts();
@@ -1336,7 +1339,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
       const cells=group=>`<tr${group.name==='TOTAL'?' class="daily-total-row"':''}><td>${esc(group.name)}</td>${DAILY_METRICS.map(key=>`<td>${group.metrics[key]}</td>`).join('')}</tr>`;
       return `<div><h3>${label} · ${entries.length}</h3><table class="daily-report-table"><thead><tr><th>${groupBy==='module'?'Módulo':'Ejecutivo'}</th>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${entries.map(cells).join('')||'<tr><td colspan="7">Sin registros en el periodo</td></tr>'}</tbody><tfoot>${entries.length?cells(totals):''}</tfoot></table></div>`;
     };
-    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("accumulated",`${esc(accumulatedPeriodText())} · ${archive.reports.length} archivos históricos · ${rows.length} registros · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`)}<section class="report-section report-section-daily" data-report-section="daily"><h2>Acumulados por módulo y ejecutivo</h2><div class="report-daily-grid">${table('module','Módulos')}${table('executive','Ejecutivos')}</div><p class="report-note"></p></section>${reportFootMarkup("accumulated")}</div>`;
+    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("accumulated",`${esc(accumulatedPeriodText())} · ${archive.reports.length} archivos históricos · ${rows.length} registros · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`)}<section class="report-section report-section-daily" data-report-section="daily"><h2>Acumulados por módulo y ejecutivo</h2><div class="report-daily-grid">${table('module','Módulos')}${table('executive','Ejecutivos')}</div><p class="report-note">Datos únicos de todos los XLS guardados en tu cuenta. Se incluyen los registros del periodo indicado. Ventas = registros con código; Programa Cero = ventas regulares con P0; Dental = ventas con PD. Sin comparación ni variaciones diarias.</p></section>${reportFootMarkup("accumulated")}</div>`;
     el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}</style>${html}`;
     return el('printPage');
   }
@@ -1362,6 +1365,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   }
 
   function buildReport(){
+    if(activePage==='visits')return window.VISITS?.buildReport();
     if(activePage==='weekly')return buildWeeklyReport();
     if(activePage==='accumulated')return buildAccumulatedReport();
     if(activePage==='daily')return imported.data?buildDailyReport():buildDailyEmptyReport();
@@ -1541,10 +1545,11 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=70;line(margin,y,content);y+=16;
     write('NOTA PARA LEER EL REPORTE',margin,y,10,true,deep);y+=20;
     y=paragraph(reportTexts.footer,margin,y,content,11,17,'#4b5c70')+19;
-    write('Versión 1.9.2',margin+content-84,y,10,false,'#6b7b8e');y+=32;
+    write('Versión 2.0.1',margin+content-84,y,10,false,'#6b7b8e');y+=32;
     return Math.ceil(y);
   }
   function exportPng(){
+    if(activePage==='visits')return window.VISITS?.exportPng();
     const button=el('exportImage'),before=button.textContent;
     button.disabled=true;button.textContent='Generando imagen…';
     try{
@@ -1574,8 +1579,31 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     if(!isAuthorized())return;
     archive.reports=await archiveGetAll();archive.temporaryMode=false;
     archiveSelectionRestore();loadFolioFlags();loadCommissionRates();
-    refreshArchiveData(true);refreshAuthorizedPages();render();
+    refreshArchiveData(true);refreshAuthorizedPages();render();window.VISITS?.refreshSources();
   });
+  // Solo lectura: acuse consulta TODOS los XLS del historial, sin aplicar filtros visuales.
+  window.VISIT_SOURCE={
+    isAuthorized,
+    rows(){
+      const data=combinedArchiveData(archive.reports);
+      if(!data)return [];
+      const indexes=Object.fromEntries(data.headers.map((h,i)=>[normalize(h),i]));
+      const find=(row,terms)=>{
+        const key=terms.find(t=>Object.hasOwn(indexes,normalize(t)));
+        return key?String(row.raw[indexes[normalize(key)]]??'').trim():'';
+      };
+      return data.rows.map(r=>({...r,
+        incidentFlag:imported.flags.has(r.uid||String(r.i)),
+        appOff:imported.appDisabled.has(r.uid||String(r.i)),
+        incidentValue:find(r,['Incidencia','Incidencias']),
+        appValue:find(r,['Act APP','Activacion App','App Invex','Activacion','APP']),
+        hasAppColumn:['Act APP','Activacion App','App Invex','Activacion','APP'].some(k=>Object.hasOwn(indexes,normalize(k)))
+      }));
+    },
+    mondayOf, sundayOf, isoDate, isYes, isNo, normalize,
+    getWeek(){return mondayOf(dateIso(new Date()));}
+  };
+  import('./visits.js').catch(err=>console.error('No se pudo abrir visitas:',err));
   window.addEventListener('focus',refreshAuthorizedPages);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshAuthorizedPages();});
 })();

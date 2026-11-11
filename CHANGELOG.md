@@ -1,33 +1,22 @@
-# V1.9.2 — Selección de semana y ejecutivo 100 % local
+# Cambios de versión
 
-- Corregido `computeImportedBase()`: ya no llama `persist()` cuando recalcula los importes derivados de XLS al cambiar de semana o ejecutivo. Este `persist()` marcaba un ajuste como modificado y activaba el guardado en PostgreSQL aunque el usuario solo filtraba.
-- Al cargar el historial guardado tampoco se produce ese guardado redundante.
-- Los filtros de fechas en comparativas, módulo, búsqueda y tabla de folios siguen siendo locales y no llaman a la API.
-- Se conservan las escrituras explícitas para **editar** metas, recuperaciones, tarifas, marcas de incidencias, APP y demás ajustes permanentes.
-- No se cambian API, Functions, SQL ni datos existentes; no requiere migración.
-- Nota: las simulaciones que el usuario **edita** deliberadamente todavía pueden guardarse como estado compartido de la calculadora; seleccionar un ejecutivo/semana no.
+## 2.0 — Nueva página de visitas de coordinación
 
-# Cambios V1.9.1 — Filtros sin sincronización
+- Sexta página protegida por Netlify Identity, optimizada para smartphone.
+- Secciones I–V replicadas según Excel, comentarios por sección, puntuación calculada y resumen.
+- Módulos y ejecutivos tomados de todos los XLS guardados; folios de lunes a domingo, hasta tres seleccionados.
+- Calidad de folios: 25% código, 25% APP, 25% Plan Cero, 25% Plan Dental; umbral ajustable (75% inicial).
+- Incidencias por módulo y semana, evaluación manual Resuelta/Pendiente.
+- Checklist personalizable con pesos, títulos, puntuaciones, etiquetas, colores, escala de texto y visibilidad de comentarios.
+- Imágenes de encabezado y firma originales del XLS, sustituibles desde Ajustes, incluidas en las exportaciones.
+- Historial de visitas por usuario, guardado manual mediante nueva Netlify Function, migración SQL.
+- PDF en tamaño carta vertical y PNG de alta resolución; firma de supervisor en blanco.
+- Se conserva el modelo económico 1.9.2: navegar por fechas, folios o ejecutivos no escribe en PostgreSQL.
 
-- Los filtros de la tabla de folios (`tableScope`, texto, pago, incidencias, APP, columna y valor) no generan ya ninguna escritura a PostgreSQL.
-- Los filtros se conservan en `sessionStorage` mientras dura la pestaña, sin enviarse a otras sesiones o dispositivos.
-- La opción “Mostrar folios sin código” también se aplica sólo localmente.
-- La selección de columnas visibles sigue sincronizándose como una preferencia permanente.
-- Se mantiene el ahorro de v1.9 (sin sondeo cada minuto; ajustes por lotes).
-- Sin cambios de esquema SQL ni en las reglas de cálculo de comisiones.
+## Versiones anteriores
 
-# Cambios V1.9 — Ahorro de créditos
+Se mantienen las cinco páginas del Dashboard, la lógica de comisiones y la sincronización optimizada de 1.9.2.
 
-- Eliminada la revisión periódica de PostgreSQL cada 60 segundos.
-- Revisión automática solamente al regresar tras 10 minutos de inactividad, con una Function `sync` que comprueba ajustes e historial en una petición.
-- La acción **↻ Sincronizar** guarda ajustes pendientes y recarga directamente (sin comprobación extra previa).
-- Guardado de ajustes agrupado: espera 3 segundos desde la última edición y envía varias claves en un único PUT/SQL.
-- No se reescriben valores de configuración idénticos en la base de datos.
-- Cola de ajustes pendientes persistida localmente, separada por ID de cuenta, con máximo dos reintentos automáticos.
-- Historial remoto: entrega paginada de hasta 8 archivos XLS pequeños por solicitud, con tope de respuesta.
-- Resuelta la exclusión de la clave `wmSamsTablaVisualV18` en la API de ajustes.
-- Conservadas las cinco páginas, cálculos, XLS de historial y exportaciones.
-- Retirado el texto fijo de explicación del reporte de Comparativa diaria, solicitado en la conversación anterior.
-- Versionado visual y del paquete actualizado a 1.9.0.
 
-No modifica las tablas existentes ni requiere un inicio de sesión nuevo. El ahorro de créditos real depende del uso y de las tarifas vigentes de Netlify.
+### Ajuste de impresión 2.0.1
+Los cinco apartados muestran un cuadro fijo **Comentarios** a la derecha en PDF y PNG, incluso cuando el campo está vacío. Se conserva una hoja carta vertical con reducción proporcional del contenido cuando hay observaciones extensas. No cambia la base de datos ni la puntuación.

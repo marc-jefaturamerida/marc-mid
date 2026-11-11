@@ -15,7 +15,8 @@ const KEYS = new Set([
   'wmSamsComparativaSemanalObjetivosV13',
   'wmSamsComisionesLayoutV5',
   'wmSamsMeridaReportTextsV17',
-  'wmSamsTablaVisualV18'
+  'wmSamsTablaVisualV18',
+  'wmSamsVisitConfigV20'
 ]);
 const PENDING_PREFIX = 'wmSamsCloudPendingV19:';
 const WRITE_DEBOUNCE_MS = 3000;

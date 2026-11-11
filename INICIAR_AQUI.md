@@ -1,67 +1,39 @@
-# INICIAR AQUÍ — Dashboard y comisiones Mérida v1.9.2
+# Dashboard y comisiones Mérida · Versión 2.0.1
 
-Esta carpeta reúne **todos los archivos necesarios** para crear un repositorio nuevo y publicarlo con **otra cuenta de Netlify**. No es necesario combinarla con archivos de versiones anteriores.
+## Publicación en Netlify
 
-## 1. Crear el repositorio en GitHub
+1. Descomprime el ZIP y sube el **contenido** de esta carpeta a la raíz de tu repositorio en GitHub. Mantén `index.html`, `package.json`, `netlify.toml`, `src/`, `public/` y `netlify/`.
+2. En Netlify importa el repositorio. Configura **Build command** `npm run build`, **Publish directory** `dist`, y deja **Base directory** vacío.
+3. Verifica que Netlify Database esté aprovisionada y que se ejecuten las migraciones de `netlify/database/migrations/`, especialmente **`20261111190000_create_dashboard_visits.sql`**.
+4. En **Data & storage → Database**, confirma las tablas `dashboard_settings`, `dashboard_reports` y `dashboard_visits`.
+5. Activa Netlify Identity, configura **Invite only** e invita los correos autorizados. Cada usuario accede a sus propios XLS, ajustes y visitas.
+6. Entra al Dashboard, importa XLS históricos y abre la **sexta pestaña, «Visitas de coordinación»**. El módulo y supervisor se eligen de los XLS. Solo aparecen los folios de la semana correspondiente (lunes a domingo).
+7. Completa el checklist, revisa folios e incidencias y captura compromisos. **La visita solo se envía al servidor cuando pulsas «Guardar visita».**
+8. Para editar títulos, ponderaciones, criterios, color, tamaño inicial de fuente, imagen de encabezado o firma del coordinador, abre **Ajustes → 9. Visitas de coordinación**.
+9. Para exportar, utiliza los botones PDF o PNG desde la visita, o los botones superiores. El PDF se optimiza para carta vertical y mantiene espacio para firmar en papel.
 
-1. Descomprime el ZIP.
-2. Crea un repositorio nuevo, preferentemente **privado**.
-3. Sube **el contenido de esta carpeta** a la raíz del repositorio (no el ZIP y no una carpeta contenedora adicional). Deben quedar `index.html`, `package.json` y `netlify.toml` en la raíz, junto con las carpetas `src/` y `netlify/`.
-4. Comprueba que GitHub haya incluido todos los archivos dentro de `src/`, `netlify/functions/`, `netlify/lib/` y `netlify/database/migrations/`. Una carpeta vacía no se sube por sí sola.
+## Archivos principales
 
-## 2. Crear el sitio en la otra cuenta de Netlify
+- `src/visits.js`: pantalla y cálculo de la visita.
+- `public/assets/visits.css`: diseño móvil, impresión y colores.
+- `public/assets/visit-header.png` y `public/assets/visit-signature.png`: imágenes **originales** extraídas de `Visitas del coordinador.xlsx`.
+- `netlify/functions/visits.js`: CRUD de visitas en el servidor, protegido con Netlify Identity.
+- `netlify/database/migrations/20261111190000_create_dashboard_visits.sql`: nueva tabla PostgreSQL `dashboard_visits`.
+- `src/legacy-app.js` y `src/cloud-boot.js`: cinco páginas anteriores y sincronización optimizada.
 
-1. Accede a la **cuenta nueva de Netlify** y selecciona **Add new project → Import an existing project**.
-2. Conecta el nuevo repositorio, usando la rama `main`.
-3. Configuración de publicación: **Build command:** `npm run build`, **Publish directory:** `dist`, **Base directory:** vacío (raíz del repositorio).
-4. Publica y revisa que Deploys indique `Published`. En `Data & storage → Database`, comprueba la creación de la base PostgreSQL y la aplicación de las migraciones SQL. El código de las tablas está en `netlify/database/migrations/`.
-5. En `Cloud compute → Functions`, comprueba que estén publicadas **files**, **settings**, **sync** y **health**.
-6. En `Data & storage → Identity`, habilita Identity, configura el registro **Invite only**, invita tu correo y completa el alta.
-7. Abre la URL nueva y prueba el inicio de sesión, la carga de un XLS, la modificación de un ajuste y la sincronización desde otro dispositivo.
+## Reglas y limitaciones
 
-## 3. Qué cambia al usar otra cuenta
+- Apartado II: los 50 puntos se calculan mediante los pesos de los criterios respondidos; solo Cumple suma puntos. Sin respuestas, 0.
+- Apartado III: selecciona hasta 3 folios de la semana; se calculan dos comprobaciones por folio: «registro correcto» y «calidad ≥ 75%». La calidad es 25% por código de barras, APP, Plan Cero y Plan Dental. La validación técnica de registro comprueba que estén presentes folio, fecha, ejecutivo y módulo. **No sustituye una revisión humana de la veracidad de los datos.** Puedes exigir además estatus pagable desde Ajustes. Si el XLS no contiene columna de activación APP, utiliza el estado predeterminado del Dashboard, y lo indica en pantalla.
+- Apartado IV: muestra las incidencias de la semana y módulo. El estado Resuelta/Pendiente se responde manualmente. Se conserva la fórmula original `20 / 3 × resueltas`, topada al máximo. Si no hay incidencias se asignan 20 puntos de manera predeterminada (personalizable en Ajustes).
+- Apartado V: Sí = +10, No = 0, En ceros = −10, conservando la fórmula.
+- Cinco campos de comentarios extensos, uno por sección. El reporte reduce su escala automáticamente para caber en carta; con textos excepcionalmente largos podría dejar de ser legible.
+- No se capturan fotografías ni firma del supervisor; la firma del coordinador sale impresa y la del supervisor queda en blanco.
+- Los XLS no se recargan de la nube al cambiar filtros, fechas o ejecutivos. Solo las ediciones de preferencias sincronizables y el botón explícito **Guardar visita** generan escrituras.
+- Las visitas de la nueva cuenta de Netlify no se copian automáticamente desde la cuenta anterior.
 
-- **La base de datos nueva empieza vacía.** Los XLS y ajustes de tu cuenta anterior de Netlify **no se transfieren automáticamente**. Tendrás que volver a importar los XLS y configurar las preferencias, salvo que realices una migración de datos separada.
-- **Los usuarios de Identity también son nuevos**: hay que volver a invitar y activar el correo.
-- Nunca publiques XLS con datos de clientes dentro del repositorio.
-- No borres la base de datos anterior hasta comprobar que recuperaste lo necesario.
-- La versión 1.9.2 evita el sondeo continuo de PostgreSQL y realiza los cálculos y exportaciones en cada navegador. El consumo de créditos sigue dependiendo del uso real.
+La compilación de Netlify y el funcionamiento real del entorno remoto requieren validar el nuevo despliegue en tu propia cuenta. Si `dashboard_visits` no existe tras desplegar, revisa que el SQL haya llegado a GitHub y el registro de migraciones de Netlify.
 
-## Comprobación de estructura
 
-```text
-index.html
-package.json
-netlify.toml
-.gitignore
-README.md
-CHANGELOG.md
-INICIAR_AQUI.md
-src/
-  cloud-boot.js
-  legacy-app.js
-netlify/
-  functions/
-    files.js
-    health.js
-    settings.js
-    sync.js
-  lib/
-    _shared.js
-  database/
-    migrations/
-      20261111010000_create_dashboard_tables.sql
-      20261111061500_ensure_dashboard_tables.sql
-```
-
-Para detalles de funcionamiento y ahorro de créditos consulta `README.md` y `CHANGELOG.md`.
-
-## Ahorro adicional v1.9.2
-
-Filtrar, buscar, cambiar fecha o cambiar el estado visible de los folios no manda datos a PostgreSQL. Los filtros de folios se guardan sólo en la pestaña actual (sessionStorage). Las columnas visibles sí se sincronizan.
-
-## Actualización V1.9.2
-
-Para actualizar un proyecto que ya funciona, basta cambiar `src/legacy-app.js` e `index.html` (el resto de archivos del ZIP queda compatible).
-Para un repositorio nuevo, sube **todo el contenido** de esta carpeta con la estructura de subcarpetas.
-El cambio evita sincronización al elegir ejecutivo/semana; no requiere reinicializar Netlify Database ni Identity.
+### Ajuste de impresión 2.0.1
+Los cinco apartados muestran un cuadro fijo **Comentarios** a la derecha en PDF y PNG, incluso cuando el campo está vacío. Se conserva una hoja carta vertical con reducción proporcional del contenido cuando hay observaciones extensas. No cambia la base de datos ni la puntuación.
