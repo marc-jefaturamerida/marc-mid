@@ -390,6 +390,33 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
 @media(max-width:800px){.all-records-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.all-records-page{padding:12px}.all-records-filter-grid,.all-records-primary,.all-records-column-filter{grid-template-columns:1fr}.all-records-primary{gap:8px}.all-records-hero h2{font-size:20px}.all-records-page .field select,.all-records-page .field input{font-size:16px;height:44px}.all-records-table-wrap{max-height:63vh}.all-records-pagination{align-items:stretch}.all-records-page-actions{width:100%;justify-content:flex-start}}
 @media print{#allRecordsPage{display:none!important}}
+
+/* V2.2 · Calidad, metas globales, supervisores y búsquedas sin costo. */
+.daily-table th:first-child,.daily-table td:first-child{width:25%;}
+.daily-table th:not(:first-child),.daily-table td:not(:first-child){width:10.714%;}
+.daily-table th:last-child,.daily-table td:last-child{font-weight:850;color:var(--blue-deep)}
+.weekly-table th:first-child,.weekly-table td:first-child{width:26%}
+.weekly-table th:not(:first-child),.weekly-table td:not(:first-child){width:10.57%}
+.weekly-table td.quality-global,.weekly-table .weekly-quality td{background:#eaf6f0;color:#115b49;font-weight:850}
+.weekly-table td.quality-unavailable{color:#728397}
+.quality-explain{font-size:11px;color:var(--sub);line-height:1.5;margin:8px 0 11px}
+.supervisor-choice-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.supervisor-choice-row label{display:inline-flex;gap:5px;align-items:center;font-size:12px;font-weight:650}
+.settings-quality-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:13px 0}
+.settings-quality-grid label,.module-goal-grid label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:750;color:var(--blue-deep)}
+.settings-quality-grid input,.module-goal-grid input{height:38px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0;width:100%;background:var(--white);color:var(--ink)}
+.module-goal-card{border:1px solid var(--line);border-radius:10px;background:var(--white);margin:9px 0;padding:10px}
+.module-goal-card summary{cursor:pointer;font-weight:800;color:var(--blue-deep);padding:5px}
+.module-goal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;padding:10px 0}
+.supervisor-control{display:flex;align-items:center;gap:8px;padding:11px 13px;margin:10px 0;background:var(--white);border:1px solid var(--line);border-radius:10px;font-size:12px;font-weight:750;color:var(--blue-deep)}
+.supervisor-control input{width:17px;height:17px;accent-color:var(--blue)}
+.folio-main-search{padding:12px 14px;display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;border:1px solid var(--line);background:var(--white);border-radius:10px;margin:8px 0 12px}
+.folio-main-search label{font-size:12px;color:var(--blue-deep);font-weight:800;align-self:center}
+.folio-main-search>.field{flex:1;min-width:220px}.folio-main-search input{flex:1 1 220px;min-width:0;height:40px;border:1px solid #c7d7e7;background:#fff;border-radius:8px;padding:9px 12px;font-size:13px}
+.report-page .report-daily-grid .daily-report-table th:first-child,.report-page .report-daily-grid .daily-report-table td:first-child{width:25%}
+.report-page .report-daily-grid .daily-report-table td{font-size:8px;padding:5px 2px}
+@media(max-width:650px){.folio-main-search{padding:10px}.folio-main-search label{width:100%}}
+@media print{.supervisor-control,.folio-main-search{display:none!important}}
 </style>
 </head>
 <body>
@@ -469,7 +496,7 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
 <div class="settings-body">
 <div class="records-controls">
 <div class="field"><label for="tableScope">Alcance de la vista</label><select id="tableScope"><option value="filtered">Semana y ejecutivo seleccionados</option><option value="all">Todos los registros activos</option></select></div>
-<div class="field"><label for="tableFilter">Buscar en cualquier columna</label><input autocomplete="off" id="tableFilter" placeholder="Folio, fecha, producto, código…"/></div>
+
 <div class="field"><label for="tablePaymentFilter">Validación de pago</label><select id="tablePaymentFilter"><option value="">Todos</option><option value="payable">Comisionable</option><option value="notpayable">No pagable</option><option value="nocode">Sin código (venta no completada)</option></select></div>
 <div class="field"><label for="tableIncFilter">Incidencia</label><select id="tableIncFilter"><option value="">Todas</option><option value="flagged">Con incidencia</option><option value="unflagged">Sin incidencia</option></select></div>
 <div class="field"><label for="tableAppFilter">Activación APP</label><select id="tableAppFilter"><option value="">Todas</option><option value="on">APP activa</option><option value="off">APP inactiva</option></select></div>
@@ -482,6 +509,20 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
 <div class="settings-actions"><button class="btn small" id="resetTableSettings" type="button">Restaurar vista predeterminada</button><span>Los filtros y columnas cambian solo la visualización; no eliminan ventas del cálculo.</span></div>
 </div>
 </details></div>
+</div></details>
+
+<details class="settings-group" id="settingsQualityV22"><summary class="settings-group-title"><span><span class="settings-number">10</span> Objetivos y factores de calidad</span></summary><div class="settings-group-body">
+  <p class="settings-help">Las metas semanales se adaptan al periodo consultado. Los objetivos de porcentaje y ponderaciones se aplican a todos los ejecutivos; cada módulo puede tener objetivos propios. Esta calidad es informativa y NO cambia las comisiones.</p>
+  <div class="settings-quality-grid" id="qualityGlobalInputs"></div>
+  <p class="settings-help">Los factores con cumplimiento inferior al mínimo configurado aportan 0. La primera compra y APP se topan al 100%; Cumplimiento y Programa Cero permiten superar 100%. Las ponderaciones se normalizan si no suman 100.</p>
+  <h4>Objetivos por módulo</h4><div id="qualityModuleInputs"></div>
+  <button id="qualityReset" class="btn small" type="button">Restaurar objetivos y factores predeterminados</button>
+  <span id="qualitySaveStatus" class="settings-help">Ajustes por cuenta, sincronizados solo cuando los modificas.</span>
+</div></details>
+<details class="settings-group" id="settingsSupervisorsV22"><summary class="settings-group-title"><span><span class="settings-number">11</span> Supervisores por módulo</span></summary><div class="settings-group-body">
+  <p class="settings-help">Marca quién es supervisor de cada módulo a partir de los ejecutivos presentes en los XLS. Puedes asignar varios; la exclusión es independiente para cada página de comparativos.</p>
+  <div id="supervisorManager"></div>
+  <div class="settings-help" id="supervisorSaveStatus">Se guardan las asignaciones solo cuando las modificas.</div>
 </div></details>
 <details class="settings-group" id="settingsVisits"><summary class="settings-group-title"><span><span class="settings-number">9</span> Visitas de coordinación</span></summary><div class="settings-group-body">
 <p class="settings-help">Personaliza el acuse, los criterios, sus pesos, el logo y la firma. Estos ajustes se guardan en tu cuenta y se comparten con tus dispositivos. Solo las visitas guardadas explícitamente se envían a PostgreSQL.</p>
@@ -508,11 +549,11 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
     <div class="field"><label for="dailyCurrentDate">Día principal</label><input type="date" id="dailyCurrentDate" disabled /></div>
     <div class="field"><label for="dailyPreviousDate">Día a comparar</label><input type="date" id="dailyPreviousDate" disabled /></div>
   </div>
-  <div class="daily-guide"><div class="daily-legend"><span>En cada indicador: <strong>total del día principal</strong> y variación frente al día comparado.</span><span class="up">▲ Subió</span><span class="down">▼ Bajó</span><span class="same">— Igual</span></div><span id="dailyDataNotice"></span></div>
+  <label class="supervisor-control"><input type="checkbox" id="includeSupervisorsDaily" checked/> Incluir registros de supervisores en esta comparativa <span class="muted">(solo afecta esta página)</span></label><div class="daily-guide"><div class="daily-legend"><span>En cada indicador: <strong>total del día principal</strong> y variación frente al día comparado.</span><span class="up">▲ Subió</span><span class="down">▼ Bajó</span><span class="same">— Igual</span></div><span id="dailyDataNotice"></span></div>
   <div class="daily-scroll" aria-label="Desplaza horizontalmente para ver las dos tablas en paralelo">
     <div class="daily-pair">
-      <article class="daily-panel"><div class="daily-panel-title"><h3>Por módulo</h3><span id="dailyModulesCount">—</span></div><table class="daily-table" id="dailyModuleTable"><thead><tr><th>Módulo</th><th title="Total de registros">Registros</th><th title="Ventas totales con código">Ventas</th><th title="Ventas regulares">Regulares</th><th title="Ventas garantizadas">Garant.</th><th title="Programas Cero">P. Cero</th><th title="Planes Dentales">Dental</th></tr></thead><tbody id="dailyModuleRows"><tr><td colspan="7" class="daily-empty">Importa un XLS para mostrar resultados.</td></tr></tbody><tfoot id="dailyModuleTotal"></tfoot></table></article>
-      <article class="daily-panel"><div class="daily-panel-title"><h3>Por ejecutivo</h3><span id="dailyExecutivesCount">—</span></div><table class="daily-table" id="dailyExecutiveTable"><thead><tr><th>Ejecutivo</th><th title="Total de registros">Registros</th><th title="Ventas totales con código">Ventas</th><th title="Ventas regulares">Regulares</th><th title="Ventas garantizadas">Garant.</th><th title="Programas Cero">P. Cero</th><th title="Planes Dentales">Dental</th></tr></thead><tbody id="dailyExecutiveRows"><tr><td colspan="7" class="daily-empty">Importa un XLS para mostrar resultados.</td></tr></tbody><tfoot id="dailyExecutiveTotal"></tfoot></table></article>
+      <article class="daily-panel"><div class="daily-panel-title"><h3>Por módulo</h3><span id="dailyModulesCount">—</span></div><table class="daily-table" id="dailyModuleTable"><thead><tr><th>Módulo</th><th title="Total de registros">Registros</th><th title="Ventas totales con código">Ventas</th><th title="Ventas regulares">Regulares</th><th title="Ventas garantizadas">Garant.</th><th title="Programas Cero">P. Cero</th><th title="Planes Dentales">Dental</th><th title="Calidad operativa sobre objetivos configurados">Calidad</th></tr></thead><tbody id="dailyModuleRows"><tr><td colspan="8" class="daily-empty">Importa un XLS para mostrar resultados.</td></tr></tbody><tfoot id="dailyModuleTotal"></tfoot></table></article>
+      <article class="daily-panel"><div class="daily-panel-title"><h3>Por ejecutivo</h3><span id="dailyExecutivesCount">—</span></div><table class="daily-table" id="dailyExecutiveTable"><thead><tr><th>Ejecutivo</th><th title="Total de registros">Registros</th><th title="Ventas totales con código">Ventas</th><th title="Ventas regulares">Regulares</th><th title="Ventas garantizadas">Garant.</th><th title="Programas Cero">P. Cero</th><th title="Planes Dentales">Dental</th><th title="Calidad operativa sobre objetivos configurados">Calidad</th></tr></thead><tbody id="dailyExecutiveRows"><tr><td colspan="8" class="daily-empty">Importa un XLS para mostrar resultados.</td></tr></tbody><tfoot id="dailyExecutiveTotal"></tfoot></table></article>
     </div>
   </div>
   
@@ -528,14 +569,14 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
     <div class="field"><label for="accumulatedTo">Fecha final (opcional)</label><input type="date" id="accumulatedTo"></div>
     <button class="btn small" type="button" id="accumulatedClearDates">Mostrar todo</button>
   </div>
-  <p class="accumulated-notice" id="accumulatedDataNotice">Se incluyen exclusivamente los XLS guardados en este navegador, sin duplicar registros repetidos. Los archivos temporales y la selección de las demás páginas no cambian estos acumulados.</p>
+  <label class="supervisor-control"><input type="checkbox" id="includeSupervisorsAccumulated" checked/> Incluir registros de supervisores en esta comparativa <span class="muted">(solo afecta esta página)</span></label><p class="accumulated-notice" id="accumulatedDataNotice">Se incluyen exclusivamente los XLS guardados en este navegador, sin duplicar registros repetidos. Los archivos temporales y la selección de las demás páginas no cambian estos acumulados.</p>
   <div class="daily-scroll" aria-label="Tablas acumuladas por módulo y ejecutivo, una al lado de la otra">
     <div class="daily-pair">
       <article class="daily-panel"><div class="daily-panel-title"><h3>Acumulado por módulo</h3><span id="accumulatedModulesCount">—</span></div>
-        <table class="daily-table" id="accumulatedModuleTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th></tr></thead><tbody id="accumulatedModuleRows"><tr><td colspan="7" class="daily-empty">No hay XLS guardados.</td></tr></tbody><tfoot id="accumulatedModuleTotal"></tfoot></table>
+        <table class="daily-table" id="accumulatedModuleTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th><th title="Calidad operativa sobre objetivos configurados">Calidad</th></tr></thead><tbody id="accumulatedModuleRows"><tr><td colspan="8" class="daily-empty">No hay XLS guardados.</td></tr></tbody><tfoot id="accumulatedModuleTotal"></tfoot></table>
       </article>
       <article class="daily-panel"><div class="daily-panel-title"><h3>Acumulado por ejecutivo</h3><span id="accumulatedExecutivesCount">—</span></div>
-        <table class="daily-table" id="accumulatedExecutiveTable"><thead><tr><th>Ejecutivo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th></tr></thead><tbody id="accumulatedExecutiveRows"><tr><td colspan="7" class="daily-empty">No hay XLS guardados.</td></tr></tbody><tfoot id="accumulatedExecutiveTotal"></tfoot></table>
+        <table class="daily-table" id="accumulatedExecutiveTable"><thead><tr><th>Ejecutivo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th><th title="Calidad operativa sobre objetivos configurados">Calidad</th></tr></thead><tbody id="accumulatedExecutiveRows"><tr><td colspan="8" class="daily-empty">No hay XLS guardados.</td></tr></tbody><tfoot id="accumulatedExecutiveTotal"></tfoot></table>
       </article>
     </div>
   </div>
@@ -550,7 +591,7 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
     <div class="field"><label for="weeklyPrimaryDate">Semana principal</label><input type="date" id="weeklyPrimaryDate"/><div class="weekly-control-date" id="weeklyPrimaryLabel">—</div></div>
     <div class="field"><label for="weeklyPreviousDate">Semana a comparar</label><input type="date" id="weeklyPreviousDate"/><div class="weekly-control-date" id="weeklyPreviousLabel">—</div></div>
   </div>
-  <section aria-label="Variación total entre las semanas">
+  <label class="supervisor-control"><input type="checkbox" id="includeSupervisorsWeekly" checked/> Incluir registros de supervisores en esta comparativa <span class="muted">(solo afecta esta página)</span></label><section aria-label="Variación total entre las semanas">
     <div class="weekly-variance-head"><h3>Variación de resultados</h3><span id="weeklyVarianceContext">Semana principal − semana comparada</span></div>
     <div class="weekly-variance-grid" id="weeklyVarianceGrid"></div>
   </section>
@@ -558,12 +599,12 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
   <div class="weekly-comparison-scroll" aria-label="Dos tablas de módulos, una por semana, colocadas lado a lado">
     <div class="weekly-comparison-grid">
       <article class="daily-panel weekly-panel"><div class="daily-panel-title"><h3 id="weeklyPrimaryTitle">Fecha de comparación 1</h3><span id="weeklyPrimaryModules">—</span></div>
-        <table class="weekly-table" id="weeklyPrimaryTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th></tr></thead>
-        <tbody id="weeklyPrimaryRows"><tr><td colspan="7" class="daily-empty">No hay datos guardados.</td></tr></tbody><tfoot id="weeklyPrimaryFooter"></tfoot></table>
+        <table class="weekly-table" id="weeklyPrimaryTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th><th title="Calidad operativa global ponderada">Calidad</th></tr></thead>
+        <tbody id="weeklyPrimaryRows"><tr><td colspan="8" class="daily-empty">No hay datos guardados.</td></tr></tbody><tfoot id="weeklyPrimaryFooter"></tfoot></table>
       </article>
       <article class="daily-panel weekly-panel"><div class="daily-panel-title"><h3 id="weeklyPreviousTitle">Fecha de comparación 2</h3><span id="weeklyPreviousModules">—</span></div>
-        <table class="weekly-table" id="weeklyPreviousTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th></tr></thead>
-        <tbody id="weeklyPreviousRows"><tr><td colspan="7" class="daily-empty">No hay datos guardados.</td></tr></tbody><tfoot id="weeklyPreviousFooter"></tfoot></table>
+        <table class="weekly-table" id="weeklyPreviousTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th><th title="Calidad operativa global ponderada">Calidad</th></tr></thead>
+        <tbody id="weeklyPreviousRows"><tr><td colspan="8" class="daily-empty">No hay datos guardados.</td></tr></tbody><tfoot id="weeklyPreviousFooter"></tfoot></table>
       </article>
     </div>
   </div>
@@ -676,6 +717,7 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
 <div class="table-wrap"><table id="comparisonTable"><thead><tr><th>Concepto</th><th>Escenario base</th><th>Simulación</th><th>Diferencia</th></tr></thead><tbody id="comparisonRows"></tbody></table></div>
 <p class="rate-caption" id="comparisonNote">Los porcentajes de penalización se suman y se calculan sobre el subtotal de conceptos más el bono.</p>
 </section></div></details><details class="layout-section" data-section="records" hidden="" id="sec-records" open=""><summary class="layout-summary"><span class="layout-name">Tabla de folios importados</span><span class="layout-hint">Mostrar / ocultar</span></summary><div class="layout-content"><section class="section-card" hidden="" id="recordsSection">
+<div class="folio-main-search"><label for="tableFilter">Buscar en toda la tabla</label><input autocomplete="off" id="tableFilter" placeholder="Folio, fecha, producto, código…"/></div>
 <details class="records-disclosure" id="recordsDisclosure" open="">
 <summary class="records-summary">Tabla de folios importados <span class="pill" id="recordsCount">0 folios</span></summary>
 <div class="records-inner">
@@ -699,7 +741,7 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
     <summary>Filtros avanzados <span class="all-records-active" id="allRecordsActiveFilters">Ningún filtro adicional</span></summary>
     <div class="all-records-advanced-body">
       <div class="all-records-filter-grid">
-        <div class="field"><label for="allRecordsSearch">Buscar en todos los campos</label><input id="allRecordsSearch" type="search" autocomplete="off" placeholder="Folio, fecha, código, producto…"></div>
+        
         <div class="field"><label for="allRecordsFrom">Fecha desde</label><input id="allRecordsFrom" type="date"></div>
         <div class="field"><label for="allRecordsTo">Fecha hasta</label><input id="allRecordsTo" type="date"></div>
         <div class="field"><label for="allRecordsPay">Validación de pago</label><select id="allRecordsPay"><option value="">Todas</option><option value="payable">Comisionable</option><option value="notpayable">No pagable</option><option value="nocode">Sin código</option></select></div>
@@ -722,11 +764,12 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
     <div class="field"><label for="allRecordsModule">Módulo</label><select id="allRecordsModule"><option value="">Todos los módulos</option></select></div>
     <div class="field"><label for="allRecordsExecutive">Ejecutivo</label><select id="allRecordsExecutive"><option value="">Todos los ejecutivos</option></select></div>
   </div>
+  <div class="folio-main-search"><div class="field"><label for="allRecordsSearch">Buscar en todos los campos</label><input id="allRecordsSearch" type="search" autocomplete="off" placeholder="Folio, fecha, código, producto…"></div></div>
   <div class="all-records-summary" id="allRecordsSummary"></div>
   <div class="all-records-help">Las columnas se muestran según <strong>Ajustes → Tabla de folios</strong>. Incidencia y APP permanecen a la vista para validarlas. Desliza horizontalmente para ver más columnas.</div>
   <div class="table-wrap all-records-table-wrap"><table id="allRecordsTable" class="record-table all-records-table"><thead id="allRecordsHead"></thead><tbody id="allRecordsBody"><tr><td>Importa un XLS para mostrar registros.</td></tr></tbody></table></div>
   <div class="all-records-pagination"><span id="allRecordsPageStatus">0 registros</span><div class="all-records-page-actions"><label for="allRecordsPageSize">Filas por página</label><select id="allRecordsPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" type="button" id="allRecordsPrev">Anterior</button><button class="btn small" type="button" id="allRecordsNext">Siguiente</button></div></div>
-  <footer class="foot">Consulta de registros XLS · Versión 2.1</footer>
+  <footer class="foot">Consulta de registros XLS · Versión 2.2</footer>
 </section>
 
 <section id="visitPage" class="visit-page" hidden aria-label="Acuse de visita de coordinación">
@@ -734,14 +777,14 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 2.1</footer>
+  <footer class="foot">Acuse de coordinación · Versión 2.2</footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 2.1</footer>
+<footer class="foot">Final de la presentacion · Versión 2.2</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 

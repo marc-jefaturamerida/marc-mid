@@ -1,4 +1,4 @@
-# Dashboard y comisiones Mérida · Versión 2.1
+# Dashboard y comisiones Mérida · Versión 2.2
 
 ## Publicación en Netlify
 
@@ -38,7 +38,7 @@ La compilación de Netlify y el funcionamiento real del entorno remoto requieren
 ### Ajuste de impresión 2.0.1
 Los cinco apartados muestran un cuadro fijo **Comentarios** a la derecha en PDF y PNG, incluso cuando el campo está vacío. Se conserva una hoja carta vertical con reducción proporcional del contenido cuando hay observaciones extensas. No cambia la base de datos ni la puntuación.
 
-## Versión 2.1 · Detalle de comisiones
+## Versión 2.0.2 · Detalle de comisiones
 
 La Calculadora individual ahora incluye en Base y Simulación un desglose de cada concepto: total pagado, cantidad y tarifa unitaria vigente del escalón. Se incluye en PDF, PNG y CSV. La actualización es visual y no cambia la base de datos ni las reglas de cálculo.
 
@@ -54,3 +54,15 @@ La Calculadora individual ahora incluye en Base y Simulación un desglose de cad
 7. Cambia la cantidad de filas por página abajo de la tabla. El botón global **Exportar CSV** y las exportaciones **PDF / PNG** usan todas las filas que cumplan los filtros, no sólo las que ves en la página actual.
 
 Esta nueva página no requiere migraciones SQL adicionales. La navegación y los filtros se ejecutan en el navegador, por lo que no incrementan el consumo de Netlify Database. Los XLS históricos siguen en la base existente.
+
+
+## Novedades de la versión 2.2
+
+1. Abre las páginas 3 (**Comparativa diaria**) y 4 (**Acumulado general**) y comprueba la columna final **Calidad** en tablas de módulo y ejecutivo.
+2. En la página 5 (**Comparativa semanal**) revisa **Calidad de factores** y **Alcance global** en ambas tablas. Puedes introducir o cambiar metas en la fila de objetivos.
+3. Desde **⚙ Ajustes → 10. Calidad y objetivos** define metas semanales por módulo, meta global por ejecutivo, objetivos de cuatro factores, umbral mínimo y ponderaciones. Las metas/ponderaciones específicas de un módulo prevalecen; si se dejan vacías aplican las globales.
+4. Desde **⚙ Ajustes → 11. Supervisores por módulo** selecciona entre los ejecutivos presentes en los XLS. Puedes marcar más de uno por módulo.
+5. Las casillas **Incluir registros de supervisores** en páginas 3, 4 y 5 filtran los registros localmente y no modifican el origen XLS.
+6. La búsqueda principal sobre folios de las páginas 1 y 7 permanece visible y no sincroniza. Los resultados de la página 7 se muestran de fecha más reciente a más antigua, también en exportaciones.
+
+**Implementación:** solo sustituye el repositorio con este proyecto completo y realiza Commit. No se añade ninguna tabla ni migración SQL en la V2.2. Las nuevas configuraciones se sincronizan mediante Netlify Functions existentes. Como antes, el despliegue se debe comprobar en la cuenta real.

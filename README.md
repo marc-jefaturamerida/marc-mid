@@ -1,4 +1,4 @@
-# Dashboard y comisiones Mérida · V2.1 Online
+# Dashboard y comisiones Mérida · V2.2 Online
 
 Proyecto completo de Netlify. Incluye las seis páginas anteriores, la **Visita de coordinación** adaptada a teléfonos, Netlify Identity, Netlify Database (PostgreSQL), funciones de servidor y exportaciones PDF/PNG.
 
@@ -42,3 +42,18 @@ La pestaña **Registros XLS** permite consultar el conjunto de filas únicas de 
 - **Economía Netlify:** filtrar, buscar, cambiar módulo/ejecutivo y paginar son operaciones completamente locales; no guardan configuraciones ni consultan PostgreSQL. Solo marcar Incidencia o cambiar APP persiste la validación del folio mediante el mecanismo ya existente.
 
 No se modifica el esquema PostgreSQL ni las Netlify Functions. No es necesario volver a cargar XLS ya guardados. Si una tabla contiene demasiadas columnas para una hoja, el PDF reduce tipografía y conserva el encabezado de columnas al continuar en páginas sucesivas.
+
+
+## Versión 2.2 · Calidad y supervisores
+
+**Página 3 – Comparativa diaria:** calidad calculada por módulo y por ejecutivo con los cuatro factores configurables. Se mantiene el comparativo frente al día elegido; el objetivo semanal se prorratea a un día para esta vista.
+
+**Página 4 – Acumulado general:** los dos comparativos incluyen calidad calculada del conjunto de registros visibles. El objetivo semanal corresponde al número de semanas representadas.
+
+**Página 5 – Comparativa semanal:** las dos tablas muestran **Calidad de factores** (nivel respecto a metas para los seis indicadores) y **Alcance global** (calidad operativa ponderada en los cuatro factores). Si defines la meta de ventas en la fila de objetivos de la semana, se usa esa meta para el cálculo global de esa semana.
+
+**Ajustes:** dos apartados nuevos, Calidad y objetivos (metas, umbrales, pesos y valores por módulo) y Supervisores por módulo (elegibles entre los ejecutivos cargados). Ambos se sincronizan en Netlify con la sesión autenticada. Las casillas para incluir supervisores en páginas 3–5 funcionan de forma local y se pueden ajustar independientemente en cada página.
+
+**Búsqueda de folios:** el filtro general en páginas 1 y 7 siempre está visible. La página 7 conserva el orden cronológico descendente en pantalla y exportaciones.
+
+No se modifican comisiones, Netlify Identity, las funciones de servidor ni el esquema de PostgreSQL. Los filtros siguen funcionando localmente sin consumir escrituras de ajustes.

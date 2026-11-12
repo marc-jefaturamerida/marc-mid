@@ -1,3 +1,24 @@
+# Versión 2.2 · Calidad, objetivos y supervisores
+
+- Páginas 3 **Comparativa diaria** y 4 **Acumulado general**: columna final **Calidad** para módulos y ejecutivos; también se imprime y exporta.
+- Página 5 **Comparativa semanal por módulo**: nueva columna Calidad y filas **CALIDAD DE FACTORES** y **ALCANCE GLOBAL**, con metas semanales de registros y ventas y comparativas de los objetivos.
+- **Ajustes → 10. Calidad y objetivos de módulos y ejecutivos**: configuración global de objetivos, mínimo de puntuación, pesos de factores y meta semanal ejecutiva; adicionalmente, cada módulo tiene objetivos, metas y ponderaciones personalizadas. Los valores de módulos vacíos heredan los globales.
+- **Ajustes → 11. Supervisores por módulo**: asigna como supervisores a los ejecutivos detectados en los XLS del módulo. Se conserva por usuario en la nube.
+- En las páginas 3, 4 y 5, casilla **Incluir registros de supervisores**, marcada inicialmente. Su cambio solo filtra/recalcula la página activa, sin persistir cambios en Netlify.
+- Búsqueda general de texto siempre visible antes de la tabla de folios de la página 1 y de la tabla de registros de la página 7; filtros por página, sin consultas remotas.
+- En la página 7 se conserva ordenamiento descendente por fecha, con registros sin fecha al final, también en PDF, PNG y CSV.
+- Se mantiene intacta la fórmula de comisiones; las columnas de calidad son análisis operativo independiente.
+- No requiere modificar el esquema PostgreSQL ni añadir Netlify Functions. Las dos nuevas preferencias se sincronizan por la función de Ajustes ya incluida.
+
+## Fórmula de calidad operativa configurada
+
+- **Cumplimiento**: ventas con código de barras / meta asignada. Referencia global 100%; sin tope superior.
+- **Primera compra**: ventas con Plan Cero **o** Plan Dental (una vez por venta) / ventas con código. Referencia 90%; calidad máxima 100%.
+- **Programa Cero**: Planes Cero en ventas regulares / ventas regulares. Referencia 30%; sin tope superior.
+- **Activación APP**: activaciones según casillas APP / ventas con código. Referencia 90%; calidad máxima 100%.
+- Si el cumplimiento real respecto al objetivo de un factor está por debajo del 60% (mínimo configurable), su puntuación es cero; la calidad global es el promedio ponderado de los factores, tomando pesos editables.
+- En la página 5, la fila Calidad de factores mide, para los seis indicadores, su resultado respecto a la meta capturada o predefinida, con la regla mínima; Alcance global muestra los cuatro factores de calidad operativa anteriores. La meta de ventas que se escriba en la comparativa semanal prevalece para ese cálculo global.
+
 # Versión 2.1 · Consulta de registros XLS
 
 - Nueva página 7 con tabla completa de los registros XLS activos, sin limitar por semana ni ejecutivo de la calculadora.
