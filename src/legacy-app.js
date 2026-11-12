@@ -688,13 +688,12 @@ const QUALITY_STORAGE_V22='wmSamsMeridaQualityConfigV22';
 const SUPERVISORS_STORAGE_V22='wmSamsMeridaSupervisorsV22';
 const QUALITY_FACTORS=['completion','purchase','p0','app'];
 const QUALITY_FACTOR_LABELS={completion:'Cumplimiento',purchase:'Primera compra (P0 o Dental)',p0:'Programa Cero',app:'Activación APP'};
-const QUALITY_DEFAULTS={execWeeklyGoal:10,minimum:60,targets:{completion:100,purchase:90,p0:30,app:90},weights:{completion:25,purchase:25,p0:25,app:25},modules:{}};
+const QUALITY_DEFAULTS={execWeeklyGoal:10,targets:{completion:100,purchase:90,p0:30,app:90},weights:{completion:25,purchase:25,p0:25,app:25},modules:{}};
 function storedJson(key){try{return JSON.parse(localStorage.getItem(key)||'null')}catch(_){return null}}
 function cleanQualityConfig(saved){
   const result=structuredClone(QUALITY_DEFAULTS);
   if(!saved||typeof saved!=='object')return result;
   if(Number.isFinite(Number(saved.execWeeklyGoal))&&Number(saved.execWeeklyGoal)>0)result.execWeeklyGoal=Number(saved.execWeeklyGoal);
-  if(Number.isFinite(Number(saved.minimum))&&Number(saved.minimum)>=0&&Number(saved.minimum)<=100)result.minimum=Number(saved.minimum);
   for(const kind of ['targets','weights'])for(const key of QUALITY_FACTORS){
     const val=Number(saved[kind]?.[key]);if(saved[kind]?.[key]!==undefined&&Number.isFinite(val)&&val>=0&&val<=1000)result[kind][key]=val;
   }
@@ -720,7 +719,7 @@ function qualityTarget(key,module,groupBy){return groupBy==='module'?(moduleQual
 function qualityMetricFactor(actual,target,{cap=false}={}){
   if(!Number.isFinite(actual)||!Number.isFinite(target)||target<=0)return null;
   const normalized=actual/target*100;
-  return normalized<qualityConfig.minimum?0:(cap?Math.min(100,normalized):normalized);
+  return cap?Math.min(100,normalized):normalized;
 }
 function qualityPercentText(value){return Number.isFinite(value)?pct(value):'—';}
 function countQualityRows(rows){
@@ -780,7 +779,7 @@ function knownExecutivesByModule(){
 function qualitySettingsInput(label,key,value,type='global'){return `<label>${esc(label)}<input type="number" min="0" max="100000" step="0.1" data-quality-kind="${type}" data-quality-key="${key}" value="${Number(value)||0}"></label>`;}
 function renderQualitySettings(){
   const host=el('qualityGlobalInputs');if(!host)return;
-  host.innerHTML=[qualitySettingsInput('Meta semanal por ejecutivo (predeterminada)','execWeeklyGoal',qualityConfig.execWeeklyGoal),qualitySettingsInput('Mínimo para puntuar un factor (%)','minimum',qualityConfig.minimum),...QUALITY_FACTORS.flatMap(key=>[
+  host.innerHTML=[qualitySettingsInput('Meta semanal por ejecutivo (predeterminada)','execWeeklyGoal',qualityConfig.execWeeklyGoal),...QUALITY_FACTORS.flatMap(key=>[
     qualitySettingsInput(`Objetivo ${QUALITY_FACTOR_LABELS[key]} (%)`,key,qualityConfig.targets[key],'target'),
     qualitySettingsInput(`Ponderación ${QUALITY_FACTOR_LABELS[key]} (%)`,key,qualityConfig.weights[key],'weight')])].join('');
   const modules=knownExecutivesByModule();
@@ -804,7 +803,7 @@ function initQualitySettings(){
   el('qualityGlobalInputs').addEventListener('change',e=>{
     const x=e.target;if(!x.matches('[data-quality-kind]'))return;
     const n=Number(x.value),kind=x.dataset.qualityKind,key=x.dataset.qualityKey;
-    if(!Number.isFinite(n)||n<0||(kind==='target'&&n<=0)||(kind==='global'&&key==='execWeeklyGoal'&&n<=0)||(kind==='global'&&key==='minimum'&&n>100)) {alert('Ingresa un número válido mayor o igual a cero.');renderQualitySettings();return;}
+    if(!Number.isFinite(n)||n<0||(kind==='target'&&n<=0)||(kind==='global'&&key==='execWeeklyGoal'&&n<=0)) {alert('Ingresa un número válido mayor o igual a cero.');renderQualitySettings();return;}
     if(kind==='global')qualityConfig[key]=n;else qualityConfig[kind==='target'?'targets':'weights'][key]=n;
     saveQualityConfig();el('qualitySaveStatus').textContent='Objetivos actualizados; guardado en la nube pendiente de confirmación.';
   });
@@ -1557,7 +1556,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     el('imageScale').addEventListener('change',e=>{uiLayout.scale=[1,2,3,4].includes(Number(e.target.value))?Number(e.target.value):3;saveLayout();});
     el('previewReport').addEventListener('click',()=>{buildReport();window.print();});
   }
-  // Versión 2.2: textos comunes a PDF y PNG. El título es global y el resto es por página.
+  // Versión 2.2.1: textos comunes a PDF y PNG. El título es global y el resto es por página.
   const REPORT_TEXT_STORAGE='wmSamsMeridaReportTextsV17';
   const REPORT_TEXT_DEFAULTS={
     individual:{subtitle:'Calculadora individual',description:'Comisiones simuladas: pueden existir variaciones respecto al monto final a pagar.',footer:'Lee los importes del escenario base y de la simulación. El desglose muestra tarifas, bono, incidencias, descuentos y pago neto estimado; los folios no comisionables no generan pago.'},
@@ -1588,7 +1587,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return `<div class="report-heading"><div><h1>${esc(content.title)}</h1><p class="report-subtitle">${esc(content.subtitle)}</p><p class="report-disclaimer">${esc(content.description)}</p><p class="report-meta">${meta}</p></div><div class="report-brand">${brand}</div></div>`;
   }
   function reportFootMarkup(page){
-    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 2.2</div></footer>`;
+    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 2.2.1</div></footer>`;
   }
   function initReportTextEditor(){
     loadReportTexts();
@@ -1928,7 +1927,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=70;line(margin,y,content);y+=16;
     write('NOTA PARA LEER EL REPORTE',margin,y,10,true,deep);y+=20;
     y=paragraph(reportTexts.footer,margin,y,content,11,17,'#4b5c70')+19;
-    write('Versión 2.2',margin+content-84,y,10,false,'#6b7b8e');y+=32;
+    write('Versión 2.2.1',margin+content-84,y,10,false,'#6b7b8e');y+=32;
     return Math.ceil(y);
   }
   function exportPng(){
