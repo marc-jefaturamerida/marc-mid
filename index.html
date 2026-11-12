@@ -333,6 +333,17 @@ body[data-page="weekly"] #quickFilters{display:none!important}
 .report-text-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px;padding-top:4px}
 #reportTextStatus{font-size:11px;color:var(--sub);margin-right:auto}
 @media(max-width:700px){.report-text-editor{grid-template-columns:1fr}.report-text-editor .field{grid-column:1/-1}}
+
+/* V2.2.3 · Correspondencia exacta de factores con las columnas semanales. */
+.weekly-comparison-grid{min-width:1860px}
+.weekly-panel{min-width:0}
+.weekly-table th:first-child,.weekly-table td:first-child{width:23%}
+.weekly-table th:not(:first-child),.weekly-table td:not(:first-child){width:8.55%}
+.weekly-table th{font-size:9px;white-space:normal;line-height:1.3;overflow-wrap:anywhere}
+.weekly-table td{font-size:11px}
+.weekly-table .weekly-rule-goal{font-size:11px;color:var(--blue-deep);font-weight:850}
+.weekly-quality td.no-goal{background:#eaf6f0;color:#83949b;font-weight:550}
+.weekly-quality td small{font-size:9px}
 </style>
 
 <style>
@@ -418,6 +429,278 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
 @media(max-width:650px){.folio-main-search{padding:10px}.folio-main-search label{width:100%}}
 @media print{.supervisor-control,.folio-main-search{display:none!important}}
 </style>
+
+<style>
+/* V2.2.3: porcentajes requeridos y límites por factor */
+.quality-factor-card{border:1px solid var(--line);background:var(--white);border-radius:11px;padding:11px 12px;margin:8px 0;min-width:0}
+.quality-factor-card>strong{display:block;color:var(--blue-deep);font-size:13px;margin:0 0 7px}
+.quality-factor-card>small{display:block;font-size:11px;color:var(--sub);line-height:1.4;margin:-2px 0 8px}
+.quality-factor-fields{display:grid;grid-template-columns:repeat(4,minmax(110px,1fr));gap:9px}
+.quality-factor-fields label{font-weight:700;color:var(--blue-deep);font-size:11px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.quality-factor-fields input{width:100%;min-width:0;background:var(--white);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:8px;height:37px}
+#qualityGlobalInputs{display:block}
+#qualityGlobalInputs>label{display:block;max-width:310px;margin-bottom:12px}
+.weekly-quality td small{display:block;font-size:9px;color:#4d6575;line-height:1.2}
+.quality-rule-field{min-width:0}.quality-rule-field>label{display:flex;flex-direction:column;gap:4px}.quality-no-cap{margin-top:5px;display:flex!important;flex-direction:row!important;align-items:center;gap:5px!important;font-size:10px!important;color:var(--sub)!important}.quality-no-cap input{width:14px!important;height:14px!important;min-height:14px!important;accent-color:var(--blue-deep)}
+@media(max-width:730px){.quality-factor-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* V2.2.5 · Dos comparativas semanales adaptables, sin desplazamiento horizontal.
+   Escritorio: columnas paralelas cuando caben; tablet y móvil: una debajo de otra.
+   Los nueve indicadores se conservan visibles en pantallas pequeñas. */
+.weekly-comparison-scroll{width:100%;min-width:0;overflow-x:visible;padding:2px 0 11px}
+.weekly-comparison-grid{width:100%;min-width:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.weekly-panel{min-width:0;width:100%;max-width:100%}
+.weekly-panel .daily-panel-title{padding:8px 9px;gap:6px}
+.weekly-panel .daily-panel-title h3{font-size:11px;line-height:1.3;overflow-wrap:anywhere}
+.weekly-table{width:100%;min-width:0;max-width:100%;table-layout:fixed}
+.weekly-table th:first-child,.weekly-table td:first-child{width:24%;padding-left:6px;padding-right:3px}
+.weekly-table th:not(:first-child),.weekly-table td:not(:first-child){width:8.4444%}
+.weekly-table th{font-size:8px;line-height:1.15;padding:7px 1px;white-space:normal;overflow-wrap:anywhere;word-break:normal;letter-spacing:-.2px}
+.weekly-table td{font-size:10px;line-height:1.2;padding:7px 1px;overflow-wrap:anywhere;word-break:normal;font-variant-numeric:tabular-nums}
+.weekly-table td .daily-entity{display:block;white-space:normal;overflow-wrap:anywhere;line-height:1.2;font-size:inherit}
+.weekly-table tfoot td{font-size:9px;line-height:1.25}
+.weekly-table .weekly-progress td{font-size:9px}
+.weekly-goal-input{min-width:0;max-width:none;width:100%;height:27px;font-size:10px;padding:2px 0;border-radius:4px}
+.weekly-goal-input::placeholder{font-size:8px}
+.weekly-goal-auto{font-size:7px;line-height:1.05;white-space:normal}
+.weekly-goal-control{gap:2px;min-width:0}
+@media(max-width:1360px){
+  .weekly-comparison-grid{grid-template-columns:minmax(0,1fr)}
+  .weekly-table th:first-child,.weekly-table td:first-child{width:24%}
+  .weekly-table th:not(:first-child),.weekly-table td:not(:first-child){width:8.4444%}
+  .weekly-table th{font-size:10px}
+  .weekly-table td{font-size:12px}
+  .weekly-table tfoot td,.weekly-table .weekly-progress td{font-size:11px}
+}
+@media(max-width:550px){
+  .weekly-comparison-grid{gap:11px}
+  .weekly-panel .daily-panel-title{padding:7px 6px}
+  .weekly-panel .daily-panel-title h3{font-size:10px}
+  .weekly-panel .daily-panel-title span{font-size:9px}
+  .weekly-table th:first-child,.weekly-table td:first-child{width:23%;padding-left:3px;padding-right:1px}
+  .weekly-table th:not(:first-child),.weekly-table td:not(:first-child){width:8.5555%}
+  .weekly-table th{font-size:7.4px;letter-spacing:-.3px;line-height:1.15;padding:5px 0;hyphens:auto}
+  .weekly-table td{font-size:8px;letter-spacing:-.2px;line-height:1.15;padding:6px 0}
+  .weekly-table tfoot td,.weekly-table .weekly-progress td{font-size:7.5px}
+  .weekly-table .weekly-rule-goal{font-size:7.5px}
+  .weekly-goal-input{height:24px;font-size:8px;padding:1px 0;border-radius:3px}
+  .weekly-goal-input::placeholder{font-size:7px}
+  .weekly-goal-auto{font-size:6.5px}
+  .weekly-table .daily-entity{font-size:7.8px}
+}
+@media(max-width:370px){
+  .weekly-table th:first-child,.weekly-table td:first-child{width:22%}
+  .weekly-table th:not(:first-child),.weekly-table td:not(:first-child){width:8.6667%}
+  .weekly-table th{font-size:6.7px;letter-spacing:-.35px}
+  .weekly-table td,.weekly-table tfoot td,.weekly-table .weekly-progress td{font-size:7px;letter-spacing:-.35px}
+  .weekly-goal-input{font-size:7px}
+}
+/* V2.2.5 · Igualar la tipografía de las tres filas de cierre semanal. */
+.weekly-table tfoot tr.weekly-progress > td,
+.weekly-table tfoot tr.weekly-quality > td { font-size:9px; line-height:1.25; }
+@media(max-width:1360px){
+  .weekly-table tfoot tr.weekly-progress > td,
+  .weekly-table tfoot tr.weekly-quality > td { font-size:11px; }
+}
+@media(max-width:550px){
+  .weekly-table tfoot tr.weekly-progress > td,
+  .weekly-table tfoot tr.weekly-quality > td { font-size:7.5px; }
+}
+@media(max-width:370px){
+  .weekly-table tfoot tr.weekly-progress > td,
+  .weekly-table tfoot tr.weekly-quality > td { font-size:7px; }
+}
+@media print{.weekly-comparison-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+
+<style id="achievementsStyles">
+/* V2.3.5: búsqueda y supervisor junto a tabla de folios. */
+.achievements-main-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+.achievements-records-controls{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:10px;align-items:end;margin:0 0 12px}
+@media(max-width:650px){.achievements-records-controls{grid-template-columns:1fr}}
+
+/* V2.3 · Logros semanales. Todas las consultas y filtros se ejecutan en memoria. */
+#achievementsPage[hidden]{display:none!important}
+body[data-page="achievements"] #sectionsContainer,
+body[data-page="achievements"] #quickFilters,
+body[data-page="achievements"] #printContext,
+body[data-page="achievements"] #printRecordsSection{display:none!important}
+.achievements-page{margin:0 0 24px;min-width:0}
+.achievements-hero{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:8px 0 17px}
+.achievements-hero h2{margin:3px 0 5px;color:var(--blue-deep);font-size:23px;line-height:1.2}
+.achievements-hero p{font-size:12px;color:var(--sub);margin:0}
+.achievements-period{font-size:12px;background:var(--blue-soft);border-radius:9px;padding:10px;color:var(--blue-deep);font-weight:800}
+.achievements-main-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:17px;background:var(--white);border:1px solid var(--line);border-radius:12px;padding:14px}
+.achievements-page .field label{display:block;font-weight:800;font-size:11px;color:var(--blue-deep);margin-bottom:5px}
+.achievements-page .field select,.achievements-page .field input{box-sizing:border-box;width:100%;min-width:0;height:41px;padding:8px 10px;background:var(--white);color:var(--ink);font:inherit;font-size:13px;border:1px solid #c9d8e7;border-radius:8px}
+.achievements-section{background:var(--white);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:12px;margin:0 0 15px;padding:15px;min-width:0}
+.achievements-section h3{font-size:16px;color:var(--blue-deep);margin:0 0 5px}
+.achievements-section>p{margin:0 0 14px;color:var(--sub);font-size:11px;line-height:1.5}
+.achievements-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.achievements-kpi{min-width:0;border:1px solid #d9e5f0;border-radius:10px;background:var(--blue-soft);padding:12px 11px}
+.achievements-kpi span{font-size:10px;color:var(--sub);font-weight:800;letter-spacing:.2px;display:block;min-height:27px}
+.achievements-kpi strong{display:block;color:var(--blue-deep);font-size:23px;line-height:1.2;margin:7px 0 5px;overflow-wrap:anywhere}
+.achievements-kpi small{display:block;font-size:10px;color:var(--sub);line-height:1.35}
+.achievements-kpi.achievements-global{background:#e8f5ef;border-color:#bfe4d0}
+.achievements-kpi.achievements-global strong{color:#145b44}
+.achievements-counts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+.achievements-count{border:1px solid var(--line);border-radius:9px;padding:11px;background:#f8fbfe;min-width:0}
+.achievements-count span{display:block;font-weight:750;color:var(--sub);font-size:10px;min-height:26px}
+.achievements-count strong{display:block;color:var(--blue-deep);font-size:22px;margin-top:5px}
+.achievements-advanced{margin:10px 0 12px;border:1px solid var(--line);border-radius:10px;background:#f9fbfd}
+.achievements-advanced summary{cursor:pointer;color:var(--blue-deep);font-weight:800;font-size:12px;padding:12px;display:list-item}
+.achievements-advanced-inner{padding:12px;border-top:1px solid var(--line)}
+.achievements-filter-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.achievements-column-filter{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:11px}
+.achievements-values{grid-column:1/-1;display:flex;gap:7px;flex-wrap:wrap;max-height:160px;overflow-y:auto}
+.achievements-values label{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:6px 8px;border-radius:7px;background:#fff;border:1px solid var(--line)}
+.achievements-values input{width:15px;height:15px}
+.achievements-advanced-footer{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+.achievements-advanced-footer label{font-size:12px;font-weight:750;color:var(--blue-deep);display:flex;gap:6px;align-items:center}
+.achievements-advanced-footer input{accent-color:var(--blue);width:17px;height:17px}
+.achievements-search{margin:11px 0}
+.achievements-records-wrap{overflow:auto;max-height:66vh;border:1px solid var(--line);border-radius:9px}
+.achievements-table{min-width:max-content;width:100%;font-size:11px}
+.achievements-table thead{position:sticky;top:0;background:var(--blue-soft);z-index:1}
+.achievements-table th,.achievements-table td{padding:8px 9px;white-space:nowrap}
+.achievements-table tbody tr:nth-child(even){background:#f3f7fb}
+.achievements-table tbody tr.flagged{background:#fff0ec}
+.achievements-pager{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:11px;color:var(--sub)}
+.achievements-pager-options{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.achievements-pager-options select{width:78px!important}
+.achievements-empty{font-size:12px;color:var(--sub);padding:14px;text-align:center}
+@media(max-width:960px){.achievements-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.achievements-counts{grid-template-columns:repeat(3,minmax(0,1fr))}.achievements-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.achievements-hero h2{font-size:20px}.achievements-main-filters{grid-template-columns:1fr}.achievements-section{padding:11px}.achievements-kpis,.achievements-counts{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.achievements-kpi strong{font-size:20px}.achievements-count strong{font-size:20px}.achievements-filter-grid,.achievements-column-filter{grid-template-columns:1fr}.achievements-page .field select,.achievements-page .field input{font-size:16px}.achievements-search{margin-bottom:10px}.achievements-pager-options{width:100%}}
+@media print{#achievementsPage{display:none!important}}
+
+/* V2.3.3: filtros al inicio, apartados plegables y supervisores siempre visibles. */
+.achievements-main-filters{align-items:end}
+.achievements-primary-search{min-width:0}
+.achievements-supervisor-control{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:5px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--blue-soft)}
+.achievements-supervisor-control label{display:flex;align-items:center;gap:9px;color:var(--blue-deep);font-size:12px;font-weight:800;cursor:pointer;line-height:1.35}
+.achievements-supervisor-control input{accent-color:var(--blue);width:18px;height:18px;flex:none}
+.achievements-supervisor-control small{font-size:10px;line-height:1.35;color:var(--sub)}
+.achievements-fold{padding:0;overflow:hidden}
+.achievements-fold>summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;padding:14px 17px;color:var(--blue-deep);font-weight:850;font-size:15px;line-height:1.3;user-select:none}
+.achievements-fold>summary::-webkit-details-marker{display:none}
+.achievements-fold>summary::after{content:'+';margin-left:auto;font-size:20px;font-weight:650;line-height:1;color:var(--blue)}
+.achievements-fold[open]>summary::after{content:'−'}
+.achievements-fold[open]>summary{border-bottom:1px solid var(--line);background:var(--blue-soft)}
+.achievements-fold-body{padding:14px 16px 17px}
+.achievements-fold-body>p{margin:0 0 13px;color:var(--sub);font-size:11px;line-height:1.5}
+.achievements-fold .achievements-badge{color:var(--sub);font-size:11px;font-weight:650}
+.achievements-fold .achievements-advanced-footer{margin-top:14px}
+@media(max-width:580px){.achievements-fold>summary{font-size:14px;padding:12px}.achievements-fold-body{padding:12px}.achievements-supervisor-control{padding:9px}}
+
+/* V2.3.3 · Objetivos semanales y control independiente de secciones impresas. */
+.achievements-goals-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.achievements-goals-grid .field{min-width:0}
+.achievements-count small{display:block;margin-top:5px;color:var(--sub);font-size:10px;line-height:1.35}
+.achievements-goals-grid input{font-variant-numeric:tabular-nums}
+.achievements-goals-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 7px}
+.achievements-goals-toolbar .muted{font-size:11px;line-height:1.45;flex:1;min-width:160px}
+.achievements-goals-footnote{font-size:10px!important;color:var(--sub);margin:12px 0 0!important}
+.achievements-fold>summary .ach-print-toggle{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:5px;font-size:11px!important;font-weight:700!important;letter-spacing:0;color:var(--blue-deep);border:1px solid var(--line);border-radius:7px;padding:5px 7px;background:var(--white);cursor:pointer;white-space:nowrap}
+.achievements-fold>summary .ach-print-toggle input{width:16px;height:16px;margin:0;accent-color:var(--blue)}
+.achievements-fold>summary::after{margin-left:2px!important}
+@media(max-width:580px){.achievements-goals-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.achievements-fold>summary .ach-print-toggle{font-size:10px!important;padding:4px 5px}}
+@media(max-width:365px){.achievements-goals-grid{grid-template-columns:1fr 1fr}.achievements-fold>summary .ach-print-toggle{font-size:9px!important}}
+/* V2.4.1 · Calculadora de supervisor, nueve páginas. */
+#supPage[hidden]{display:none!important}
+body[data-page="supervisor"] #sectionsContainer,
+body[data-page="supervisor"] #quickFilters,
+body[data-page="supervisor"] #printContext,
+body[data-page="supervisor"] #printRecordsSection{display:none!important}
+.sup-page{display:block;color:var(--ink);padding-bottom:16px}
+.sup-hero{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:13px}
+.sup-hero h2{margin:3px 0 4px;color:var(--blue-deep);font-size:24px}
+.sup-hero p{font-size:12px;color:var(--sub);margin:0;line-height:1.45}
+.sup-hero-chip{padding:6px 9px;border-radius:30px;background:var(--blue-soft);font-size:10px;font-weight:800;color:var(--blue-deep);white-space:nowrap}
+.sup-filters{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end;padding:14px;margin-bottom:10px}
+.sup-filters .field label{display:block;font-size:11px;font-weight:800;margin-bottom:6px;color:var(--sub)}
+.sup-filters select{width:100%;min-width:0;padding:9px 11px;border-radius:9px;background:#fff;border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--ink)}
+.sup-selection-note{padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--blue-soft);font-size:11px;color:var(--blue-deep);margin-bottom:13px}
+.sup-top-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.sup-big-card{min-width:0;padding:14px;background:#f1f6fc;border:1px solid #d9e6f2;border-radius:12px;display:flex;flex-direction:column;gap:5px}
+.sup-big-card small{font-weight:800;font-size:11px;color:var(--sub)}
+.sup-big-card strong{font-size:24px;font-weight:900;color:var(--blue-deep);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sup-big-card span{font-size:10px;color:var(--sub);line-height:1.4}
+.sup-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;align-items:start}
+.sup-panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px;min-width:0}
+.sup-panel:last-child{grid-column:1/-1}
+.sup-panel h3{font-size:14px;color:var(--blue-deep);margin:0 0 11px}
+.sup-facts{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px;font-size:11px;color:var(--sub)}
+.sup-facts span{padding:5px 8px;background:var(--blue-soft);border-radius:8px}
+.sup-facts b{color:var(--blue-deep)}
+.sup-formula{background:#f0f6fd;border-radius:8px;padding:9px;margin-bottom:9px;font-size:12px;font-weight:800;color:var(--blue-deep)}
+.sup-metrics{border-collapse:collapse;width:100%;font-size:11px}
+.sup-metrics th,.sup-metrics td{border-bottom:1px solid #e2eaf2;padding:7px 5px;vertical-align:top;text-align:right}
+.sup-metrics th:first-child,.sup-metrics td:first-child{text-align:left}
+.sup-metrics thead th{background:#edf4fc;font-size:10px;color:#345f81}
+.sup-metrics tr.sup-table-emphasis{background:#eaf7f1;font-weight:900;color:#0b6850}
+.sup-records{display:grid;gap:12px;margin:13px 0}
+.sup-block{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.sup-block summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:13px 14px;gap:10px;color:var(--blue-deep);font-size:14px;font-weight:850;background:#f3f7fc}
+.sup-block summary small{font-size:10px;color:var(--sub);white-space:nowrap}
+.sup-block summary::-webkit-details-marker{display:none}
+.sup-block .sup-muted{padding:0 14px}
+.sup-table-scroll{max-height:570px;overflow:auto;padding:0 9px 12px}
+.sup-record-table{border-collapse:collapse;width:100%;min-width:950px;font-size:10.5px}
+.sup-record-table th,.sup-record-table td{border-bottom:1px solid #e2eaf1;padding:7px 8px;text-align:left;white-space:nowrap}
+.sup-record-table thead th{background:#e9f1f9;color:#365d7c;position:sticky;top:0;z-index:1}
+.sup-record-table tbody tr:nth-child(2n){background:#f9fbfe}
+.sup-record-table tr.sup-incident{background:#fff0ef!important}
+.sup-record-table input[type=checkbox]{width:17px;height:17px;accent-color:#176ca4;cursor:pointer}
+.sup-muted,.sup-footnote,.sup-empty{font-size:11px;line-height:1.55;color:var(--sub)}
+.sup-footnote{margin:12px 0 16px}
+.sup-setting-field{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:750;color:var(--sub);min-width:0}
+.sup-setting-field input,.sup-metrics input{min-width:0;width:100%;border:1px solid var(--line);border-radius:7px;padding:7px 8px;background:#fff;color:var(--ink);font-size:12px}
+.sup-setting-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:8px 0 12px}
+.sup-factor-setting{padding:12px 0;border-bottom:1px solid var(--line)}
+.sup-factor-setting>b{font-size:12px;color:var(--blue-deep)}
+.sup-setting-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0}
+.sup-table-wrap{max-width:100%;overflow:auto}
+#supSettingsEditor h4{margin:22px 0 8px;font-size:14px;color:var(--blue-deep)}
+@media(max-width:780px){.sup-detail-grid{grid-template-columns:1fr}.sup-panel:last-child{grid-column:auto}.sup-setting-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.sup-hero{align-items:flex-start;flex-direction:column}.sup-hero h2{font-size:20px}.sup-filters{grid-template-columns:1fr}.sup-top-summary{grid-template-columns:1fr}.sup-big-card{padding:12px}.sup-big-card strong{font-size:25px}.sup-facts{gap:4px}.sup-settings-field input{font-size:16px}.sup-record-table{font-size:10px}}
+
+/* V2.4.1: tarjetas del supervisor compactas y secciones plegables. */
+.sup-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:start;width:100%;min-width:0}
+.sup-detail-grid>.sup-panel:last-child{grid-column:auto}
+.sup-panel{padding:0;min-width:0;overflow:hidden}
+.sup-panel .sup-fold-body{padding:9px;min-width:0}
+.sup-panel .sup-facts{gap:4px;font-size:10px;margin-bottom:6px}
+.sup-panel .sup-facts span{padding:3px 5px;overflow-wrap:anywhere}
+.sup-panel .sup-metrics{width:100%;table-layout:fixed;font-size:10px}
+.sup-panel .sup-metrics th,.sup-panel .sup-metrics td{padding:5px 3px;white-space:normal;overflow-wrap:anywhere}
+.sup-panel .sup-metrics td{font-variant-numeric:tabular-nums}
+.sup-panel .sup-metrics thead th{font-size:9px}
+.sup-panel .sup-formula{font-size:10px;padding:7px;overflow-wrap:anywhere}
+.sup-fold{min-width:0;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;margin:0}
+.sup-fold>summary{list-style:none;display:flex;justify-content:space-between;gap:7px;align-items:center;cursor:pointer;color:var(--blue-deep);font-weight:850;font-size:12px;padding:10px 9px;background:#f2f7fd;line-height:1.35}
+.sup-fold>summary::-webkit-details-marker{display:none}
+.sup-fold>summary .sup-fold-title{min-width:0;overflow-wrap:anywhere}
+.sup-fold-actions{display:flex;align-items:center;gap:6px;flex:none}
+.sup-print-toggle{font-size:10px;font-weight:750;display:inline-flex;align-items:center;gap:4px;cursor:pointer;border:1px solid #c9dbee;padding:4px 6px;background:#fff;border-radius:7px;color:var(--blue-deep);white-space:nowrap}
+.sup-print-toggle input{width:15px;height:15px;accent-color:var(--blue);margin:0;cursor:pointer}
+.sup-fold-chevron{font-size:14px;transform:rotate(0deg);transition:transform .16s ease;line-height:1}
+.sup-fold:not([open]) .sup-fold-chevron{transform:rotate(-90deg)}
+.sup-fold-body{padding:9px 11px 12px}
+.sup-overview{margin:8px 0}
+.sup-overview .sup-top-summary{margin:0}
+.sup-filter-fold,.sup-search-fold{margin:9px 0}
+.sup-filter-fold .sup-filters,.sup-search-fold .sup-filters{margin:0;border:0;padding:4px;box-shadow:none}
+.sup-records .sup-block{margin:0}
+.sup-records .sup-block>.sup-fold-body{padding:0 0 6px}
+.sup-records .sup-block .sup-muted{padding:0 11px}
+.sup-records .sup-block>summary{background:#f2f7fd}
+.sup-records .sup-block .sup-fold-actions small{font-size:10px}
+@media(max-width:1030px){.sup-detail-grid{gap:6px}.sup-panel .sup-fold-body{padding:7px}.sup-panel .sup-metrics{font-size:9px}.sup-panel .sup-metrics th,.sup-panel .sup-metrics td{padding:4px 2px}}
+@media(max-width:760px){.sup-detail-grid{grid-template-columns:1fr;gap:10px}.sup-panel .sup-metrics{font-size:11px}.sup-panel .sup-metrics th,.sup-panel .sup-metrics td{padding:7px 6px}.sup-panel .sup-fold-body{padding:12px}.sup-fold>summary{font-size:13px}.sup-records .sup-block .sup-fold-actions small{max-width:80px;overflow:hidden;text-overflow:ellipsis}}
+@media(max-width:380px){.sup-print-toggle{font-size:9px;padding:3px 4px}.sup-fold>summary{font-size:11px;padding:9px 7px}}
+
+@media print{#supPage{display:none!important}}
+</style>
 </head>
 <body>
 <main class="shell">
@@ -433,20 +716,22 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
 
 
 
-<button class="btn" id="cloudLoginButton" type="button">Ingresar con correo</button><button class="btn" id="cloudSyncButton" type="button" hidden>↻ Sincronizar</button><span class="cloud-session-label" id="cloudSessionLabel" aria-live="polite" title="La nube se consulta al iniciar sesión, al regresar tras una pausa y al sincronizar manualmente">Sin sesión · XLS temporales</span><button class="btn primary" id="chooseXls" type="button">Cargar XLS</button><button class="btn" id="print" type="button">Imprimir / PDF</button><button class="btn" id="exportImage" type="button">Exportar PNG</button><button class="btn" id="export" type="button">Exportar CSV</button><button aria-controls="settingsPanel" aria-expanded="false" class="btn" id="toggleSettings" type="button">⚙ Ajustes</button><input accept=".xls" aria-label="Seleccionar reportes XLS" multiple hidden="" id="xlsInput" type="file"/></div>
+<button class="btn" id="cloudLoginButton" type="button">Ingresar con correo</button><button class="btn" id="cloudSyncButton" type="button" hidden>↻ Sincronizar</button><span class="cloud-session-label" id="cloudSessionLabel" aria-live="polite" title="La nube se consulta al iniciar sesión, al regresar tras una pausa y al sincronizar manualmente">Sin sesión · XLS temporales</span><button class="btn primary" id="chooseXls" type="button">Cargar XLS</button><button class="btn" id="print" type="button">Imprimir / PDF</button><button class="btn" id="exportImage" type="button">Exportar PNG</button><button class="btn" id="export" type="button">Exportar CSV</button><button aria-controls="settingsPanel" aria-expanded="false" class="btn" id="toggleSettings" type="button">⚙ Ajustes</button><input accept=".xls,.xlsx,.csv,.tsv" aria-label="Seleccionar reportes XLS" multiple hidden="" id="xlsInput" type="file"/></div>
 </header>
 <nav class="app-navigation" role="tablist" aria-label="Vistas de comisiones">
   <button class="app-tab active" type="button" role="tab" aria-selected="true" aria-controls="sectionsContainer" data-page-tab="individual">Calculadora individual</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="teamPage" data-page-tab="team">Comparativo de ejecutivos</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="dailyPage" data-page-tab="daily">Comparativa diaria</button>
-  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="accumulatedPage" data-page-tab="accumulated" hidden>Acumulado general</button>
-  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="weeklyPage" data-page-tab="weekly" hidden>Comparativa semanal</button>
-  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="visitPage" data-page-tab="visits" hidden>Visitas de coordinación</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="accumulatedPage" data-page-tab="accumulated">Acumulado general</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="weeklyPage" data-page-tab="weekly">Comparativa semanal</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="visitPage" data-page-tab="visits">Visitas de coordinación</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="allRecordsPage" data-page-tab="allrecords">Registros XLS</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="achievementsPage" data-page-tab="achievements">Logros semanales</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="supPage" data-page-tab="supervisor">Calculadora supervisor</button>
 </nav>
 <details class="settings-panel section-card" id="settingsPanel">
 <summary class="settings-panel-title"><span><span class="settings-icon">⚙</span> Ajustes de la calculadora</span><small>Archivos · Tarifas · Temas · Impresión · Folios</small></summary>
-<div class="settings-panel-content"><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="btn small" id="authLogout" type="button">Cerrar sesión</button><button class="btn small close-settings" id="closeSettings" type="button">Cerrar ajustes ✕</button></div><details class="settings-group" id="settingsArchive"><summary class="settings-group-title"><span><span class="settings-number">1</span> Archivos XLS guardados</span></summary><div class="settings-group-body">
+<div class="settings-panel-content"><div id="guestSettingsNotice" class="settings-help" hidden role="status" style="margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--blue-soft);font-weight:650">Modo sin sesión: puedes abrir y modificar estas opciones para probar el Dashboard en este dispositivo. No se guardan en Netlify y podrían restablecerse al recargar la página. Inicia sesión para sincronizarlas.</div><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="btn small" id="authLogout" type="button">Cerrar sesión</button><button class="btn small close-settings" id="closeSettings" type="button">Cerrar ajustes ✕</button></div><details class="settings-group" id="settingsArchive"><summary class="settings-group-title"><span><span class="settings-number">1</span> Archivos XLS guardados</span></summary><div class="settings-group-body">
 <p class="settings-help">Los reportes se almacenan en tu cuenta de Netlify Database cuando inicias sesión. Puedes usar un archivo, varios o el total acumulado sin crear páginas adicionales. Los registros duplicados de diferentes reportes se cuentan una sola vez.</p>
 <div class="file-archive"><div class="archive-controls" role="radiogroup" aria-label="Fuente para los cálculos"><label><input type="radio" name="archiveMode" value="all" checked> Total acumulado</label><label><input type="radio" name="archiveMode" value="selected"> Elegir uno o varios archivos</label></div>
 <div class="archive-list" id="archiveList"><div class="archive-empty">No hay archivos guardados.</div></div>
@@ -477,7 +762,7 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
 <p class="settings-help">Personaliza título, subtítulo, descripción y nota final que aparecerán en las exportaciones PDF y PNG. El título es general; los otros tres textos son independientes para cada página. Se guardan automáticamente en este navegador.</p>
 <div class="report-text-editor">
 <div class="field"><label for="reportTextTitle">Título general de los reportes</label><input type="text" id="reportTextTitle" maxlength="140" placeholder="Reporte de avances merida"/></div>
-<div class="field"><label for="reportTextPage">Editar textos de la página</label><select id="reportTextPage"><option value="individual">Calculadora individual</option><option value="team">Comparativo de ejecutivos</option><option value="daily">Comparativa diaria</option><option value="accumulated">Acumulado general</option><option value="weekly">Comparativa semanal</option><option value="allrecords">Registros XLS</option></select></div>
+<div class="field"><label for="reportTextPage">Editar textos de la página</label><select id="reportTextPage"><option value="individual">Calculadora individual</option><option value="team">Comparativo de ejecutivos</option><option value="daily">Comparativa diaria</option><option value="accumulated">Acumulado general</option><option value="weekly">Comparativa semanal</option><option value="allrecords">Registros XLS</option><option value="achievements">Logros semanales</option><option value="supervisor">Calculadora supervisor</option></select></div>
 <div class="field"><label for="reportTextSubtitle">Subtítulo del reporte</label><input type="text" id="reportTextSubtitle" maxlength="160"/></div>
 <div class="field"><label for="reportTextDescription">Descripción del reporte</label><textarea id="reportTextDescription" rows="3" maxlength="700"></textarea></div>
 <div class="field"><label for="reportTextFootnote">Nota de pie de página — cómo interpretar los resultados</label><textarea id="reportTextFootnote" rows="4" maxlength="1200"></textarea></div>
@@ -511,12 +796,16 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
 </details></div>
 </div></details>
 
-<details class="settings-group" id="settingsQualityV22"><summary class="settings-group-title"><span><span class="settings-number">10</span> Objetivos y factores de calidad</span></summary><div class="settings-group-body">
-  <p class="settings-help">Las metas semanales se adaptan al periodo consultado. Los objetivos de porcentaje y ponderaciones se aplican a todos los ejecutivos; cada módulo puede tener objetivos propios. Esta calidad es informativa y NO cambia las comisiones.</p>
+<details class="settings-group" id="settingsVisits"><summary class="settings-group-title"><span><span class="settings-number">9</span> Visitas de coordinación</span></summary><div class="settings-group-body">
+<p class="settings-help">Personaliza el acuse, los criterios, sus pesos, el logo y la firma. Estos ajustes se guardan en tu cuenta y se comparten con tus dispositivos. Solo las visitas guardadas explícitamente se envían a PostgreSQL.</p>
+<div id="visitsSettingsEditor"></div>
+</div></details>
+<details class="settings-group" id="settingsQualityV22"><summary class="settings-group-title"><span><span class="settings-number">10</span> Porcentajes requeridos y límites de calidad</span></summary><div class="settings-group-body">
+  <p class="settings-help">Configura el porcentaje requerido para Cumplimiento, Plan Cero, Plan Dental, Activación APP, Primera compra y Calidad. Cada calidad se calcula como (alcance ÷ requerido) × 100. Mínimo: si la calidad calculada es menor, se convierte a 0%. Máximo: tope opcional, en blanco = sin tope. Por módulo puedes dejar campos vacíos para heredar los globales. No modifica los pagos de comisiones.</p>
   <div class="settings-quality-grid" id="qualityGlobalInputs"></div>
-  <p class="settings-help">Todos los factores aportan su resultado proporcional desde 0%, sin umbral mínimo. Primera compra y APP se topan al 100%; Cumplimiento y Programa Cero pueden superar 100%. Las ponderaciones se normalizan si no suman 100.</p>
+  <p class="settings-help">Cinco factores componen la calidad ponderada: Cumplimiento, Plan Cero, Plan Dental, APP y Primera compra. El factor Calidad evalúa ese promedio respecto a su propio porcentaje requerido; no participa en su propio promedio. Cada mínimo y máximo se aplica individualmente. Puedes personalizarlos por módulo.</p>
   <h4>Objetivos por módulo</h4><div id="qualityModuleInputs"></div>
-  <button id="qualityReset" class="btn small" type="button">Restaurar objetivos y factores predeterminados</button>
+  <button id="qualityReset" class="btn small" type="button">Restaurar porcentajes y límites predeterminados</button>
   <span id="qualitySaveStatus" class="settings-help">Ajustes por cuenta, sincronizados solo cuando los modificas.</span>
 </div></details>
 <details class="settings-group" id="settingsSupervisorsV22"><summary class="settings-group-title"><span><span class="settings-number">11</span> Supervisores por módulo</span></summary><div class="settings-group-body">
@@ -524,10 +813,10 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
   <div id="supervisorManager"></div>
   <div class="settings-help" id="supervisorSaveStatus">Se guardan las asignaciones solo cuando las modificas.</div>
 </div></details>
-<details class="settings-group" id="settingsVisits"><summary class="settings-group-title"><span><span class="settings-number">9</span> Visitas de coordinación</span></summary><div class="settings-group-body">
-<p class="settings-help">Personaliza el acuse, los criterios, sus pesos, el logo y la firma. Estos ajustes se guardan en tu cuenta y se comparten con tus dispositivos. Solo las visitas guardadas explícitamente se envían a PostgreSQL.</p>
-<div id="visitsSettingsEditor"></div>
-</div></details>
+<details class="settings-group" id="settingsSupervisorCommissionV24"><summary class="settings-group-title"><span><span class="settings-number">12</span> Calculadora de supervisor · bonos, calidad y tarifas</span></summary><div class="settings-group-body">
+<p class="settings-help">Ajusta el bono base, metas semanales por módulo, porcentajes requeridos, mínimos, máximos, ponderaciones, bonos adicionales, penalizaciones y tarifas por escalón. Los cambios se aplican a la calculadora de supervisor cuando pulses <strong>Guardar configuración</strong>.</p>
+<div id="supSettingsEditor"></div></div></details>
+
 </div>
 </details><div aria-label="Filtros rápidos de importación" class="quick-filters section-card" id="quickFilters">
 <div class="quick-row">
@@ -595,16 +884,16 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
     <div class="weekly-variance-head"><h3>Variación de resultados</h3><span id="weeklyVarianceContext">Semana principal − semana comparada</span></div>
     <div class="weekly-variance-grid" id="weeklyVarianceGrid"></div>
   </section>
-  <div class="weekly-variance-head"><h3>Resultados y objetivos por módulo</h3><span>Registros y ventas: metas manuales · Regulares y garantizadas: 0 · Plan Cero: total de regulares · Dental: total de ventas</span></div>
+  <div class="weekly-variance-head"><h3>Resultados y objetivos por módulo</h3><span>Registros y ventas: metas manuales · Regulares y garantizadas: sin objetivo · Plan Cero: total de regulares · Dental: total de ventas · APP y Primera compra: % requerido</span></div>
   <div class="weekly-comparison-scroll" aria-label="Dos tablas de módulos, una por semana, colocadas lado a lado">
     <div class="weekly-comparison-grid">
       <article class="daily-panel weekly-panel"><div class="daily-panel-title"><h3 id="weeklyPrimaryTitle">Fecha de comparación 1</h3><span id="weeklyPrimaryModules">—</span></div>
-        <table class="weekly-table" id="weeklyPrimaryTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th><th title="Calidad operativa global ponderada">Calidad</th></tr></thead>
-        <tbody id="weeklyPrimaryRows"><tr><td colspan="8" class="daily-empty">No hay datos guardados.</td></tr></tbody><tfoot id="weeklyPrimaryFooter"></tfoot></table>
+        <table class="weekly-table" id="weeklyPrimaryTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th><th>APP</th><th>1ª compra</th><th title="Calidad operativa global ponderada">Calidad</th></tr></thead>
+        <tbody id="weeklyPrimaryRows"><tr><td colspan="10" class="daily-empty">No hay datos guardados.</td></tr></tbody><tfoot id="weeklyPrimaryFooter"></tfoot></table>
       </article>
       <article class="daily-panel weekly-panel"><div class="daily-panel-title"><h3 id="weeklyPreviousTitle">Fecha de comparación 2</h3><span id="weeklyPreviousModules">—</span></div>
-        <table class="weekly-table" id="weeklyPreviousTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th><th title="Calidad operativa global ponderada">Calidad</th></tr></thead>
-        <tbody id="weeklyPreviousRows"><tr><td colspan="8" class="daily-empty">No hay datos guardados.</td></tr></tbody><tfoot id="weeklyPreviousFooter"></tfoot></table>
+        <table class="weekly-table" id="weeklyPreviousTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th><th>APP</th><th>1ª compra</th><th title="Calidad operativa global ponderada">Calidad</th></tr></thead>
+        <tbody id="weeklyPreviousRows"><tr><td colspan="10" class="daily-empty">No hay datos guardados.</td></tr></tbody><tfoot id="weeklyPreviousFooter"></tfoot></table>
       </article>
     </div>
   </div>
@@ -769,22 +1058,121 @@ body[data-page="allrecords"] #sectionsContainer,body[data-page="allrecords"] #qu
   <div class="all-records-help">Las columnas se muestran según <strong>Ajustes → Tabla de folios</strong>. Incidencia y APP permanecen a la vista para validarlas. Desliza horizontalmente para ver más columnas.</div>
   <div class="table-wrap all-records-table-wrap"><table id="allRecordsTable" class="record-table all-records-table"><thead id="allRecordsHead"></thead><tbody id="allRecordsBody"><tr><td>Importa un XLS para mostrar registros.</td></tr></tbody></table></div>
   <div class="all-records-pagination"><span id="allRecordsPageStatus">0 registros</span><div class="all-records-page-actions"><label for="allRecordsPageSize">Filas por página</label><select id="allRecordsPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" type="button" id="allRecordsPrev">Anterior</button><button class="btn small" type="button" id="allRecordsNext">Siguiente</button></div></div>
-  <footer class="foot">Consulta de registros XLS · Versión 2.2.1</footer>
+  <footer class="foot">Consulta de registros XLS · Versión 2.4.1</footer>
+</section>
+
+
+<section id="supPage" class="sup-page" hidden aria-label="Calculadora de comisiones para supervisores">
+  <div class="sup-hero"><div><div class="eyebrow">COMISIONES DEL MÓDULO Y VENTAS PROPIAS</div><h2>Calculadora de supervisor</h2><p>El escalón de ventas propias se determina por las ventas comisionables de ejecutivos, sin incluir a los supervisores.</p></div><span class="sup-hero-chip">Cálculo simulado · Semana fiscal</span></div>
+  <details class="sup-fold sup-filter-fold" data-sup-fold="filters" open><summary><span class="sup-fold-title">Filtros · Semana y supervisor</span><span class="sup-fold-actions"><span class="sup-print-toggle"><input type="checkbox" data-sup-print="filters" aria-label="Incluir filtros en impresión"> Imprimir</span><span class="sup-fold-chevron" aria-hidden="true">⌄</span></span></summary><div class="sup-fold-body">
+  <div class="sup-filters section-card" role="group" aria-label="Semana y supervisor">
+    <div class="field"><label for="supWeek">Semana de consulta (lunes a domingo)</label><select id="supWeek"><option value="">Carga un XLS</option></select></div>
+    <div class="field"><label for="supSupervisor">Supervisor asignado y módulo</label><select id="supSupervisor"><option value="">Asigna supervisores en Ajustes → 11</option></select></div>
+  </div>
+  </div></details>
+  <div id="supSelectionInfo" class="sup-selection-note" role="status">Importa un XLS y configura un supervisor en Ajustes → 11.</div>
+  <div id="supSummary" class="sup-summary" aria-live="polite"><p>Selecciona una semana y un supervisor.</p></div>
+  <details class="sup-fold sup-search-fold" data-sup-fold="search" open><summary><span class="sup-fold-title">Buscar folios</span><span class="sup-fold-actions"><span class="sup-print-toggle"><input type="checkbox" data-sup-print="search" aria-label="Incluir búsqueda en impresión"> Imprimir</span><span class="sup-fold-chevron" aria-hidden="true">⌄</span></span></summary><div class="sup-fold-body"><div class="sup-filters section-card" style="grid-template-columns:1fr" aria-label="Buscar registros del supervisor"><div class="field"><label for="supSearch">Buscar en los folios del módulo y del supervisor</label><input id="supSearch" type="search" autocomplete="off" placeholder="Buscar fecha, folio, ejecutivo, código o estatus…" style="width:100%;padding:10px;border-radius:9px;border:1px solid var(--line)"></div></div></div></details>
+  <div id="supRecordTables" class="sup-records">
+    <details class="sup-block sup-fold" data-sup-fold="recordsTeam"><summary><span class="sup-fold-title">Registros de los ejecutivos del módulo</span><span class="sup-fold-actions"><span class="sup-print-toggle"><input type="checkbox" data-sup-print="recordsTeam" checked aria-label="Imprimir registros de los ejecutivos"> Imprimir</span><small id="supTeamCount">0 registros</small><span class="sup-fold-chevron" aria-hidden="true">⌄</span></span></summary><div class="sup-fold-body">
+      <p class="sup-muted">Estos registros definen el porcentaje de cumplimiento y el escalón del módulo. No se incluyen las ventas de los supervisores.</p>
+      <div class="sup-table-scroll" id="supTeamRows"></div>
+    </div></details>
+    <details class="sup-block sup-fold" data-sup-fold="recordsOwn"><summary><span class="sup-fold-title">Registros del supervisor</span><span class="sup-fold-actions"><span class="sup-print-toggle"><input type="checkbox" data-sup-print="recordsOwn" checked aria-label="Imprimir registros del supervisor"> Imprimir</span><small id="supOwnCount">0 registros</small><span class="sup-fold-chevron" aria-hidden="true">⌄</span></span></summary><div class="sup-fold-body">
+      <p class="sup-muted">Estas ventas se remuneran con el escalón determinado por el equipo. Una incidencia excluye todos los conceptos de ese folio.</p>
+      <div class="sup-table-scroll" id="supOwnRows"></div>
+    </div></details>
+  </div>
+  <p class="sup-footnote">Cálculo informativo. Los importes de bono base y bonos adicionales permanecen sin configurar hasta que se indiquen en Ajustes → 12. Solo se transmiten cambios a Netlify al guardar ajustes o validaciones de folios; consultar semanas y supervisores es local.</p>
+  <footer class="foot">Calculadora de supervisor · Versión 2.4.1</footer>
+</section>
+<section id="achievementsPage" class="achievements-page" hidden aria-label="Logros semanales por módulo">
+  <div class="achievements-hero">
+    <div><div class="eyebrow">SEGUIMIENTO DE RESULTADOS</div><h2>Logros semanales</h2><p>Indicadores de calidad y cantidades del módulo, con sus folios.</p></div>
+    <span class="achievements-period" id="achPeriod">Importa un XLS para consultar</span>
+  </div>
+  <!-- Los filtros principales y el control de supervisores siempre quedan visibles. -->
+  <div class="achievements-main-filters" role="group" aria-label="Filtros principales de logros semanales">
+    <div class="field"><label for="achWeek">Semana de consulta (lunes a domingo)</label><select id="achWeek"><option value="">Sin semanas disponibles</option></select></div>
+    <div class="field"><label for="achModule">Módulo</label><select id="achModule"><option value="">Todos los módulos</option></select></div>
+
+  </div>
+  <details class="achievements-section achievements-fold achievements-goal-section" id="achGoalsSection" open>
+    <summary>Objetivos semanales: cantidades y porcentajes <label class="ach-print-toggle" title="Incluir esta sección en PDF y PNG"><input type="checkbox" data-ach-print="goals" checked> Imprimir</label></summary>
+    <div class="achievements-fold-body">
+      <p>Registros y Ventas: captura el objetivo en <strong>cantidades</strong>. Para Plan Dental, Plan Cero, Primera compra y APP: captura el <strong>porcentaje requerido</strong> (no una cantidad). La calidad de cada factor compara el porcentaje alcanzado contra el requerido y respeta los límites de Ajustes.</p>
+      <div class="achievements-goals-grid" id="achGoalsFields">
+        <div class="field"><label for="achGoalRecords">Registros</label><input type="number" inputmode="numeric" min="1" step="1" id="achGoalRecords" placeholder="Sin meta"></div>
+        <div class="field"><label for="achGoalSales">Ventas (Cumplimiento)</label><input type="number" inputmode="numeric" min="1" step="1" id="achGoalSales" placeholder="Sin meta"></div>
+        <div class="field"><label for="achGoalDental">Plan Dental · % requerido</label><input type="number" inputmode="numeric" min="0.01" max="100" step="0.01" id="achGoalDental" placeholder="Ej. 95"></div>
+        <div class="field"><label for="achGoalP0">Plan Cero · % requerido</label><input type="number" inputmode="numeric" min="0.01" max="100" step="0.01" id="achGoalP0" placeholder="Ej. 30"></div>
+        <div class="field"><label for="achGoalPurchase">Primera compra · % requerido</label><input type="number" inputmode="numeric" min="0.01" max="100" step="0.01" id="achGoalPurchase" placeholder="Ej. 95"></div>
+        <div class="field"><label for="achGoalApp">Activaciones APP · % requerido</label><input type="number" inputmode="numeric" min="0.01" max="100" step="0.01" id="achGoalApp" placeholder="Ej. 95"></div>
+      </div>
+      <div class="achievements-goals-toolbar"><button type="button" class="btn primary small" id="achSaveGoals">Guardar objetivos</button><span id="achGoalsStatus" class="muted" aria-live="polite">Define los objetivos para calcular los porcentajes.</span></div>
+      <p class="achievements-goals-footnote">Las metas se guardan por semana y módulo. Los porcentajes requeridos usan como base: P0 / regulares; Dental, APP y Primera compra / ventas con código. Calidad y Alcance global se derivan de los cinco factores. Sin sesión se conservan en este navegador; con sesión se sincronizan al pulsar Guardar objetivos.</p>
+    </div>
+  </details>
+  <details class="achievements-section achievements-fold achievements-filter-section" id="achAdvanced">
+    <summary>Filtros avanzados de registros <span id="achFilterBadge" class="achievements-badge">· Contraídos por defecto</span><label class="ach-print-toggle" title="Incluir esta sección en PDF y PNG"><input type="checkbox" data-ach-print="filters" > Imprimir</label></summary>
+    <div class="achievements-fold-body"><p>Los filtros avanzados, la búsqueda, la semana, el módulo y la inclusión de supervisores también modifican los indicadores. Los folios con incidencia siguen visibles, pero no suman en los resultados.</p>
+      <div class="achievements-filter-grid">
+        <div class="field"><label for="achExec">Ejecutivo</label><select id="achExec"><option value="">Todos los ejecutivos</option></select></div>
+        <div class="field"><label for="achPayment">Validación de pago</label><select id="achPayment"><option value="">Todas</option><option value="payable">Comisionable</option><option value="notpayable">No pagable</option><option value="nocode">Sin código</option></select></div>
+        <div class="field"><label for="achIncident">Incidencias</label><select id="achIncident"><option value="">Todas</option><option value="yes">Con incidencia</option><option value="no">Sin incidencia</option></select></div>
+        <div class="field"><label for="achApp">Activación APP</label><select id="achApp"><option value="">Todas</option><option value="yes">Activa</option><option value="no">Inactiva</option></select></div>
+        <div class="field"><label for="achCode">Código de barras</label><select id="achCode"><option value="">Todos</option><option value="yes">Con código</option><option value="no">Sin código</option></select></div>
+        <div class="field"><label for="achGuarantee">Tipo de venta</label><select id="achGuarantee"><option value="">Todos</option><option value="yes">Garantizada</option><option value="no">Regular</option></select></div>
+        <div class="field"><label for="achP0">Plan Cero</label><select id="achP0"><option value="">Todos</option><option value="yes">Con P0</option><option value="no">Sin P0</option></select></div>
+        <div class="field"><label for="achDental">Plan Dental</label><select id="achDental"><option value="">Todos</option><option value="yes">Con Dental</option><option value="no">Sin Dental</option></select></div>
+      </div><div class="achievements-column-filter">
+        <div class="field"><label for="achColumn">Otra columna XLS</label><select id="achColumn"><option value="">Sin columna adicional</option></select></div>
+        <div class="field"><label for="achValueSearch">Buscar valores</label><input id="achValueSearch" type="search" placeholder="Filtrar opciones…" disabled></div>
+        <div class="achievements-values" id="achValues">Selecciona una columna para elegir varios valores.</div>
+      </div>
+      <div class="achievements-advanced-footer"><button id="achReset" class="btn small" type="button">Limpiar filtros avanzados</button></div>
+    </div>
+  </details>
+  <details class="achievements-section achievements-fold" id="achPercentSection" open>
+    <summary>Logros por porcentaje<label class="ach-print-toggle" title="Incluir esta sección en PDF y PNG"><input type="checkbox" data-ach-print="percentages" checked> Imprimir</label></summary>
+    <div class="achievements-fold-body"><p>Porcentaje grande: <strong>alcance real</strong>. Porcentaje pequeño: <strong>calidad del factor</strong>, aplicando los porcentajes requeridos y sus límites. Solo cuentan los folios que cumplen los filtros y no tienen incidencia.</p><div id="achPercentages" class="achievements-kpis"></div></div>
+  </details>
+  <details class="achievements-section achievements-fold" id="achQuantitySection" open>
+    <summary>Logros en cantidades<label class="ach-print-toggle" title="Incluir esta sección en PDF y PNG"><input type="checkbox" data-ach-print="quantities" checked> Imprimir</label></summary>
+    <div class="achievements-fold-body"><p>Totales reales, metas en unidades para Registros/Ventas y porcentajes requeridos para P0, Dental, APP y Primera compra. Regulares y Garantizadas no tienen objetivo.</p><div id="achQuantities" class="achievements-counts"></div></div>
+  </details>
+  <details class="achievements-section achievements-fold" id="achRecordsSection" open>
+    <summary>Registros de la semana<label class="ach-print-toggle" title="Incluir esta sección en PDF y PNG"><input type="checkbox" data-ach-print="records" checked> Imprimir</label></summary>
+    <div class="achievements-fold-body">
+      <div class="achievements-records-controls" role="group" aria-label="Buscar folios e incluir registros de supervisores">
+        <div class="field achievements-primary-search"><label for="achSearch">Buscar en toda la tabla de folios</label><input id="achSearch" type="search" autocomplete="off" placeholder="Folio, código, nombre, fecha o cualquier dato…"></div>
+        <div class="achievements-supervisor-control">
+          <label for="achIncludeSupervisors"><input type="checkbox" id="achIncludeSupervisors" checked> Incluir registros de supervisores</label>
+          <small id="achSupervisorStatus" aria-live="polite">Los indicadores incluyen supervisores.</small>
+        </div>
+      </div>
+      <p>La búsqueda y los filtros avanzados afectan tanto a la tabla como a los indicadores. Las incidencias siguen visibles en la tabla, pero se excluyen completamente de los cálculos. Se consideran todas las filas filtradas, no solo la página visible. Las casillas Incidencia y APP son compartidas con la calculadora.</p>
+      <div class="all-records-summary" id="achRecordSummary"></div>
+      <div class="achievements-records-wrap"><table id="achRecordsTable" class="record-table achievements-table"><thead id="achRecordsHead"></thead><tbody id="achRecordsBody"><tr><td>Importa un XLS para consultar folios.</td></tr></tbody></table></div>
+      <div class="achievements-pager"><span id="achRecordStatus">0 registros</span><div class="achievements-pager-options"><label for="achPageSize">Filas</label><select id="achPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" id="achPrev" type="button">Anterior</button><button class="btn small" id="achNext" type="button">Siguiente</button></div></div>
+    </div>
+  </details>
+  <footer class="foot">Logros semanales · Versión 2.4.1</footer>
 </section>
 
 <section id="visitPage" class="visit-page" hidden aria-label="Acuse de visita de coordinación">
-  <div class="visit-hero"><div><div class="eyebrow">AUDITORÍA OPERATIVA</div><h2>Visitas de coordinación</h2><p>Acuse de visita · Captura móvil · Semana en curso</p></div><span id="visitCloudInfo" class="visit-state">Disponible al iniciar sesión</span></div>
+  <div class="visit-hero"><div><div class="eyebrow">AUDITORÍA OPERATIVA</div><h2>Visitas de coordinación</h2><p>Acuse de visita · Captura móvil · Semana en curso</p></div><span id="visitCloudInfo" class="visit-state">Captura local · Guarda en la nube con sesión</span></div>
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 2.2.1</footer>
+  <footer class="foot">Acuse de coordinación · Versión 2.4.1</footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 2.2.1</footer>
+<footer class="foot">Final de la presentacion · Versión 2.4.1</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 

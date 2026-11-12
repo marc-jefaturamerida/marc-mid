@@ -5,7 +5,7 @@ function norm(s) { return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,
 function checkReport(r) {
   if (!r || typeof r !== 'object') throw new Error('Reporte inválido.');
   if (typeof r.id !== 'string' || !/^xls_[\w-]{5,90}$/.test(r.id)) throw new Error('Identificador de reporte incorrecto.');
-  if (typeof r.name !== 'string' || r.name.length > 200 || !/\.xls$/i.test(r.name)) throw new Error('Nombre XLS inválido.');
+  if (typeof r.name !== 'string' || r.name.length > 200 || !/\.(xls|xlsx|csv|tsv)$/i.test(r.name)) throw new Error('El nombre debe terminar en .xls, .xlsx, .csv o .tsv.');
   if (typeof r.fingerprint !== 'string' || !/^[\w-]{4,120}$/.test(r.fingerprint)) throw new Error('Firma de archivo inválida.');
   if (!Array.isArray(r.headers) || r.headers.length < 8 || r.headers.length > 120 || r.headers.some(v=>typeof v!=='string'||v.length>150)) throw new Error('Encabezados inválidos.');
   const keys = new Set(r.headers.map(norm));

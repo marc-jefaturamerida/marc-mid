@@ -39,10 +39,25 @@
   const state={base:{...DEFAULT_BASE},sim:{...DEFAULT_SIM}};
 
 
-// El mismo parser para XLS-HTML y las mismas reglas base de ventas del Dashboard V21.
-const REQUIRED_COLS=['Módulo','Ejecutivo','Código','Programa Cero','Salud Dental','Fecha','Garantizada','Folio','Estatus'];
+// Importador compatible con XLS HTML (incluidos exportes de Forms), XLS binario,
+// XLSX y archivos delimitados. Todos se normalizan al esquema histórico del Dashboard.
+const XLS_REQUIRED_CORE=['Módulo','Ejecutivo','Fecha'];
+const XLS_STANDARD_COLUMNS=['Módulo','Ejecutivo','Código','Programa Cero','Salud Dental','Fecha','Garantizada','Folio','Estatus'];
 const XLS_LIMIT=30*1024*1024;
+const XLS_HEADER_ALIASES={
+  'Módulo':['Módulo','Modulo','Módulo de venta','Módulo de ventas','Nombre del módulo','Sucursal','Punto de venta'],
+  'Ejecutivo':['Ejecutivo','Nombre ejecutivo','Nombre del ejecutivo','Ejecutivo de ventas','Promotor','Nombre promotor','Vendedor','Asesor','Colaborador'],
+  'Código':['Código','Codigo','Código de barras','Codigo de barras','Código tarjeta','Codigo tarjeta','Código de tarjeta','Código de barras (Ref)','Codigo de barras (Ref)','Barcode'],
+  'Programa Cero':['Programa Cero','Plan Cero','P0','Programa 0','Plan 0'],
+  'Salud Dental':['Salud Dental','Plan Dental','Dental','P. Dental','PD'],
+  'Fecha':['Fecha','Fecha de registro','Fecha del trámite','Fecha de trámite','Fecha de la solicitud','Fecha de solicitud','Fecha del registro','Fecha captura','Fecha de captura','Fecha de operación','Marca temporal','Timestamp'],
+  'Garantizada':['Garantizada','Es garantizada','Venta garantizada','Tarjeta garantizada','¿Garantizada?','Garantía','Garantia'],
+  'Folio':['Folio','Folio de solicitud','Folio de la solicitud','Folio del trámite','Folio de trámite','Folio solicitud','Número de folio','No. de folio','N° de folio','N.º de folio','ID de solicitud'],
+  'Estatus':['Estatus','Estatus del trámite','Estado del trámite','Estado del proceso','Resultado del trámite','Resultado de trámite','Resultado del proceso','Status'],
+  'Act APP':['Act APP','Activación APP','Activacion APP','APP Invex','Activación de APP','Activacion de APP','APP']
+};
 const normalize=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,' ').toUpperCase();
+const XLS_CANONICAL_BY_ALIAS=new Map(Object.entries(XLS_HEADER_ALIASES).flatMap(([canonical,aliases])=>aliases.map(alias=>[normalize(alias),canonical])));
 const isYes=v=>['SI','S','TRUE','VERDADERO','1','ACTIVADA','ACTIVADO'].includes(normalize(v));
 const isNo=v=>['NO','N','FALSE','FALSO','0'].includes(normalize(v));
 const isNonPayableStatus=v=>['CANCELADA','INCOMPLETA','RECHAZO'].includes(normalize(v));
@@ -70,10 +85,17 @@ let inputMode='manual';
 const fmtDay=iso=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(iso))return iso;const [y,m,d]=iso.split('-');return `${d}/${m}/${y}`;};
 function isoDate(value){
   const raw=String(value||'').trim();
-  let m=raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  let m=raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/);
   if(m)return `${m[1]}-${m[2]}-${m[3]}`;
-  m=raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  m=raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})(?:$|[T\s])/);
   if(m)return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m=raw.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if(m)return `${m[1]}-${m[2]}-${m[3]}`;
+  // Fecha de Excel cuando la hoja entrega el número de serie sin formato.
+  if(/^\d{5}(?:\.\d+)?$/.test(raw)){
+    const serial=Number(raw);
+    if(serial>20000&&serial<100000)return new Date(Date.UTC(1899,11,30)+Math.floor(serial)*86400000).toISOString().slice(0,10);
+  }
   return '';
 }
 const dateFromIso=iso=>{const [y,m,d]=iso.split('-').map(Number);return new Date(y,m-1,d,12);};
@@ -81,38 +103,133 @@ const dateIso=date=>[date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'
 function mondayOf(iso){let d=dateFromIso(iso);const offset=(d.getDay()+6)%7;d.setDate(d.getDate()-offset);return dateIso(d);}
 function sundayOf(iso){let d=dateFromIso(iso);d.setDate(d.getDate()+6);return dateIso(d);}
 const weekLabel=iso=>`${fmtDay(iso)} — ${fmtDay(sundayOf(iso))}`;
-function parseXlsHtml(html){
-  if(!/<table[\s>]/i.test(html))throw Error('No se encontró una tabla HTML: se requiere XLS exportado como HTML, no XLS binario.');
-  const doc=new DOMParser().parseFromString(html,'text/html');
-  const tables=[...doc.querySelectorAll('table')];
-  const table=tables.sort((a,b)=>b.querySelectorAll('tr').length-a.querySelectorAll('tr').length)[0];
-  if(!table)throw Error('El XLS no contiene una tabla utilizable.');
-  const trs=[...table.querySelectorAll('tr')];
-  let headerAt=trs.findIndex(tr=>tr.querySelectorAll('th').length>=4);
-  if(headerAt===-1)headerAt=0;
-  const cells=tr=>[...tr.children].filter(e=>/^(TH|TD)$/i.test(e.tagName));
-  const headers=cells(trs[headerAt]).map((c,i)=>c.textContent.trim().replace(/\s+/g,' ')||(i===0?'N.º':`Columna ${i+1}`));
-  if(headers.length<4)throw Error('Faltan encabezados en la tabla XLS.');
-  const missing=REQUIRED_COLS.filter(c=>!headers.some(h=>normalize(c)===normalize(h)));
-  if(missing.length)throw Error('Faltan columnas necesarias para la calculadora: '+missing.join(', '));
+
+function xlsCanonicalHeader(name){return XLS_CANONICAL_BY_ALIAS.get(normalize(name))||String(name??'').trim();}
+function xlsHeaderScore(row){
+  const values=row.map(v=>xlsCanonicalHeader(v));
+  const available=new Set(values.filter(v=>XLS_STANDARD_COLUMNS.includes(v)));
+  return XLS_REQUIRED_CORE.filter(k=>available.has(k)).length*10+available.size;
+}
+function xlsRowsToData(rows,sourceLabel='archivo'){
+  // Nunca asumir que la primera fila o la hoja más grande contiene encabezados.
+  const candidates=rows.slice(0,Math.min(rows.length,60));
+  let headerAt=-1,best=-1;
+  for(let i=0;i<candidates.length;i++){
+    const score=xlsHeaderScore(candidates[i]);
+    if(score>best){best=score;headerAt=i;}
+  }
+  if(headerAt<0||best<30){
+    const found=(candidates[0]||[]).map(v=>String(v||'').trim()).filter(Boolean).slice(0,15);
+    throw Error(`No se identificó una tabla de trámites en ${sourceLabel}. Se requieren Módulo, Ejecutivo y Fecha. ${found.length?'Primeras columnas encontradas: '+found.join(', '):'No se encontraron encabezados.'}`);
+  }
+  const original=rows[headerAt].map((v,i)=>String(v??'').trim().replace(/\s+/g,' ')||(i===0?'N.º':`Columna ${i+1}`));
+  const headers=[],used=new Set();
+  for(let i=0;i<original.length;i++){
+    const candidate=xlsCanonicalHeader(original[i]);
+    let header=candidate||`Columna ${i+1}`,suffix=2;
+    while(used.has(normalize(header)))header=`${candidate} (${suffix++})`;
+    headers.push(header);used.add(normalize(header));
+  }
+  const absent=XLS_REQUIRED_CORE.filter(k=>!used.has(normalize(k)));
+  if(absent.length)throw Error('Faltan columnas principales: '+absent.join(', '));
+  const optionalMissing=XLS_STANDARD_COLUMNS.filter(k=>!used.has(normalize(k)));
+  for(const k of optionalMissing)headers.push(k);
   const idx=Object.fromEntries(headers.map((v,i)=>[normalize(v),i]));
   const parsed=[];
-  for(const tr of trs.slice(headerAt+1)){
-    const parts=cells(tr).map(c=>c.textContent.trim().replace(/\s+/g,' '));
-    if(!parts.length||parts.every(c=>!c))continue;
-    while(parts.length<headers.length)parts.push('');
-    const raw=parts.slice(0,headers.length);
+  for(const row of rows.slice(headerAt+1)){
+    if(!Array.isArray(row))continue;
+    const raw=headers.map((_,i)=>i<original.length?String(row[i]??'').trim():'');
+    if(raw.every(v=>!v))continue;
     const get=k=>String(raw[idx[normalize(k)]]??'').trim();
+    // Omitir encabezados repetidos cuando se exportan varias páginas en el mismo archivo.
+    if(xlsHeaderScore(raw)>=best&&normalize(get('Ejecutivo'))==='EJECUTIVO')continue;
     const fecha=isoDate(get('Fecha'));
-    const folio=get('Folio');
-    parsed.push({i:parsed.length,raw,folio,fecha,week:fecha?mondayOf(fecha):'',executive:get('Ejecutivo'),module:get('Módulo'),code:get('Código'),status:get('Estatus'),guaranteed:get('Garantizada'),dental:get('Salud Dental'),p0:get('Programa Cero'),appField:''});
+    const folio=get('Folio'),executive=get('Ejecutivo'),module=get('Módulo');
+    if(!fecha&&!folio&&!executive&&!module)continue;
+    // Resúmenes y totales no son trámites individuales.
+    if(!executive&&!folio&&!get('Código'))continue;
+    parsed.push({i:parsed.length,raw,folio,fecha,week:fecha?mondayOf(fecha):'',executive,module,
+      code:get('Código'),status:get('Estatus'),guaranteed:get('Garantizada'),dental:get('Salud Dental'),p0:get('Programa Cero'),appField:get('Act APP')});
   }
-  if(!parsed.length)throw Error('No se encontraron registros en el XLS.');
-  const appColumn=headers.find(h=>['ACT APP','ACTIVACION APP','APP INVEX','ACTIVACION','APP'].includes(normalize(h)))||null;
-  if(appColumn)for(const r of parsed)r.appField=r.raw[idx[normalize(appColumn)]]||'';
-  const hasDates=parsed.some(r=>r.week);
-  if(!hasDates)throw Error('Ningún registro contiene una fecha reconocible.');
-  return {headers,rows:parsed,appColumn};
+  if(!parsed.length)throw Error('No se encontraron trámites individuales debajo de los encabezados.');
+  if(!parsed.some(r=>r.week))throw Error('No se reconocieron fechas. Se admiten AAAA-MM-DD, DD/MM/AAAA y fechas numéricas de Excel.');
+  const appColumn=headers.find(h=>xlsCanonicalHeader(h)==='Act APP')||null;
+  return {headers,rows:parsed,appColumn,missingOptional:optionalMissing};
+}
+function parseXlsHtml(html){
+  if(!/<table[\s>]/i.test(html))throw Error('Este archivo no contiene una tabla HTML de Excel.');
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const tables=[...doc.querySelectorAll('table')];
+  if(!tables.length)throw Error('No se encontraron tablas en el archivo HTML.');
+  const cells=tr=>[...tr.children].filter(e=>/^(TH|TD)$/i.test(e.tagName));
+  const toRows=table=>[...table.querySelectorAll('tr')].map(tr=>cells(tr).map(c=>c.textContent.trim().replace(/\s+/g,' ')));
+  // Preferir la tabla de trámites que tenga los encabezados correctos, no la más larga.
+  const ranked=tables.map(t=>({rows:toRows(t)})).map(t=>({...t,score:Math.max(0,...t.rows.slice(0,60).map(xlsHeaderScore))}));
+  ranked.sort((a,b)=>b.score-a.score||b.rows.length-a.rows.length);
+  return xlsRowsToData(ranked[0].rows,'XLS HTML');
+}
+function excelTextFromBuffer(bytes){
+  let enc='utf-8';
+  if(bytes[0]===0xFF&&bytes[1]===0xFE)enc='utf-16le';
+  else if(bytes[0]===0xFE&&bytes[1]===0xFF)enc='utf-16be';
+  else if(bytes[0]===0&&bytes[1]===0x3C)enc='utf-16be';
+  else if(bytes[0]===0x3C&&bytes[1]===0)enc='utf-16le';
+  else{
+    const sample=new TextDecoder('windows-1252').decode(bytes.slice(0,4096));
+    const charset=sample.match(/charset\s*=\s*["']?([\w-]+)/i)?.[1];
+    if(charset)enc=/^(utf-8|utf8)$/i.test(charset)?'utf-8':/^(iso-8859-1|latin1|windows-1252)$/i.test(charset)?'windows-1252':charset;
+    else try{new TextDecoder('utf-8',{fatal:true}).decode(bytes);}
+    catch(_){enc='windows-1252';}
+  }
+  try{return new TextDecoder(enc).decode(bytes);}catch(_){return new TextDecoder('utf-8').decode(bytes);}
+}
+function parseDelimitedXls(text){
+  const lines=text.replace(/^\uFEFF/,'').replace(/^sep=[,;\t]\r?\n/i,'').trim();
+  const samples=lines.split(/\r?\n/).slice(0,6);
+  const delimiter=['\t',';',','].sort((a,b)=>samples.reduce((s,x)=>s+(x.split(b).length-1),0)-samples.reduce((s,x)=>s+(x.split(a).length-1),0))[0];
+  const result=[];let row=[],val='',quoted=false;
+  for(let i=0;i<lines.length;i++){
+    const c=lines[i];
+    if(c==='"'){
+      if(quoted&&lines[i+1]==='"'){val+='"';i++;}
+      else quoted=!quoted;
+    }else if(c===delimiter&&!quoted){row.push(val);val='';}
+    else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&lines[i+1]==='\n')i++;row.push(val);result.push(row);row=[];val='';}
+    else val+=c;
+  }
+  if(val||row.length){row.push(val);result.push(row);}
+  return xlsRowsToData(result,'reporte delimitado');
+}
+async function loadExcelReader(){
+  try{return await import('xlsx');}
+  catch(_){throw Error('No se pudo cargar el lector de Excel binario. Comprueba que el nuevo despliegue instaló SheetJS (npm run build).');}
+}
+async function parseExcelFile(buffer,filename){
+  const bytes=new Uint8Array(buffer),name=String(filename||'');
+  const zipped=bytes[0]===0x50&&bytes[1]===0x4B;
+  const ole=bytes[0]===0xD0&&bytes[1]===0xCF&&bytes[2]===0x11&&bytes[3]===0xE0;
+  if(zipped||ole||/\.xlsx$/i.test(name)){
+    // Lectura local en el navegador; no se transmite el contenido a ningún servicio.
+    // Versión actualizada de SheetJS (la versión antigua de npm es vulnerable).
+    const XLSX=await loadExcelReader();
+    const wb=XLSX.read(bytes,{type:'array',cellDates:false,dense:true});
+    const candidates=wb.SheetNames.map(sheetName=>({sheetName,rows:XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:'',raw:false,blankrows:false})}));
+    candidates.sort((a,b)=>Math.max(0,...b.rows.slice(0,60).map(xlsHeaderScore))-Math.max(0,...a.rows.slice(0,60).map(xlsHeaderScore)));
+    if(!candidates.length)throw Error('El libro Excel no contiene hojas.');
+    return xlsRowsToData(candidates[0].rows,`hoja «${candidates[0].sheetName}»`);
+  }
+  const text=excelTextFromBuffer(bytes);
+  if((/<Workbook[\s>]/i.test(text)||/xmlns:ss=/i.test(text))&&/<(?:\?xml|Workbook|Worksheet)/i.test(text)){
+    const XLSX=await loadExcelReader();
+    const wb=XLSX.read(bytes,{type:'array'});
+    const candidates=wb.SheetNames.map(sheetName=>({sheetName,rows:XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:'',raw:false,blankrows:false})}));
+    candidates.sort((a,b)=>Math.max(0,...b.rows.slice(0,60).map(xlsHeaderScore))-Math.max(0,...a.rows.slice(0,60).map(xlsHeaderScore)));
+    if(!candidates.length)throw Error('El libro XML no contiene hojas.');
+    return xlsRowsToData(candidates[0].rows,`hoja «${candidates[0].sheetName}»`);
+  }
+  if(/<table[\s>]/i.test(text))return parseXlsHtml(text);
+  if(/\t|;|,/.test(text.slice(0,1500)))return parseDelimitedXls(text);
+  throw Error('Formato no reconocido. Se admiten XLS HTML, XLS binario, XLSX, XML de Excel y CSV/TSV.');
 }
 function statusBox(text,kind=''){
   el('importStatus').className='import-status '+kind;
@@ -308,6 +425,8 @@ function refreshArchiveData(forceImportMode=false){
   allRecordsView.selectedValues.clear();
   el('allRecordsColumn').value='';el('allRecordsValueSearch').value='';
   populateAllRecordsMainFilters();populateAllRecordsColumns();allRecordsView.page=1;renderAllRecords();
+  achievementsView.page=1;achievementsView.chosen.clear();populateAchFilters();renderAchievements();
+  populateSupervisorCalculatorFilters();renderSupervisorCalculator();renderSupervisorCalculatorSettings();
 }
 async function importXlsFiles(files){
   if(!files?.length)return;
@@ -316,16 +435,15 @@ async function importXlsFiles(files){
   const persistent=isAuthorized();
   if(persistent&&!archive.ready){statusBox('No está disponible el historial en línea. No se pudo guardar el XLS.','error');return;}
   const target=persistent?archive.reports:archive.tempReports;
-  let added=0,duplicated=0,failures=[];
+  let added=0,duplicated=0,failures=[],warnings=[];
   for(const file of [...files]){
     try{
-      if(!/\.xls$/i.test(file.name))throw Error('Debe ser XLS exportado como HTML.');
+      if(!/\.(xls|xlsx|csv|tsv)$/i.test(file.name))throw Error('Selecciona un archivo XLS, XLSX, CSV o TSV.');
       if(file.size>XLS_LIMIT)throw Error('El archivo supera 30 MB.');
       const buffer=await file.arrayBuffer(),fingerprint=bytesFingerprint(new Uint8Array(buffer));
       if(target.some(r=>r.fingerprint===fingerprint)){duplicated++;continue;}
-      let html=new TextDecoder('utf-8').decode(buffer);
-      if(!/<table[\s>]/i.test(html))html=new TextDecoder('windows-1252').decode(buffer);
-      const data=parseXlsHtml(html);
+      const data=await parseExcelFile(buffer,file.name);
+      if(data.missingOptional?.length)warnings.push(`${file.name}: faltan ${data.missingOptional.join(', ')} (se dejan vacíos)`);
       const record={id:'xls_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9),
         name:file.name,size:file.size,addedAt:Date.now(),fingerprint,
         headers:data.headers,rows:data.rows.map(r=>r.raw)};
@@ -344,7 +462,7 @@ async function importXlsFiles(files){
     `${added} archivo(s) guardado(s) en el historial · ${duplicated} duplicado(s) omitido(s).`:
     `${added} archivo(s) temporal(es) · ${duplicated} duplicado(s) omitido(s). No se guardan: al recargar o cerrar esta página se perderán.`;
   if(failures.length)statusBox(esc(stateText+' Errores: '+failures.join('; ')),'error');
-  else if(added||target.length)statusBox(esc(stateText)+` ${number.format(imported.data?.rows.length||0)} registros únicos en uso.`,'success');
+  else if(added||target.length)statusBox(esc(stateText)+` ${number.format(imported.data?.rows.length||0)} registros únicos en uso.`+(warnings.length?` <span class="muted">Avisos: ${esc(warnings.join('; '))}.</span>`:''),'success');
   el('xlsInput').value='';
 }
 
@@ -570,6 +688,7 @@ function applyFolioValidationChange(target){
   if(importActive()){computeImportedBase();renderRecords();renderTeam();}
   drawImportMeta(imported.sourceName||'Reporte.xls');
   renderAllRecords();
+  renderAchievements();
   return true;
 }
 function initAllRecordsPage(){
@@ -683,27 +802,45 @@ function renderTeam(){
 }
 
 
-// V2.2 · Configuración de calidad operativa; independiente de las comisiones.
+// V2.2.3 · Porcentajes requeridos y límites individuales de calidad.
+// Cinco factores aportan al compuesto; "Calidad" evalúa el compuesto contra su
+// propio porcentaje requerido, sin añadirse a su propio promedio (sin circularidad).
 const QUALITY_STORAGE_V22='wmSamsMeridaQualityConfigV22';
 const SUPERVISORS_STORAGE_V22='wmSamsMeridaSupervisorsV22';
-const QUALITY_FACTORS=['completion','purchase','p0','app'];
-const QUALITY_FACTOR_LABELS={completion:'Cumplimiento',purchase:'Primera compra (P0 o Dental)',p0:'Programa Cero',app:'Activación APP'};
-const QUALITY_DEFAULTS={execWeeklyGoal:10,targets:{completion:100,purchase:90,p0:30,app:90},weights:{completion:25,purchase:25,p0:25,app:25},modules:{}};
+const QUALITY_FACTORS=['completion','p0','dental','app','purchase'];
+const QUALITY_RULE_KEYS=[...QUALITY_FACTORS,'quality'];
+const QUALITY_FACTOR_LABELS={completion:'Cumplimiento',p0:'Plan Cero',dental:'Plan Dental',app:'Activación por APP',purchase:'Primera compra (P0 o Dental)',quality:'Calidad'};
+const QUALITY_DEFAULTS={execWeeklyGoal:10,
+  targets:{completion:100,p0:30,dental:95,app:90,purchase:90,quality:90},
+  minima:{completion:0,p0:0,dental:0,app:0,purchase:0,quality:0},
+  maxima:{completion:null,p0:null,dental:100,app:100,purchase:100,quality:100},
+  weights:{completion:20,p0:20,dental:20,app:20,purchase:20},modules:{}};
 function storedJson(key){try{return JSON.parse(localStorage.getItem(key)||'null')}catch(_){return null}}
+function validQualityNumber(value,{positive=false}={}){return typeof value==='number'&&Number.isFinite(value)&&(positive?value>0:value>=0)&&value<=100000;}
 function cleanQualityConfig(saved){
   const result=structuredClone(QUALITY_DEFAULTS);
-  if(!saved||typeof saved!=='object')return result;
-  if(Number.isFinite(Number(saved.execWeeklyGoal))&&Number(saved.execWeeklyGoal)>0)result.execWeeklyGoal=Number(saved.execWeeklyGoal);
-  for(const kind of ['targets','weights'])for(const key of QUALITY_FACTORS){
-    const val=Number(saved[kind]?.[key]);if(saved[kind]?.[key]!==undefined&&Number.isFinite(val)&&val>=0&&val<=1000)result[kind][key]=val;
+  if(!saved||typeof saved!=='object'||Array.isArray(saved))return result;
+  if(validQualityNumber(Number(saved.execWeeklyGoal),{positive:true}))result.execWeeklyGoal=Number(saved.execWeeklyGoal);
+  for(const kind of ['targets','minima','maxima','weights'])for(const key of (kind==='weights'?QUALITY_FACTORS:QUALITY_RULE_KEYS)){
+    const original=saved[kind]?.[key];
+    if(original===undefined)continue;
+    if(kind==='maxima'&&(original===null||original==='')){result.maxima[key]=null;continue;}
+    const val=Number(original);
+    if(validQualityNumber(val,{positive:kind==='targets'}))result[kind][key]=val;
   }
-  if(saved.modules&&typeof saved.modules==='object')for(const [module,opts] of Object.entries(saved.modules)){
-    if(!module||!opts||typeof opts!=='object')continue;
-    const item={weeklySales:0,weeklyRecords:0,targets:{},weights:{}};
-    for(const key of ['weeklySales','weeklyRecords'])if(Number.isFinite(Number(opts[key]))&&Number(opts[key])>=0)item[key]=Number(opts[key]);
-    for(const key of QUALITY_FACTORS){
-      const val=opts.targets?.[key];if(val!==undefined&&val!==''&&Number.isFinite(Number(val))&&Number(val)>0)item.targets[key]=Number(val);
-      const weight=opts.weights?.[key];if(weight!==undefined&&weight!==''&&Number.isFinite(Number(weight))&&Number(weight)>=0)item.weights[key]=Number(weight);
+  // La V2.2.1 usaba cuatro ponderaciones de 25. Incluir Dental en igualdad
+  // de condiciones requiere 25; la media normaliza por la suma (125).
+  if(saved.weights?.dental===undefined&&saved.weights&&typeof saved.weights==='object')result.weights.dental=25;
+  if(saved.modules&&typeof saved.modules==='object'&&!Array.isArray(saved.modules))for(const [module,opts] of Object.entries(saved.modules)){
+    if(!module||!opts||typeof opts!=='object'||Array.isArray(opts))continue;
+    const item={weeklySales:0,weeklyRecords:0,targets:{},minima:{},maxima:{},weights:{}};
+    for(const k of ['weeklySales','weeklyRecords'])if(validQualityNumber(Number(opts[k])))item[k]=Number(opts[k]);
+    for(const kind of ['targets','minima','maxima','weights'])for(const key of (kind==='weights'?QUALITY_FACTORS:QUALITY_RULE_KEYS)){
+      const original=opts[kind]?.[key];
+      if(original===undefined||original==='')continue;
+      if(kind==='maxima'&&original===null){item.maxima[key]=null;continue;}
+      const val=Number(original);
+      if(validQualityNumber(val,{positive:kind==='targets'}))item[kind][key]=val;
     }
     result.modules[module]=item;
   }
@@ -713,13 +850,19 @@ let qualityConfig=cleanQualityConfig(storedJson(QUALITY_STORAGE_V22));
 let supervisorConfig=storedJson(SUPERVISORS_STORAGE_V22)||{};
 if(!supervisorConfig||typeof supervisorConfig!=='object'||Array.isArray(supervisorConfig))supervisorConfig={};
 function saveQualityConfig(){localStorage.setItem(QUALITY_STORAGE_V22,JSON.stringify(qualityConfig));renderQualityPages();}
-function saveSupervisorConfig(){localStorage.setItem(SUPERVISORS_STORAGE_V22,JSON.stringify(supervisorConfig));renderQualityPages();}
-function moduleQualityOptions(module){return qualityConfig.modules[module]||{weeklySales:0,weeklyRecords:0,targets:{},weights:{}};}
-function qualityTarget(key,module,groupBy){return groupBy==='module'?(moduleQualityOptions(module).targets?.[key]||qualityConfig.targets[key]):qualityConfig.targets[key];}
-function qualityMetricFactor(actual,target,{cap=false}={}){
+function saveSupervisorConfig(){localStorage.setItem(SUPERVISORS_STORAGE_V22,JSON.stringify(supervisorConfig));renderQualityPages();populateSupervisorCalculatorFilters();renderSupervisorCalculator();renderSupervisorCalculatorSettings();}
+function moduleQualityOptions(module){return qualityConfig.modules[module]||{weeklySales:0,weeklyRecords:0,targets:{},minima:{},maxima:{},weights:{}};}
+function qualityRule(key,module,groupBy){
+  const cfg=groupBy==='module'?moduleQualityOptions(module):null;
+  const own=kind=>cfg&&Object.prototype.hasOwnProperty.call(cfg[kind]||{},key)?cfg[kind][key]:qualityConfig[kind][key];
+  return {required:own('targets'),minimum:own('minima'),maximum:own('maxima')};
+}
+function qualityTarget(key,module,groupBy){return qualityRule(key,module,groupBy).required;}
+function qualityMetricFactor(actual,target,{minimum=0,maximum=null}={}){
   if(!Number.isFinite(actual)||!Number.isFinite(target)||target<=0)return null;
-  const normalized=actual/target*100;
-  return cap?Math.min(100,normalized):normalized;
+  const normalized=Math.max(0,(actual/target)*100);
+  if(normalized<minimum)return 0;
+  return maximum===null?normalized:Math.min(maximum,normalized);
 }
 function qualityPercentText(value){return Number.isFinite(value)?pct(value):'—';}
 function countQualityRows(rows){
@@ -728,7 +871,8 @@ function countQualityRows(rows){
   const purchase=salesRows.filter(r=>isYes(r.p0)||isYes(r.dental)).length;
   const p0=regular.filter(r=>isYes(r.p0)).length;
   const apps=salesRows.filter(appEnabled).length;
-  return {sales:salesRows.length,regular:regular.length,purchase,p0,apps};
+  const dental=salesRows.filter(r=>isYes(r.dental)).length;
+  return {sales:salesRows.length,regular:regular.length,purchase,p0,apps,dental};
 }
 function availableWeeks(rows){
   const weeks=[...new Set(rows.map(r=>r.fecha?mondayOf(r.fecha):'').filter(Boolean))];
@@ -752,20 +896,289 @@ function qualityWeeklyGoal(rows,name,groupBy,granularity){
 }
 function qualityResult(rows,groupBy,name,granularity='weekly',goalOverride=null){
   const counters=countQualityRows(rows);
-  if(!rows.length)return {goal:0,actual:{},factors:{},global:null,counters};
+  if(!rows.length)return {goal:0,actual:{},factors:{},composite:null,global:null,counters};
   const goal=goalOverride!==null?goalOverride:qualityWeeklyGoal(rows,name,groupBy,granularity);
-  const actual={completion:goal>0?100*counters.sales/goal:NaN,purchase:counters.sales>0?100*counters.purchase/counters.sales:NaN,p0:counters.regular>0?100*counters.p0/counters.regular:NaN,app:counters.sales>0?100*counters.apps/counters.sales:NaN};
+  const actual={completion:goal>0?100*counters.sales/goal:0,
+    p0:counters.regular>0?100*counters.p0/counters.regular:0,
+    dental:counters.sales>0?100*counters.dental/counters.sales:0,
+    app:counters.sales>0?100*counters.apps/counters.sales:0,
+    purchase:counters.sales>0?100*counters.purchase/counters.sales:0};
   const factors={};let weighted=0,weightTotal=0;
   for(const key of QUALITY_FACTORS){
-    const target=qualityTarget(key,name,groupBy);
-    const value=qualityMetricFactor(Number.isFinite(actual[key])?actual[key]:0,target,{cap:key==='purchase'||key==='app'})??0;
+    const rule=qualityRule(key,name,groupBy);
+    const value=qualityMetricFactor(actual[key],rule.required,{minimum:rule.minimum,maximum:rule.maximum})??0;
     factors[key]=value;
-    const weight=groupBy==='module'?(moduleQualityOptions(name).weights?.[key]??qualityConfig.weights[key]):qualityConfig.weights[key];weighted+=value*weight;weightTotal+=weight;
+    const weight=groupBy==='module'?(moduleQualityOptions(name).weights?.[key]??qualityConfig.weights[key]):qualityConfig.weights[key];
+    weighted+=value*weight;weightTotal+=weight;
   }
-  return {goal,actual,factors,global:weightTotal>0?weighted/weightTotal:null,counters};
+  const composite=weightTotal>0?weighted/weightTotal:null;
+  const finalRule=qualityRule('quality',name,groupBy);
+  const global=composite===null?null:qualityMetricFactor(composite,finalRule.required,{minimum:finalRule.minimum,maximum:finalRule.maximum});
+  factors.quality=global;actual.quality=composite;
+  return {goal,actual,factors,composite,global,counters};
 }
+
+// V2.3.3 · Metas mixtas: Registros y Ventas en unidades; Dental, P0, Compra y APP en porcentaje requerido.
+const achievementsView={page:1,pageSize:100,chosen:new Set()};
+const ACH_GOALS_STORAGE='wmSamsMeridaAchievementGoalsV232';
+const ACH_GOAL_INPUTS={records:'achGoalRecords',sales:'achGoalSales',dental:'achGoalDental',p0:'achGoalP0',purchase:'achGoalPurchase',app:'achGoalApp'};
+const ACH_QUANTITY_GOALS=new Set(['records','sales']);
+const ACH_PERCENT_GOALS=new Set(['dental','p0','purchase','app']);
+const ACH_GOAL_LABELS={records:'Registros · cantidad',sales:'Ventas (Cumplimiento) · cantidad',dental:'Plan Dental · % requerido',p0:'Plan Cero · % requerido',purchase:'Primera compra · % requerido',app:'Activaciones APP · % requerido'};
+const achGoalText=(key,value)=>value===null||value===undefined?'Sin objetivo':ACH_PERCENT_GOALS.has(key)?`${number.format(value)}%`:number.format(value);
+const ACH_PRINT_DEFAULTS={filters:false,goals:true,percentages:true,quantities:true,records:true};
+const ACH_PRINT_STORAGE='wmSamsMeridaAchievementPrintLocalV232';
+let achievementGoalStore=storedJson(ACH_GOALS_STORAGE)||{};
+if(!achievementGoalStore||typeof achievementGoalStore!=='object'||Array.isArray(achievementGoalStore))achievementGoalStore={};
+// La V2.3.3 guardaba seis objetivos como CANTIDADES. Convertir esos valores a
+// porcentajes sin permiso daría resultados incorrectos. Conservar sólo las metas
+// de Registros y Ventas. Las cuatro nuevas metas porcentuales empiezan vacías.
+// La migración permanece en memoria hasta pulsar Guardar, sin consumir créditos.
+if(achievementGoalStore.__schema!==2){
+  achievementGoalStore=Object.fromEntries(Object.entries(achievementGoalStore).filter(([k])=>k.startsWith('[')).map(([scope,old])=>[
+    scope,{records:old?.records??null,sales:old?.sales??null,dental:null,p0:null,purchase:null,app:null}
+  ]));
+  achievementGoalStore.__schema=2;
+}
+let achievementPrintStore=storedJson(ACH_PRINT_STORAGE)||{};
+const achGoalScope=()=>JSON.stringify([achValue('achWeek'),achValue('achModule')||'*']);
+function achParseGoal(input,key){
+  if(input===null||input===undefined||String(input).trim()==='')return null;
+  const v=Number(String(input).trim());
+  if(!Number.isFinite(v)||v<=0)return null;
+  if(ACH_QUANTITY_GOALS.has(key))return Number.isSafeInteger(v)&&v<=1000000?v:null;
+  return v<=100?v:null;
+}
+function achReadGoals(){
+  const obj=achievementGoalStore[achGoalScope()]||{};
+  return Object.fromEntries(Object.keys(ACH_GOAL_INPUTS).map(k=>[k,achParseGoal(obj[k],k)]));
+}
+function achShowGoals(){
+  const goals=achReadGoals();
+  for(const [key,id] of Object.entries(ACH_GOAL_INPUTS))el(id).value=goals[key]??'';
+  el('achGoalsStatus').textContent=Object.values(goals).some(Number.isFinite)?'Objetivos cargados para esta semana y módulo.':'Sin objetivos guardados para esta semana y módulo.';
+}
+function achDraftGoals(){
+  const goals={};
+  for(const [key,id] of Object.entries(ACH_GOAL_INPUTS))goals[key]=achParseGoal(el(id).value,key);
+  achievementGoalStore[achGoalScope()]=goals;
+  el('achGoalsStatus').textContent='Cambios locales. Pulsa Guardar objetivos para conservarlos.';
+  renderAchievements();
+}
+function achSaveGoals(){
+  const invalid=Object.entries(ACH_GOAL_INPUTS).filter(([key,id])=>el(id).value.trim()&&!achParseGoal(el(id).value,key));
+  if(invalid.length){el('achGoalsStatus').textContent='Registros y Ventas requieren enteros positivos; los demás, porcentajes mayores a 0 y hasta 100.';el(invalid[0][1]).focus();return;}
+  achievementGoalStore[achGoalScope()]=Object.fromEntries(Object.entries(ACH_GOAL_INPUTS).map(([k,id])=>[k,achParseGoal(el(id).value,k)]));
+  localStorage.setItem(ACH_GOALS_STORAGE,JSON.stringify(achievementGoalStore)); // Una escritura al confirmar, sincronizable con login.
+  el('achGoalsStatus').textContent=window.APP_CLOUD?.user?'Guardado localmente · sincronización pendiente de confirmar en la nube.':'Objetivos guardados en este dispositivo.';
+  renderAchievements();
+}
+function achPrintEnabled(key){return el('achievementsPage')?.querySelector(`[data-ach-print="${key}"]`)?.checked!==false;}
+function achPrintFilters(){
+  const pairs=[['Semana',achValue('achWeek')?weekLabel(achValue('achWeek')):'Sin seleccionar'],['Módulo',achValue('achModule')||'Todos los módulos'],['Supervisores',el('achIncludeSupervisors').checked?'Incluidos':'Excluidos'],['Búsqueda',achValue('achSearch')||'Ninguna']];
+  for(const id of ACH_ADDITIONAL){const node=el(id);if(node?.value)pairs.push([node.closest('.field')?.querySelector('label')?.textContent||id,node.selectedOptions?.[0]?.textContent||node.value]);}
+  if(achValue('achColumn')&&achievementsView.chosen.size)pairs.push(['Columna XLS',`${el('achColumn').selectedOptions[0].textContent}: ${[...achievementsView.chosen].join(', ')}`]);
+  return pairs;
+}
+function achTargetQuality(alcancePct,requeridoPct,key,module){
+  const rule=qualityRule(key,module,'module');
+  return requeridoPct?qualityMetricFactor(alcancePct,requeridoPct,{minimum:rule.minimum,maximum:rule.maximum}):null;
+}
+
+const ACH_ADDITIONAL=['achExec','achPayment','achIncident','achApp','achCode','achGuarantee','achP0','achDental'];
+const achValue=id=>el(id)?.value||'';
+function achBaseRows(){
+  const week=achValue('achWeek'),module=achValue('achModule');
+  return (imported.data?.rows||[]).filter(r=>(!week||r.week===week)&&(!module||r.module===module));
+}
+function achRowsForMetric(){
+  const rows=achBaseRows();
+  return el('achIncludeSupervisors')?.checked===false?rows.filter(r=>!supervisorRow(r)):rows;
+}
+function achRecordTarget(rows){
+  // Sólo mostrar un objetivo de trámites si el usuario lo configuró en Ajustes 10.
+  const mods=[...new Set(rows.map(r=>r.module).filter(Boolean))];
+  if(!mods.length)return null;
+  const goals=mods.map(module=>moduleQualityOptions(module).weeklyRecords);
+  return goals.every(goal=>goal>0)?goals.reduce((a,b)=>a+b,0):null;
+}
+// V2.3.4: las mismas filas filtradas que aparecen en la tabla alimentan los indicadores.
+// La paginación solo divide la visualización: no cambia los totales de los filtros.
+// Las filas con incidencia permanecen visibles para auditoría, pero jamás suman
+// a registros, ventas ni a los numeradores o denominadores de calidad.
+function achData(){
+  const filteredRows=achFilteredRecords();
+  const incidents=filteredRows.filter(selectedIncident);
+  const rows=filteredRows.filter(r=>!selectedIncident(r));
+  const module=achValue('achModule');
+  const counters=countQualityRows(rows),goals=achReadGoals(),records=rows.length;
+  const c=counters;
+  const values={records,completion:c.sales,dental:c.dental,p0:c.p0,purchase:c.purchase,app:c.apps};
+  // Bases exclusivamente de los folios visibles por filtro que NO tienen incidencia.
+  const bases={dental:c.sales,p0:c.regular,purchase:c.sales,app:c.sales};
+  const alcances={
+    records:goals.records?100*records/goals.records:null,
+    completion:goals.sales?100*c.sales/goals.sales:null,
+    dental:bases.dental?100*c.dental/bases.dental:0,
+    p0:bases.p0?100*c.p0/bases.p0:0,
+    purchase:bases.purchase?100*c.purchase/bases.purchase:0,
+    app:bases.app?100*c.apps/bases.app:0
+  };
+  const factors={};let weighted=0,weightTotal=0,complete=true;
+  for(const key of QUALITY_FACTORS){
+    const required=goals[key==='completion'?'sales':key];
+    const value=achTargetQuality(alcances[key],key==='completion'?100:required,key,module);
+    factors[key]=value;
+    if(value===null){complete=false;continue;}
+    const w=module?(moduleQualityOptions(module).weights?.[key]??qualityConfig.weights[key]):qualityConfig.weights[key];
+    weighted+=value*w;weightTotal+=w;
+  }
+  const composite=complete&&weightTotal>0?weighted/weightTotal:null;
+  const qualityRequirement=qualityRule('quality',module,'module');
+  const globalReach=composite===null||!(qualityRequirement.required>0)?null:100*composite/qualityRequirement.required;
+  const global=composite===null?null:qualityMetricFactor(composite,qualityRequirement.required,{minimum:qualityRequirement.minimum,maximum:qualityRequirement.maximum});
+  // 'Alcance' es siempre el porcentaje grande; el resultado sujeto a mínimos y
+  // máximos configurables se expone abajo como 'Calidad' en cada tarjeta.
+  const factorIndicator=(name,key)=>({name,reach:alcances[key],quality:factors[key],
+    required:goals[key]??null});
+  const metricList=[
+    {name:'Registros',reach:alcances.records,quality:alcances.records,required:goals.records},
+    {name:'Cumplimiento',reach:alcances.completion,quality:factors.completion,required:goals.sales},
+    factorIndicator('Plan Dental','dental'),
+    factorIndicator('Plan Cero','p0'),
+    factorIndicator('Activación APP','app'),
+    factorIndicator('Primera compra','purchase'),
+    {name:'Calidad',reach:composite,quality:global,required:qualityRequirement.required},
+    {name:'Alcance global',reach:globalReach,quality:global,required:qualityRequirement.required,global:true}
+  ];
+  const counts=[
+    ['Registros',records],['Ventas con código',c.sales],['Regulares',c.regular],['Garantizadas',rows.filter(r=>hasCode(r)&&isYes(r.guaranteed)).length],
+    ['Plan Dental',c.dental],['Plan Cero',c.p0],['Primera compra',c.purchase],['APP activadas',c.apps],
+    ['Incidencias excluidas (informativo)',incidents.length],['Ejecutivos',new Set(rows.map(r=>r.executive).filter(Boolean)).size]
+  ];
+  const q={goal:goals.sales,actual:values,counters,factors,composite,global};
+  return {rows,filteredRows,incidents,q,counts,metricList,goals,recordGoal:goals.records,alcances,bases};
+}
+
+function populateAchFilters(){
+  const data=imported.data,rows=data?.rows||[];
+  const weeks=[...new Set(rows.map(r=>r.week).filter(Boolean))].sort().reverse(),select=el('achWeek');
+  if(!select)return;
+  const previous=select.value;
+  select.innerHTML=weeks.length?weeks.map(w=>`<option value="${esc(w)}">${esc(weekLabel(w))}</option>`).join(''):'<option value="">Sin semanas disponibles</option>';
+  select.value=weeks.includes(previous)?previous:(weeks.includes(imported.week)?imported.week:weeks[0]||'');
+  select.disabled=!weeks.length;
+  const modules=[...new Set(rows.filter(r=>r.week===select.value).map(r=>r.module).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+  setAllRecordsOptions(el('achModule'),modules,'Todos los módulos');
+  const all=achBaseRows(),executives=[...new Set(all.map(r=>r.executive).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+  setAllRecordsOptions(el('achExec'),executives,'Todos los ejecutivos');
+  const col=el('achColumn'),oldCol=col.value;
+  col.innerHTML='<option value="">Sin columna adicional</option>'+tableView.columns.filter(c=>c.key.startsWith('raw:')).map(c=>`<option value="${esc(c.key)}">${esc(c.name)}</option>`).join('');
+  col.value=tableView.columns.some(c=>c.key===oldCol)?oldCol:'';
+  if(oldCol!==col.value)achievementsView.chosen.clear();
+  populateAchValueChoices();
+}
+function populateAchValueChoices(){
+  const key=achValue('achColumn'),host=el('achValues');if(!host)return;
+  const search=normalize(achValue('achValueSearch'));
+  el('achValueSearch').disabled=!key;
+  if(!key){host.textContent='Selecciona una columna para elegir varios valores.';return;}
+  const values=[...new Set(achBaseRows().map(r=>getCellText(r,key)))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+  const shown=values.filter(v=>!search||normalize(v||'(vacío)').includes(search)).slice(0,150);
+  host.innerHTML=shown.map(v=>`<label><input type="checkbox" data-ach-value="${esc(v)}" ${achievementsView.chosen.has(v)?'checked':''}>${esc(displayXlsValue(v)||'(vacío)')}</label>`).join('')||'<span class="muted">Sin valores</span>';
+}
+function achFilteredRecords(){
+  let rows=achRowsForMetric();
+  const exec=achValue('achExec'),pay=achValue('achPayment'),inc=achValue('achIncident'),app=achValue('achApp');
+  const code=achValue('achCode'),guar=achValue('achGuarantee'),p0=achValue('achP0'),dental=achValue('achDental');
+  const search=normalize(achValue('achSearch')),col=achValue('achColumn');
+  if(exec)rows=rows.filter(r=>r.executive===exec);
+  if(pay==='payable')rows=rows.filter(payable);
+  if(pay==='notpayable')rows=rows.filter(r=>hasCode(r)&&!payable(r));
+  if(pay==='nocode')rows=rows.filter(r=>!hasCode(r));
+  if(inc==='yes')rows=rows.filter(selectedIncident);
+  if(inc==='no')rows=rows.filter(r=>!selectedIncident(r));
+  if(app==='yes')rows=rows.filter(appEnabled);
+  if(app==='no')rows=rows.filter(r=>!appEnabled(r));
+  if(code==='yes')rows=rows.filter(hasCode);
+  if(code==='no')rows=rows.filter(r=>!hasCode(r));
+  if(guar==='yes')rows=rows.filter(r=>isYes(r.guaranteed));
+  if(guar==='no')rows=rows.filter(r=>isNo(r.guaranteed));
+  if(p0==='yes')rows=rows.filter(r=>isYes(r.p0));
+  if(p0==='no')rows=rows.filter(r=>isNo(r.p0));
+  if(dental==='yes')rows=rows.filter(r=>isYes(r.dental));
+  if(dental==='no')rows=rows.filter(r=>isNo(r.dental));
+  if(col&&achievementsView.chosen.size)rows=rows.filter(r=>achievementsView.chosen.has(getCellText(r,col)));
+  if(search)rows=rows.filter(r=>normalize([...r.raw,getCellText(r,'incident'),getCellText(r,'app'),getCellText(r,'payment')].join(' ')).includes(search));
+  // Conservar la preferencia solicitada: fechas recientes primero, incluso en PDF/PNG/CSV.
+  return [...rows].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||b.i-a.i);
+}
+function renderAchievements(){
+  if(!el('achPercentages'))return;
+  const {rows,filteredRows,incidents,metricList,counts,goals,q,alcances}=achData();
+  const baseRows=achBaseRows(),supervisorRows=baseRows.filter(supervisorRow).length;
+  const includeSupervisors=el('achIncludeSupervisors').checked;
+  const note=el('achSupervisorStatus');
+  if(!Object.values(supervisorConfig).some(names=>Array.isArray(names)&&names.length))
+    note.textContent='Asigna supervisores en Ajustes → 11 para activar esta exclusión.';
+  else if(!supervisorRows)note.textContent='No hay trámites de supervisores identificados para esta semana y módulo.';
+  else note.textContent=includeSupervisors?`${number.format(supervisorRows)} trámites de supervisores incluidos en indicadores y registros.`:`${number.format(supervisorRows)} trámites de supervisores excluidos de indicadores y registros.`;
+  el('achPeriod').textContent=rows.length?`${weekLabel(achValue('achWeek'))} · ${achValue('achModule')||'Todos los módulos'}`:imported.data?`${achValue('achWeek')?weekLabel(achValue('achWeek')):'Sin semana'} · ${achValue('achModule')||'Todos los módulos'}`:'Sin datos XLS';
+  el('achPercentages').innerHTML=metricList.map(m=>`<div class="achievements-kpi ${m.global?'achievements-global':''}"><span>${esc(m.name)}</span><strong>${qualityPercentText(m.reach)}</strong><small>Calidad: <b>${qualityPercentText(m.quality)}</b></small></div>`).join('');
+  const goalForCount={Registros:'records','Ventas con código':'sales','Plan Dental':'dental','Plan Cero':'p0','Primera compra':'purchase','APP activadas':'app'};
+  el('achQuantities').innerHTML=counts.map(([label,value])=>{
+    const key=goalForCount[label],target=goals[key];
+    let extra='';
+    if(ACH_QUANTITY_GOALS.has(key)&&target)extra=`Meta: ${achGoalText(key,target)} · ${qualityPercentText(100*value/target)} logrado`;
+    else if(ACH_PERCENT_GOALS.has(key))extra=`Alcance: ${qualityPercentText(alcances[key])}${target?` · requerido: ${achGoalText(key,target)}`:''}`;
+    return `<div class="achievements-count"><span>${esc(label)}</span><strong>${number.format(value)}</strong>${extra?`<small>${esc(extra)}</small>`:''}</div>`;
+  }).join('');
+  const records=filteredRows,cols=allRecordsColumns();
+  const pages=Math.max(1,Math.ceil(records.length/achievementsView.pageSize));
+  achievementsView.page=Math.min(Math.max(1,achievementsView.page),pages);
+  const start=(achievementsView.page-1)*achievementsView.pageSize,visible=records.slice(start,start+achievementsView.pageSize);
+  el('achRecordsHead').innerHTML='<tr>'+cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')+'</tr>';
+  el('achRecordsBody').innerHTML=visible.length?visible.map(r=>`<tr class="${selectedIncident(r)?'flagged':''}">${cols.map(c=>`<td>${tableCellMarkup(r,c)}</td>`).join('')}</tr>`).join(''):`<tr><td class="achievements-empty" colspan="${Math.max(1,cols.length)}">${imported.data?'No hay registros que coincidan con los filtros.':'Carga un XLS para consultar los registros.'}</td></tr>`;
+  el('achRecordSummary').innerHTML=`<span>${number.format(records.length)} folios filtrados en la tabla</span><span>${number.format(rows.length)} contados en indicadores</span><span>${rows.filter(hasCode).length} ventas válidas</span><span>${number.format(incidents.length)} incidencias excluidas</span>`;
+  el('achRecordStatus').textContent=records.length?`Filas ${start+1}–${Math.min(start+achievementsView.pageSize,records.length)} de ${records.length} · Página ${achievementsView.page}/${pages}`:'0 registros';
+  el('achPrev').disabled=achievementsView.page<=1;el('achNext').disabled=achievementsView.page>=pages;
+  const filtered=ACH_ADDITIONAL.filter(id=>achValue(id)).length+(achValue('achColumn')&&achievementsView.chosen.size?1:0);
+  el('achFilterBadge').textContent=filtered?`· ${filtered} filtros activos`:'· Contraídos por defecto';
+}
+function initAchievements(){
+  el('achWeek').addEventListener('change',()=>{el('achModule').value='';populateAchFilters();achShowGoals();achievementsView.page=1;renderAchievements();});
+  el('achModule').addEventListener('change',()=>{populateAchFilters();achShowGoals();achievementsView.page=1;renderAchievements();});
+  for(const id of ACH_ADDITIONAL)el(id).addEventListener('change',()=>{achievementsView.page=1;renderAchievements();});
+  el('achIncludeSupervisors').addEventListener('change',()=>{achievementsView.page=1;renderAchievements();});
+  el('achSearch').addEventListener('input',()=>{achievementsView.page=1;renderAchievements();});
+  el('achColumn').addEventListener('change',()=>{achievementsView.chosen.clear();el('achValueSearch').value='';populateAchValueChoices();achievementsView.page=1;renderAchievements();});
+  el('achValueSearch').addEventListener('input',populateAchValueChoices);
+  el('achValues').addEventListener('change',e=>{if(!e.target.matches('input[data-ach-value]'))return;const v=e.target.dataset.achValue;e.target.checked?achievementsView.chosen.add(v):achievementsView.chosen.delete(v);achievementsView.page=1;renderAchievements();});
+  el('achReset').addEventListener('click',()=>{for(const id of ACH_ADDITIONAL)el(id).value='';el('achColumn').value='';el('achValueSearch').value='';achievementsView.chosen.clear();achievementsView.page=1;populateAchValueChoices();renderAchievements();});
+  el('achPageSize').addEventListener('change',()=>{achievementsView.pageSize=Number(el('achPageSize').value)||100;achievementsView.page=1;renderAchievements();});
+  el('achPrev').addEventListener('click',()=>{achievementsView.page--;renderAchievements();});
+  el('achNext').addEventListener('click',()=>{achievementsView.page++;renderAchievements();});
+  el('achRecordsTable').addEventListener('change',e=>applyFolioValidationChange(e.target));
+  for(const id of Object.values(ACH_GOAL_INPUTS))el(id).addEventListener('input',achDraftGoals);
+  el('achSaveGoals').addEventListener('click',achSaveGoals);
+  el('achievementsPage').querySelectorAll('[data-ach-print]').forEach(input=>{
+    const key=input.dataset.achPrint;
+    input.checked=Object.prototype.hasOwnProperty.call(achievementPrintStore,key)?!!achievementPrintStore[key]:ACH_PRINT_DEFAULTS[key];
+    input.addEventListener('click',event=>event.stopPropagation());
+    input.closest('label').addEventListener('click',event=>event.stopPropagation());
+    input.addEventListener('change',()=>{achievementPrintStore[key]=input.checked;localStorage.setItem(ACH_PRINT_STORAGE,JSON.stringify(achievementPrintStore));});
+  });
+  populateAchFilters();achShowGoals();renderAchievements();
+}
+
 function groupRowsFor(rows,groupBy,name){return name==='TOTAL'?rows:rows.filter(r=>(String(r[groupBy]||'').trim()||(groupBy==='module'?'Sin módulo':'Sin ejecutivo'))===name);}
-function supervisorRow(row){return (supervisorConfig[String(row.module||'').trim()]||[]).includes(String(row.executive||'').trim());}
+function supervisorRow(row){
+  const mod=normalize(String(row.module||'').trim()),person=normalize(String(row.executive||'').trim());
+  if(!mod||!person)return false;
+  return Object.entries(supervisorConfig).some(([module,names])=>
+    normalize(String(module).trim())===mod && Array.isArray(names) &&
+    names.some(name=>normalize(String(name||'').trim())===person));
+}
 function filterPageSupervisors(rows,page){const id={daily:'includeSupervisorsDaily',accumulated:'includeSupervisorsAccumulated',weekly:'includeSupervisorsWeekly'}[page];return !id||el(id)?.checked!==false?rows:rows.filter(r=>!supervisorRow(r));}
 function knownExecutivesByModule(){
   const out=new Map();
@@ -776,47 +1189,84 @@ function knownExecutivesByModule(){
   for(const module of [...Object.keys(supervisorConfig),...Object.keys(qualityConfig.modules)])if(!out.has(module))out.set(module,new Set());
   return [...out.entries()].sort((a,b)=>a[0].localeCompare(b[0],'es')).map(([module,names])=>({module,names:[...names].sort((a,b)=>a.localeCompare(b,'es'))}));
 }
-function qualitySettingsInput(label,key,value,type='global'){return `<label>${esc(label)}<input type="number" min="0" max="100000" step="0.1" data-quality-kind="${type}" data-quality-key="${key}" value="${Number(value)||0}"></label>`;}
+function qualitySettingsInput(label,key,value,type='global'){
+  return `<label>${esc(label)}<input type="number" min="0" max="100000" step="0.1" data-quality-kind="${type}" data-quality-key="${key}" value="${Number(value)||0}"></label>`;
+}
+function qualityRuleInput(key,kind,module=''){
+  const mod=module?moduleQualityOptions(module):null;
+  const values=mod?.[kind]||qualityConfig[kind];
+  const globalValue=qualityConfig[kind][key];
+  const override=module&&Object.prototype.hasOwnProperty.call(values,key);
+  const val=override?values[key]:module?'':globalValue;
+  const baseLabel=kind==='targets'?'Requerido':kind==='minima'?'Mínimo':'Máximo';
+  const placeholder=module?'Global: '+(globalValue===null?'Sin tope':globalValue+'%'):kind==='maxima'?'Sin tope':'';
+  const hint=kind==='maxima'?'Dejar vacío = sin tope':kind==='minima'?'Por debajo de este valor la calidad es 0%':'';
+  const kindName=module?'module-'+(kind==='targets'?'target':kind==='minima'?'minimum':'maximum'):(kind==='targets'?'target':kind==='minima'?'minimum':'maximum');
+  const noCap=module&&kind==='maxima'?`<label class="quality-no-cap"><input type="checkbox" data-quality-kind="module-no-cap" data-quality-key="${key}" data-quality-module="${esc(module)}" ${override&&val===null?'checked':''}> Sin tope</label>`:'';
+  return `<div class="quality-rule-field"><label>${baseLabel} (%)<input aria-label="${esc(baseLabel+' '+QUALITY_FACTOR_LABELS[key]+' '+(module||'global'))}" type="number" min="${kind==='targets'?'0.01':'0'}" max="100000" step="0.1" data-quality-kind="${kindName}" data-quality-key="${key}" ${module?`data-quality-module="${esc(module)}"`:''} value="${val??''}" placeholder="${esc(placeholder)}" title="${esc(hint)}"></label>${noCap}</div>`;
+}
+function qualityFactorCard(key,module=''){
+  const weightValue=module?moduleQualityOptions(module).weights?.[key]:qualityConfig.weights[key];
+  const weight=key==='quality'?'':`<label>Ponderación<input aria-label="Ponderación ${esc(QUALITY_FACTOR_LABELS[key])}" type="number" min="0" max="100000" step="0.1" data-quality-kind="${module?'module-weight':'weight'}" data-quality-key="${key}" ${module?`data-quality-module="${esc(module)}"`:''} placeholder="${module?'Global '+qualityConfig.weights[key]+'%':''}" value="${weightValue??''}"></label>`;
+  return `<div class="quality-factor-card"><strong>${esc(QUALITY_FACTOR_LABELS[key])}</strong>${key==='quality'?'<small>Resultado compuesto de los otros cinco factores. No se pondera a sí mismo.</small>':''}<div class="quality-factor-fields">${qualityRuleInput(key,'targets',module)}${qualityRuleInput(key,'minima',module)}${qualityRuleInput(key,'maxima',module)}${weight}</div></div>`;
+}
 function renderQualitySettings(){
   const host=el('qualityGlobalInputs');if(!host)return;
-  host.innerHTML=[qualitySettingsInput('Meta semanal por ejecutivo (predeterminada)','execWeeklyGoal',qualityConfig.execWeeklyGoal),...QUALITY_FACTORS.flatMap(key=>[
-    qualitySettingsInput(`Objetivo ${QUALITY_FACTOR_LABELS[key]} (%)`,key,qualityConfig.targets[key],'target'),
-    qualitySettingsInput(`Ponderación ${QUALITY_FACTOR_LABELS[key]} (%)`,key,qualityConfig.weights[key],'weight')])].join('');
+  host.innerHTML=qualitySettingsInput('Meta semanal por ejecutivo (predeterminada)','execWeeklyGoal',qualityConfig.execWeeklyGoal)+QUALITY_RULE_KEYS.map(k=>qualityFactorCard(k)).join('');
   const modules=knownExecutivesByModule();
   el('qualityModuleInputs').innerHTML=modules.length?modules.map(({module})=>{
-    const data=moduleQualityOptions(module),targets=data.targets||{},weights=data.weights||{};
+    const data=moduleQualityOptions(module);
     return `<details class="module-goal-card"><summary>${esc(module)}</summary><div class="module-goal-grid">
-      ${qualitySettingsInput('Meta semanal de ventas','weeklySales',data.weeklySales||0,'module') .replace('data-quality-kind="module"',`data-quality-kind="module" data-quality-module="${esc(module)}"`)}
+      ${qualitySettingsInput('Meta semanal de ventas','weeklySales',data.weeklySales||0,'module').replace('data-quality-kind="module"',`data-quality-kind="module" data-quality-module="${esc(module)}"`)}
       ${qualitySettingsInput('Meta semanal de trámites','weeklyRecords',data.weeklyRecords||0,'module').replace('data-quality-kind="module"',`data-quality-kind="module" data-quality-module="${esc(module)}"`)}
-      ${QUALITY_FACTORS.map(key=>`<label>Objetivo ${esc(QUALITY_FACTOR_LABELS[key])} (%) · vacío = global<input type="number" min="0.1" max="1000" step="0.1" data-quality-kind="module-target" data-quality-key="${key}" data-quality-module="${esc(module)}" placeholder="Global (${qualityConfig.targets[key]}%)" value="${targets[key]??''}"></label><label>Peso de ${esc(QUALITY_FACTOR_LABELS[key])} · vacío = global<input type="number" min="0" max="1000" step="0.1" data-quality-kind="module-weight" data-quality-key="${key}" data-quality-module="${esc(module)}" placeholder="Global (${qualityConfig.weights[key]})" value="${weights[key]??''}"></label>`).join('')}
-    </div></details>`;
+      </div>${QUALITY_RULE_KEYS.map(k=>qualityFactorCard(k,module)).join('')}</details>`;
   }).join(''):'<p class="settings-help">Importa un XLS para identificar los módulos disponibles.</p>';
 }
 function renderSupervisorSettings(){
   const host=el('supervisorManager');if(!host)return;
   const modules=knownExecutivesByModule();
-  host.innerHTML=modules.length?modules.map(({module,names})=>`<div class="module-goal-card"><strong>${esc(module)}</strong><div class="supervisor-choice-row">${names.length?names.map(name=>`<label><input type="checkbox" data-supervisor-module="${esc(module)}" data-supervisor-name="${esc(name)}" ${(supervisorConfig[module]||[]).includes(name)?'checked':''}/> ${esc(name)}</label>`).join(''):'<span class="muted">Sin ejecutivos en los XLS activos.</span>'}</div></div>`).join(''):'<p class="settings-help">Importa XLS para asociar supervisores a sus módulos.</p>';
+  host.innerHTML=modules.length?modules.map(({module,names})=>`<div class="module-goal-card"><strong>${esc(module)}</strong><div class="supervisor-choice-row">${names.length?names.map(name=>`<label><input type="checkbox" data-supervisor-module="${esc(module)}" data-supervisor-name="${esc(name)}" ${(supervisorConfig[module]||[]).includes(name)?'checked':''}/> ${esc(name)}</label>`).join(''):'<span class="muted">Sin ejecutivos en los XLS activos.</span>'}</div></div>`).join(''):'<p class="settings-help">Importa un XLS para identificar supervisores disponibles.</p>';
 }
-function renderQualityPages(){if(el('dailyPage'))renderDaily();if(el('accumulatedPage'))renderAccumulated();if(el('weeklyPage'))renderWeekly();}
+function renderQualityPages(){if(el('dailyPage'))renderDaily();if(el('accumulatedPage'))renderAccumulated();if(el('weeklyPage'))renderWeekly();if(el('achievementsPage'))renderAchievements();}
+function setQualityField(cfg,kind,key,inputValue){
+  const target=kind==='target'?'targets':kind==='minimum'?'minima':kind==='maximum'?'maxima':'weights';
+  if(target==='maxima'&&inputValue===''){cfg.maxima[key]=null;return true;}
+  const n=Number(inputValue);
+  if(!validQualityNumber(n,{positive:target==='targets'}))return false;
+  cfg[target][key]=n;return true;
+}
 function initQualitySettings(){
   renderQualitySettings();renderSupervisorSettings();
   el('qualityGlobalInputs').addEventListener('change',e=>{
     const x=e.target;if(!x.matches('[data-quality-kind]'))return;
-    const n=Number(x.value),kind=x.dataset.qualityKind,key=x.dataset.qualityKey;
-    if(!Number.isFinite(n)||n<0||(kind==='target'&&n<=0)||(kind==='global'&&key==='execWeeklyGoal'&&n<=0)) {alert('Ingresa un número válido mayor o igual a cero.');renderQualitySettings();return;}
-    if(kind==='global')qualityConfig[key]=n;else qualityConfig[kind==='target'?'targets':'weights'][key]=n;
-    saveQualityConfig();el('qualitySaveStatus').textContent='Objetivos actualizados; guardado en la nube pendiente de confirmación.';
+    const kind=x.dataset.qualityKind,key=x.dataset.qualityKey;
+    let good=true;
+    if(kind==='global'){
+      const val=Number(x.value);
+      if(!validQualityNumber(val,{positive:true}))good=false;else qualityConfig[key]=val;
+    }else good=setQualityField(qualityConfig,kind,key,x.value);
+    if(!good){alert('Valor no válido. Requerido mayor que 0; mínimos y máximos iguales o superiores a 0.');renderQualitySettings();return;}
+    saveQualityConfig();el('qualitySaveStatus').textContent='Porcentajes requeridos y límites actualizados; sincronización pendiente de confirmación.';
   });
   el('qualityModuleInputs').addEventListener('change',e=>{
     const x=e.target;if(!x.matches('[data-quality-kind]'))return;
     const module=x.dataset.qualityModule,key=x.dataset.qualityKey,kind=x.dataset.qualityKind;
-    const n=Number(x.value);if(x.value!==''&&(!Number.isFinite(n)||n<0||(kind==='module-target'&&n<=0))){alert('Ingresa un objetivo válido.');return;}
-    qualityConfig.modules[module]??={weeklySales:0,weeklyRecords:0,targets:{},weights:{}};
-    const target=qualityConfig.modules[module];
-    if(kind==='module-target'){if(x.value==='')delete target.targets[key];else target.targets[key]=n;}
-    else if(kind==='module-weight'){target.weights??={};if(x.value==='')delete target.weights[key];else target.weights[key]=n;}
-    else target[key]=n;
-    saveQualityConfig();el('qualitySaveStatus').textContent='Objetivo del módulo actualizado.';
+    const val=x.value.trim(),n=Number(val);
+    qualityConfig.modules[module]??={weeklySales:0,weeklyRecords:0,targets:{},minima:{},maxima:{},weights:{}};
+    const cfg=qualityConfig.modules[module];cfg.targets??={};cfg.minima??={};cfg.maxima??={};cfg.weights??={};
+    if(kind==='module-no-cap'){
+      if(x.checked)cfg.maxima[key]=null;else delete cfg.maxima[key];
+    }else if(kind==='module'){
+      if(!validQualityNumber(n)){alert('Meta inválida.');return;}
+      cfg[key]=n;
+    }else{
+      const kindShort=kind.slice('module-'.length);
+      const target=kindShort==='target'?'targets':kindShort==='minimum'?'minima':kindShort==='maximum'?'maxima':'weights';
+      if(val==='')delete cfg[target][key];
+      else if(!validQualityNumber(n,{positive:target==='targets'})){alert('Porcentaje inválido.');return;}
+      else cfg[target][key]=n;
+    }
+    saveQualityConfig();el('qualitySaveStatus').textContent='Porcentajes del módulo actualizados.';
   });
   el('supervisorManager').addEventListener('change',e=>{
     const x=e.target;if(!x.matches('input[data-supervisor-module]'))return;
@@ -824,7 +1274,7 @@ function initQualitySettings(){
     const names=new Set(supervisorConfig[module]||[]);if(x.checked)names.add(name);else names.delete(name);
     supervisorConfig[module]=[...names];saveSupervisorConfig();el('supervisorSaveStatus').textContent='Asignaciones actualizadas.';
   });
-  el('qualityReset').addEventListener('click',()=>{if(!confirm('¿Restaurar metas y factores globales y de todos los módulos?'))return;qualityConfig=cleanQualityConfig(null);saveQualityConfig();renderQualitySettings();});
+  el('qualityReset').addEventListener('click',()=>{if(!confirm('¿Restaurar porcentajes requeridos, límites, metas y pesos?'))return;qualityConfig=cleanQualityConfig(null);saveQualityConfig();renderQualitySettings();});
   for(const id of ['includeSupervisorsDaily','includeSupervisorsAccumulated','includeSupervisorsWeekly'])el(id)?.addEventListener('change',renderQualityPages);
 }
 
@@ -917,7 +1367,7 @@ function renderDaily(){
 
 // V12 · Acumulados independientes de la selección activa. Solo XLS persistidos.
 function accumulatedRows(){
-  const consolidated=combinedArchiveData(archive.reports);
+  const consolidated=combinedArchiveData(isAuthorized()?archive.reports:archive.tempReports);
   if(!consolidated)return [];
   const from=el('accumulatedFrom').value,to=el('accumulatedTo').value;
   // Sin fechas: incluir todos los registros históricos, incluso sin fecha válida.
@@ -949,21 +1399,21 @@ function accumulatedPeriodText(){
   return 'Histórico completo';
 }
 function renderAccumulated(){
-  if(!el('accumulatedPage')||!isAuthorized())return;
+  if(!el('accumulatedPage'))return;
   const start=el('accumulatedFrom').value,end=el('accumulatedTo').value;
   const invalid=start&&end&&start>end;
   const rows=invalid?[]:accumulatedRows();
   el('accumulatedPeriod').textContent=accumulatedPeriodText();
-  el('accumulatedPeriodLabel').textContent=start||end?'Rango personalizado':'Todos los registros guardados';
+  el('accumulatedPeriodLabel').textContent=start||end?'Rango personalizado':isAuthorized()?'Todos los registros guardados':'Registros XLS temporales';
   el('accumulatedDataNotice').textContent=invalid?
     'La fecha inicial no puede ser posterior a la fecha final. Corrige el intervalo.':
-    `${archive.reports.length} XLS guardados · ${number.format(rows.length)} registros únicos en el periodo · Fuente: historial remoto completo (sin archivos temporales).`;
+    `${isAuthorized()?archive.reports.length:archive.tempReports.length} XLS ${isAuthorized()?'guardados':'temporales'} · ${number.format(rows.length)} registros únicos en el periodo · ${isAuthorized()?'Fuente: historial remoto completo.':'Fuente: archivos cargados en esta sesión, sin guardar en la nube.'}`;
   for(const [groupBy,rowsId,totalId,countId,label] of [
     ['module','accumulatedModuleRows','accumulatedModuleTotal','accumulatedModulesCount','módulos'],
     ['executive','accumulatedExecutiveRows','accumulatedExecutiveTotal','accumulatedExecutivesCount','ejecutivos']]){
     const {entries,totals}=accumulatedGroups(rows,groupBy);
     el(rowsId).innerHTML=entries.length?entries.map(g=>accumulatedRowMarkup(g,false,groupBy)).join(''):
-      `<tr><td colspan="8" class="daily-empty">${invalid?'Revisa el rango de fechas.':archive.reports.length?'Sin registros en el periodo.':'No hay XLS guardados en tu cuenta.'}</td></tr>`;
+      `<tr><td colspan="8" class="daily-empty">${invalid?'Revisa el rango de fechas.':(isAuthorized()?archive.reports:archive.tempReports).length?'Sin registros en el periodo.':'No hay XLS cargados en esta sesión.'}</td></tr>`;
     el(totalId).innerHTML=entries.length?accumulatedRowMarkup(totals,true,groupBy):'';
     el(countId).textContent=`${entries.length} ${label}`;
   }
@@ -972,7 +1422,35 @@ function renderAccumulated(){
 // Comparativa semanal protegida: dos semanas completas (lunes a domingo).
 // Se trabaja sobre todos los XLS guardados, sin alterar la selección del resto de páginas.
 const WEEKLY_GOALS_KEY='wmSamsComparativaSemanalObjetivosV13';
-const WEEKLY_LABELS={records:'Registros',sales:'Ventas totales',reg:'Ventas regulares',guar:'Ventas garantizadas',p0:'Programa Cero',dental:'Plan Dental'};
+const WEEKLY_LABELS={records:'Registros',sales:'Ventas totales',reg:'Ventas regulares',guar:'Ventas garantizadas',p0:'Programa Cero',dental:'Plan Dental',app:'Activación APP',purchase:'Primera compra'};
+// El orden de las columnas semanales es explícito. Regulares y garantizadas
+// solamente son conteos; no tienen meta ni calidad propia.
+const WEEKLY_DISPLAY_METRICS=['records','sales','reg','guar','p0','dental','app','purchase'];
+function weeklyMetricValue(metrics,rows,key){
+  if(key==='app')return countQualityRows(rows).apps;
+  if(key==='purchase')return countQualityRows(rows).purchase;
+  return metrics[key]??0;
+}
+function weeklyTargetPct(key){return qualityPercentText(qualityRule(key,'TOTAL','module').required);}
+function weeklyGoalMarkup(week,key,primaryWeek,metrics){
+  if(key==='reg'||key==='guar')return '<td class="no-goal" title="Sin objetivo">—</td>';
+  if(key==='app'||key==='purchase')return `<td class="weekly-rule-goal" title="Porcentaje requerido en Ajustes (puede variar por módulo)">${weeklyTargetPct(key)}</td>`;
+  return weeklyGoalInput(week,key,primaryWeek,metrics);
+}
+function weeklyFactorValues(week,primaryWeek,data,q){
+  const recordsGoal=weeklyGoalFor(week,'records',primaryWeek,data.totals.metrics);
+  return [
+    {label:'Registros',value:recordsGoal>0?weeklyPercent(data.totals.metrics.records,recordsGoal):'—'},
+    {label:'Cumplimiento',value:qualityPercentText(q.factors.completion)},
+    null,null,
+    {label:'Plan Cero',value:qualityPercentText(q.factors.p0)},
+    {label:'Plan Dental',value:qualityPercentText(q.factors.dental)},
+    {label:'APP',value:qualityPercentText(q.factors.app)},
+    {label:'Primera compra',value:qualityPercentText(q.factors.purchase)},
+    {label:'Calidad',value:qualityPercentText(q.factors.quality)}
+  ];
+}
+
 const weeklyGoals=loadTeamStore(WEEKLY_GOALS_KEY);
 function weekShift(start,days){const d=dateFromIso(start);d.setDate(d.getDate()+days);return dateIso(d);}
 function defaultWeeklyDates(){const current=mondayOf(dateIso(new Date()));return {primary:weekShift(current,-7),previous:weekShift(current,-14)};}
@@ -1022,7 +1500,7 @@ function weeklyGoalExport(week,key,primaryWeek,metrics){
   return (key==='records'||key==='sales')&&!hasWeeklyGoalOverride(week,key)&&val===0?'':val;
 }
 function weeklyGroups(week){
-  const data=combinedArchiveData(archive.reports);
+  const data=combinedArchiveData(isAuthorized()?archive.reports:archive.tempReports);
   const validRows=filterPageSupervisors(data?.rows||[],'weekly').filter(r=>r.fecha&&r.fecha>=week&&r.fecha<=sundayOf(week));
   const {entries,totals}=accumulatedGroups(validRows,'module');
   return {entries,totals,rows:validRows};
@@ -1037,14 +1515,25 @@ function weeklyPercent(actual,target){return target>0?pct(100*actual/target):'�
 function weeklyPanelMarkup(week,primaryWeek){
   const data=weeklyGroups(week);
   const qualityFor=g=>qualityResult(g.rows,'module',g.name,'weekly').global;
-  const overall=weeklyGlobalQuality(week,primaryWeek,data);
-  const rowMarkup=g=>`<tr><td><span class="daily-entity" title="${esc(g.name)}">${esc(g.name)}</span></td>${DAILY_METRICS.map(k=>`<td>${number.format(g.metrics[k])}</td>`).join('')}<td class="quality-global">${qualityPercentText(qualityFor(g))}</td></tr>`;
-  const inputRow=`<tr class="goal-row"><td>OBJETIVOS</td>${DAILY_METRICS.map(k=>weeklyGoalInput(week,k,primaryWeek,data.totals.metrics)).join('')}<td>—</td></tr>`;
-  const totalRow=`<tr class="weekly-total"><td>TOTAL ACUMULADO</td>${DAILY_METRICS.map(k=>`<td>${number.format(data.totals.metrics[k])}</td>`).join('')}<td class="quality-global">${qualityPercentText(overall)}</td></tr>`;
-  const progressRow=`<tr class="weekly-progress"><td>CUMPLIMIENTO</td>${DAILY_METRICS.map(k=>{const goal=weeklyGoalFor(week,k,primaryWeek,data.totals.metrics);return `<td class="${goal?'':'no-goal'}">${weeklyPercent(data.totals.metrics[k],goal)}</td>`;}).join('')}<td>—</td></tr>`;
-  const factorRow=`<tr class="weekly-quality"><td>CALIDAD DE FACTORES</td>${DAILY_METRICS.map(k=>{const goal=weeklyGoalFor(week,k,primaryWeek,data.totals.metrics);const ratio=qualityMetricFactor(goal>0?100*data.totals.metrics[k]/goal:NaN,100,{cap:!['sales','p0'].includes(k)});return `<td>${qualityPercentText(ratio)}</td>`;}).join('')}<td>—</td></tr>`;
-  const globalRow=`<tr class="weekly-quality"><td>ALCANCE GLOBAL</td>${DAILY_METRICS.map(()=>'<td>—</td>').join('')}<td class="quality-global">${qualityPercentText(overall)}</td></tr>`;
-  return {data,body:inputRow+(data.entries.length?data.entries.map(rowMarkup).join(''):'<tr><td colspan="8" class="daily-empty">Sin registros para esta semana.</td></tr>'),footer:totalRow+progressRow+factorRow+globalRow};
+  const totalQuality=qualityResult(data.rows,'module','TOTAL','weekly',weeklyGoalFor(week,'sales',primaryWeek,data.totals.metrics)||null);
+  const overall=totalQuality.global;
+  const metricCells=g=>WEEKLY_DISPLAY_METRICS.map(k=>`<td>${number.format(weeklyMetricValue(g.metrics,g.rows,k))}</td>`).join('');
+  const rowMarkup=g=>`<tr><td><span class="daily-entity" title="${esc(g.name)}">${esc(g.name)}</span></td>${metricCells(g)}<td class="quality-global">${qualityPercentText(qualityFor(g))}</td></tr>`;
+  const inputRow=`<tr class="goal-row"><td>OBJETIVOS</td>${WEEKLY_DISPLAY_METRICS.map(k=>weeklyGoalMarkup(week,k,primaryWeek,data.totals.metrics)).join('')}<td class="weekly-rule-goal" title="Porcentaje requerido de Calidad en Ajustes">${weeklyTargetPct('quality')}</td></tr>`;
+  const totalRow=`<tr class="weekly-total"><td>TOTAL ACUMULADO</td>${metricCells(data.totals)}<td class="quality-global">${qualityPercentText(overall)}</td></tr>`;
+  const progressRow=`<tr class="weekly-progress"><td>CUMPLIMIENTO</td>${WEEKLY_DISPLAY_METRICS.map(k=>{
+    if(k==='reg'||k==='guar')return '<td class="no-goal">—</td>';
+    if(k==='app'||k==='purchase'){
+      const sold=data.totals.metrics.sales;
+      return `<td>${sold?weeklyPercent(weeklyMetricValue(data.totals.metrics,data.rows,k),sold):'—'}</td>`;
+    }
+    const goal=weeklyGoalFor(week,k,primaryWeek,data.totals.metrics);
+    return `<td class="${goal?'':'no-goal'}">${weeklyPercent(data.totals.metrics[k],goal)}</td>`;
+  }).join('')}<td>${qualityPercentText(totalQuality.composite)}</td></tr>`;
+  const factorValues=weeklyFactorValues(week,primaryWeek,data,totalQuality);
+  const factorRow=`<tr class="weekly-quality"><td>CALIDAD DE FACTORES</td>${factorValues.map(cell=>cell?`<td title="${esc(cell.label)}">${cell.value}</td>`:'<td class="no-goal">—</td>').join('')}</tr>`;
+  const globalRow=`<tr class="weekly-quality"><td>ALCANCE GLOBAL</td>${WEEKLY_DISPLAY_METRICS.map(()=>'<td>—</td>').join('')}<td class="quality-global">${qualityPercentText(overall)}</td></tr>`;
+  return {data,body:inputRow+(data.entries.length?data.entries.map(rowMarkup).join(''):'<tr><td colspan="10" class="daily-empty">Sin registros para esta semana.</td></tr>'),footer:totalRow+progressRow+factorRow+globalRow};
 }
 
 function weeklyVarianceData(){
@@ -1053,7 +1542,7 @@ function weeklyVarianceData(){
   return {primary,previous,main,older};
 }
 function renderWeekly(){
-  if(!el('weeklyPage')||!isAuthorized())return;
+  if(!el('weeklyPage'))return;
   const {primary,previous,main,older}=weeklyVarianceData();
   el('weeklyPrimaryDate').value=primary;el('weeklyPreviousDate').value=previous;
   el('weeklyPrimaryLabel').textContent=weekLabel(primary);el('weeklyPreviousLabel').textContent=weekLabel(previous);
@@ -1095,17 +1584,357 @@ el('weeklyPage').addEventListener('change',event=>{
   renderWeekly();
 });
 
+// V2.4.1 · Calculadora de comisiones para supervisores.
+// Separa el incentivo por el equipo de las comisiones de ventas propias.
+// NO hay solicitudes remotas durante la navegación o el cálculo.
+const SUP_COMMISSION_KEY='wmSamsMeridaSupervisorCommissionV24';
+const SUP_FACTOR_KEYS=['completion','purchase','p0','app'];
+const SUP_FACTOR_LABELS={completion:'Cumplimiento',purchase:'Primera compra',p0:'Programa Cero',app:'Activación por APP',quality:'Calidad total'};
+const SUP_BASE_RULES={
+  baseBonus:null,goals:{},
+  required:{completion:100,purchase:90,p0:30,app:90,quality:90},
+  minimum:{completion:0,purchase:0,p0:0,app:0,quality:0},
+  maximum:{completion:null,purchase:100,p0:null,app:100,quality:100},
+  weights:{completion:25,purchase:25,p0:25,app:25},
+  additional:[{threshold:110,amount:null},{threshold:115,amount:null},{threshold:120,amount:null}],
+  moduleP0Threshold:30,moduleP0Penalty:15,ownP0Threshold:30,ownP0Penalty:15,
+  incidencePenalties:[0,0,10,20,30],
+  tiers:DEFAULT_TIER.map(t=>({min:t.min,sale:t.sale,dental:t.dental,app:t.app,p0:t.p0}))
+};
+const SUP_LIMITS={min:0,max:1000000};
+function supNumber(value,{nullable=false,positive=false,whole=false}={}){
+  if(nullable&&(value===null||value===''))return null;
+  const n=Number(value);
+  return Number.isFinite(n)&&n>=0&&n<=1000000&&(!positive||n>0)&&(!whole||Number.isInteger(n))?n:null;
+}
+function normalizeSupervisorCommission(saved){
+  const out=structuredClone(SUP_BASE_RULES);
+  if(!saved||typeof saved!=='object'||Array.isArray(saved))return out;
+  if(supNumber(saved.baseBonus)!==null)out.baseBonus=Number(saved.baseBonus);
+  if(saved.baseBonus===null)out.baseBonus=null;
+  for(const m of Object.keys(saved.goals||{})){
+    const n=supNumber(saved.goals[m],{whole:true,positive:true});
+    if(m&&n!==null)out.goals[m]=n;
+  }
+  for(const [group,keys] of [['required',[...SUP_FACTOR_KEYS,'quality']],['minimum',[...SUP_FACTOR_KEYS,'quality']],['maximum',[...SUP_FACTOR_KEYS,'quality']],['weights',SUP_FACTOR_KEYS]]){
+    for(const k of keys){
+      if(!Object.prototype.hasOwnProperty.call(saved[group]||{},k))continue;
+      if(group==='maximum'&&(saved.maximum[k]===null||saved.maximum[k]==='')){out.maximum[k]=null;continue;}
+      const n=supNumber(saved[group][k],{positive:group==='required'});
+      if(n!==null)out[group][k]=n;
+    }
+  }
+  for(const key of ['moduleP0Threshold','moduleP0Penalty','ownP0Threshold','ownP0Penalty']){
+    const n=supNumber(saved[key]);if(n!==null)out[key]=n;
+  }
+  if(Array.isArray(saved.additional))out.additional=out.additional.map((row,i)=>{
+    const src=saved.additional[i]||{};
+    const threshold=supNumber(src.threshold,{positive:true});const amount=supNumber(src.amount,{nullable:true});
+    return {threshold:threshold??row.threshold,amount:amount===null?null:amount};
+  });
+  if(Array.isArray(saved.incidencePenalties))for(let i=1;i<=4;i++){
+    const n=supNumber(saved.incidencePenalties[i]);if(n!==null)out.incidencePenalties[i]=n;
+  }
+  if(Array.isArray(saved.tiers))for(let i=0;i<out.tiers.length;i++){
+    const src=saved.tiers[i]||{};
+    for(const key of ['min','sale','dental','app','p0']){
+      const n=supNumber(src[key]);if(n!==null)out.tiers[i][key]=n;
+    }
+  }
+  return out;
+}
+let supSettings=normalizeSupervisorCommission(storedJson(SUP_COMMISSION_KEY));
+const supView={week:'',selection:'',search:'',pageSize:100,page:1};
+// Opciones solo de presentación/exportación: no se guardan en PostgreSQL.
+const SUP_PRINT_KEY='wmSamsMeridaSupPrintV241';
+const SUP_PRINT_DEFAULTS={filters:false,overview:true,search:false,team:true,bonus:true,own:true,recordsTeam:true,recordsOwn:true};
+const supPrintState={...SUP_PRINT_DEFAULTS};
+try{const stored=JSON.parse(localStorage.getItem(SUP_PRINT_KEY)||'null');if(stored&&typeof stored==='object')for(const k of Object.keys(SUP_PRINT_DEFAULTS))if(typeof stored[k]==='boolean')supPrintState[k]=stored[k];}catch(_){}
+const supFoldState={filters:true,overview:true,search:true,team:true,bonus:true,own:true,recordsTeam:false,recordsOwn:false};
+function supPrintEnabled(key){return supPrintState[key]!==false;}
+function supFoldOpen(key){return supFoldState[key]!==false;}
+function supFoldHeading(text,key){return `<summary><span class="sup-fold-title">${esc(text)}</span><span class="sup-fold-actions"><span class="sup-print-toggle"><input type="checkbox" data-sup-print="${key}" ${supPrintEnabled(key)?'checked':''} aria-label="Imprimir ${esc(text)}"> Imprimir</span><span class="sup-fold-chevron" aria-hidden="true">⌄</span></span></summary>`;}
+function captureSupFolds(){document.querySelectorAll('#supPage details[data-sup-fold]').forEach(n=>{if(n.isConnected)supFoldState[n.dataset.supFold]=n.open;});}
+function syncSupPrintChecks(){document.querySelectorAll('#supPage input[data-sup-print]').forEach(x=>{x.checked=supPrintEnabled(x.dataset.supPrint);});}
+
+function saveSupervisorCalculatorSettings(){
+  localStorage.setItem(SUP_COMMISSION_KEY,JSON.stringify(supSettings));
+  renderSupervisorCalculator();
+}
+function supervisorOptions(){
+  const all=[];
+  for(const [module,names] of Object.entries(supervisorConfig))for(const name of names||[]){
+    if(!module||!name)continue;
+    all.push({module,name,key:JSON.stringify([module,name])});
+  }
+  return all.sort((a,b)=>a.module.localeCompare(b.module,'es')||a.name.localeCompare(b.name,'es'));
+}
+function supReadSelection(){
+  try{const [module,name]=JSON.parse(supView.selection);if(module&&name)return {module,name};}catch(_){}
+  return null;
+}
+function supInputNumber(id,options={}){
+  const val=el(id)?.value;
+  const out=supNumber(val,{nullable:options.nullable,positive:options.positive,whole:options.whole});
+  return out;
+}
+function supWeeks(){return [...new Set((imported.data?.rows||[]).map(r=>r.week).filter(Boolean))].sort().reverse();}
+function populateSupervisorCalculatorFilters(){
+  const sel=el('supSupervisor'),weekSel=el('supWeek');if(!sel||!weekSel)return;
+  const opts=supervisorOptions();
+  if(!opts.some(x=>x.key===supView.selection))supView.selection=opts[0]?.key||'';
+  sel.innerHTML=opts.length?opts.map(s=>`<option value="${esc(s.key)}">${esc(s.name)} · ${esc(s.module)}</option>`).join(''):'<option value="">Asigna supervisores en Ajustes → 11</option>';
+  sel.value=supView.selection;sel.disabled=!opts.length;
+  const weeks=supWeeks();const current=mondayOf(dateIso(new Date()));
+  if(!weeks.includes(supView.week))supView.week=weeks.find(w=>w<=current)||weeks[0]||'';
+  weekSel.innerHTML=weeks.length?weeks.map(w=>`<option value="${w}">${weekLabel(w)}</option>`).join(''):'<option value="">Carga un XLS para consultar</option>';
+  weekSel.value=supView.week;weekSel.disabled=!weeks.length;
+}
+function supervisorModuleGoal(module,week,teamRows){
+  if(supSettings.goals[module]>0)return supSettings.goals[module];
+  const preset=Number(moduleQualityOptions(module).weeklySales)||0;
+  if(preset>0)return preset;
+  const names=[...new Set(teamRows.map(r=>r.executive).filter(Boolean))];
+  return names.reduce((a,n)=>a+executiveGoal(week,n),0);
+}
+function supervisorWeekRows(){
+  const selected=supReadSelection();
+  if(!selected||!imported.data||!supView.week)return {selected,team:[],own:[],otherSupervisors:[]};
+  const rows=imported.data.rows.filter(r=>r.week===supView.week&&r.module===selected.module);
+  return {selected,team:rows.filter(r=>!supervisorRow(r)),own:rows.filter(r=>r.executive===selected.name),otherSupervisors:rows.filter(r=>supervisorRow(r)&&r.executive!==selected.name)};
+}
+function supFiltered(rows){
+  const q=normalize(el('supSearch')?.value||'');
+  if(!q)return rows;
+  return rows.filter(r=>normalize([r.folio,r.fecha,r.executive,r.module,r.code,r.status,r.p0,r.dental,selectedIncident(r)?'INCIDENCIA':'',appEnabled(r)?'APP':''].join(' ')).includes(q));
+}
+function supIncidentRate(n){return supSettings.incidencePenalties[Math.min(4,Math.max(0,n))]||0;}
+function supervisorQuality(validRows,goal){
+  const base=countQualityRows(validRows);
+  const actual={completion:goal>0?100*base.sales/goal:null,
+    purchase:base.sales?100*base.purchase/base.sales:0,
+    p0:base.regular?100*base.p0/base.regular:0,
+    app:base.sales?100*base.apps/base.sales:0};
+  const factors={};let numerator=0,denominator=0;
+  for(const k of SUP_FACTOR_KEYS){
+    const raw=actual[k];
+    const quality=raw===null?null:qualityMetricFactor(raw,supSettings.required[k],{
+      minimum:supSettings.minimum[k],maximum:supSettings.maximum[k]});
+    factors[k]=quality;
+    const weight=supSettings.weights[k];
+    if(Number.isFinite(quality)&&weight>0){numerator+=quality*weight;denominator+=weight;}
+  }
+  const composite=denominator?numerator/denominator:null;
+  const global=composite===null?null:qualityMetricFactor(composite,supSettings.required.quality,{
+    minimum:supSettings.minimum.quality,maximum:supSettings.maximum.quality});
+  return {actual,factors,composite,global,base};
+}
+function supTier(teamCompletion){return [...supSettings.tiers].sort((a,b)=>b.min-a.min).find(t=>teamCompletion>=t.min)||null;}
+function supervisorCalculator(){
+  const src=supervisorWeekRows(),selected=src.selected;
+  if(!selected)return {ready:false,reason:'Selecciona un supervisor en Ajustes → 11 e importa registros XLS.'};
+  const goal=supervisorModuleGoal(selected.module,supView.week,src.team);
+  const teamValid=src.team.filter(r=>candidate(r)&&!excluded(r));
+  const teamReg=teamValid.filter(r=>guaranteeType(r)==='reg');
+  const teamP0=teamReg.filter(r=>isYes(r.p0));
+  const completion=goal>0?teamValid.length/goal*100:null;
+  const q=supervisorQuality(teamValid,goal);
+  const tier=completion===null?null:supTier(completion);
+  const bonusConfigured=supSettings.baseBonus!==null;
+  const base=bonusConfigured&&completion!==null&&q.global!==null?round(supSettings.baseBonus*(completion/100)*(q.global/100)):0;
+  const additional=supSettings.additional.map(t=>({threshold:t.threshold,amount:t.amount||0,configured:t.amount!==null,earned:completion!==null&&completion>=t.threshold?round(t.amount||0):0}));
+  const extras=round(additional.reduce((s,b)=>s+b.earned,0));
+  const moduleP0Reach=teamReg.length?100*teamP0.length/teamReg.length:null;
+  const modulePenalty=teamReg.length&&moduleP0Reach<supSettings.moduleP0Threshold?supSettings.moduleP0Penalty:0;
+  const incentiveBefore=round(base+extras);
+  const incentiveDiscount=round(incentiveBefore*modulePenalty/100);
+  const incentiveNet=round(incentiveBefore-incentiveDiscount);
+  const ownValid=src.own.filter(r=>candidate(r)&&!excluded(r));
+  const ownReg=ownValid.filter(r=>guaranteeType(r)==='reg');
+  const ownDental=ownValid.filter(r=>isYes(r.dental));
+  const ownApp=ownValid.filter(appEnabled);
+  const ownP0=ownReg.filter(r=>isYes(r.p0));
+  const ownInc=src.own.filter(selectedIncident).length;
+  const rate=tier||{sale:0,dental:0,app:0,p0:0};
+  const parts=[
+    {name:'Ventas',count:ownValid.length,rate:rate.sale,total:round(ownValid.length*rate.sale)},
+    {name:'Activación APP',count:ownApp.length,rate:rate.app,total:round(ownApp.length*rate.app)},
+    {name:'Plan Dental',count:ownDental.length,rate:rate.dental,total:round(ownDental.length*rate.dental)},
+    {name:'Plan Cero',count:ownP0.length,rate:rate.p0,total:round(ownP0.length*rate.p0)}
+  ];
+  const ownGross=round(parts.reduce((s,p)=>s+p.total,0));
+  const ownP0Reach=ownReg.length?100*ownP0.length/ownReg.length:null;
+  // Las ventas propias tienen penalización P0 INDEPENDIENTE del bono del módulo.
+  // 0 ventas regulares => no existe denominador aplicable y no se penaliza.
+  const ownP0BelowTarget=ownReg.length>0&&ownP0Reach<supSettings.ownP0Threshold;
+  const ownP0Penalty=ownP0BelowTarget?supSettings.ownP0Penalty:0;
+  const ownIncPenalty=supIncidentRate(ownInc);
+  const ownP0Discount=round(ownGross*ownP0Penalty/100);
+  const ownIncDiscount=round(ownGross*ownIncPenalty/100);
+  const ownNet=round(ownGross-ownP0Discount-ownIncDiscount);
+  return {ready:true,selected,goal,src,teamValid,teamReg,teamP0,completion,q,tier,
+    bonusConfigured,base,additional,extras,moduleP0Reach,modulePenalty,incentiveBefore,incentiveDiscount,incentiveNet,
+    ownValid,ownReg,ownDental,ownApp,ownP0,ownInc,parts,ownGross,ownP0Reach,ownP0BelowTarget,ownP0Penalty,ownIncPenalty,ownP0Discount,ownIncDiscount,ownNet,
+    total:round(incentiveNet+ownNet)};
+}
+function supText(v){return Number.isFinite(v)?pct(v):'—';}
+function supMoneyValue(v){return Number.isFinite(v)?mx(v):'—';}
+function supDetailCards(c){
+  if(!c.ready)return `<p class="sup-empty">${esc(c.reason)}</p>`;
+  const qty=k=>c.q.actual[k];
+  const factorRows=SUP_FACTOR_KEYS.map(k=>`<tr><th>${SUP_FACTOR_LABELS[k]}</th><td>${supText(qty(k))}</td><td>${supText(c.q.factors[k])}</td></tr>`).join('');
+  const bonusRows=c.additional.map(b=>`<tr><th>Bono ${pct(b.threshold)}${!b.configured?' · Sin importe':''}</th><td>${b.earned?mx(b.earned):'—'}</td></tr>`).join('');
+  const partsRows=c.parts.map(p=>`<tr><th>${p.name}</th><td>${number.format(p.count)} × ${mx(p.rate)}</td><td>${mx(p.total)}</td></tr>`).join('');
+  return `<details class="sup-fold sup-overview" data-sup-fold="overview" ${supFoldOpen('overview')?'open':''}>${supFoldHeading('Resumen de comisiones','overview')}<div class="sup-fold-body"><div class="sup-top-summary">
+      <div class="sup-big-card"><small>Comisión total estimada</small><strong>${mx(c.total)}</strong><span>${esc(c.selected.name)} · ${esc(c.selected.module)}</span></div>
+      <div class="sup-big-card"><small>Bono por módulo</small><strong>${mx(c.incentiveNet)}</strong><span>Base + adicionales − descuento P0</span></div>
+      <div class="sup-big-card"><small>Ventas propias</small><strong>${mx(c.ownNet)}</strong><span>Tarifas del escalón sin ventas de supervisores</span></div>
+    </div></div></details>
+    <div class="sup-detail-grid">
+      <details class="sup-panel sup-fold" data-sup-fold="team" ${supFoldOpen('team')?'open':''}>${supFoldHeading('Resultados del equipo (sin supervisores)','team')}<div class="sup-fold-body"><div class="sup-facts">
+        <span>Objetivo: <b>${number.format(c.goal)} ventas</b></span><span>Ventas válidas: <b>${c.teamValid.length}</b></span>
+        <span>Cumplimiento: <b>${supText(c.completion)}</b></span><span>Escalón aplicable: <b>${c.tier?esc(c.tier.min+'% o más'):'Sin escalón pagable'}</b></span>
+        <span>P0 del módulo: <b>${supText(c.moduleP0Reach)}</b></span><span>Calidad total: <b>${supText(c.q.composite)}</b></span>
+        <span>Alcance global: <b>${supText(c.q.global)}</b></span>
+      </div><table class="sup-metrics"><thead><tr><th>Factor</th><th>Alcance</th><th>Calidad</th></tr></thead><tbody>${factorRows}
+        <tr class="sup-table-emphasis"><th>Calidad total</th><td>${supText(c.q.composite)}</td><td>${supText(c.q.global)}</td></tr></tbody></table></div></details>
+      <details class="sup-panel sup-fold" data-sup-fold="bonus" ${supFoldOpen('bonus')?'open':''}>${supFoldHeading('Desglose del bono del módulo','bonus')}<div class="sup-fold-body"><div class="sup-formula">Bono base × ${supText(c.completion)} × ${supText(c.q.global)}</div>
+        <table class="sup-metrics"><tbody><tr><th>Bono base ${!c.bonusConfigured?'(sin configurar)':''}</th><td>${c.bonusConfigured?mx(supSettings.baseBonus):'—'}</td></tr>
+        <tr><th>Cálculo base</th><td>${mx(c.base)}</td></tr>${bonusRows}
+        <tr><th>Base + bonos adicionales</th><td>${mx(c.incentiveBefore)}</td></tr>
+        <tr><th>Descuento P0 módulo (${pct(c.modulePenalty)})</th><td>−${mx(c.incentiveDiscount)}</td></tr>
+        <tr class="sup-table-emphasis"><th>Bono neto módulo</th><td>${mx(c.incentiveNet)}</td></tr></tbody></table></div></details>
+      <details class="sup-panel sup-fold" data-sup-fold="own" ${supFoldOpen('own')?'open':''}>${supFoldHeading('Ventas propias del supervisor','own')}<div class="sup-fold-body"><div class="sup-facts">
+        <span>Registros propios: <b>${c.src.own.length}</b></span><span>Ventas pagables: <b>${c.ownValid.length}</b></span>
+        <span>Incidencias propias: <b>${c.ownInc}</b></span><span>Plan Cero propio: <b>${supText(c.ownP0Reach)}</b></span>
+        <span>Requerido P0 propio: <b>${pct(supSettings.ownP0Threshold)}</b></span>
+        <span>${!c.ownReg.length?'Sin regulares: penalización P0 no aplicable':c.ownP0BelowTarget?'P0 por debajo del requerido: se aplica penalización':'Objetivo P0 alcanzado: sin penalización'}</span>
+      </div><table class="sup-metrics"><thead><tr><th>Concepto</th><th>Cantidad × tarifa</th><th>Total</th></tr></thead><tbody>${partsRows}</tbody></table>
+      <table class="sup-metrics"><tbody><tr><th>Subtotal ventas propias</th><td>${mx(c.ownGross)}</td></tr>
+      <tr><th>Descuento P0 (${pct(c.ownP0Penalty)}) · requerido ${pct(supSettings.ownP0Threshold)}</th><td>−${mx(c.ownP0Discount)}</td></tr>
+      <tr><th>Descuento incidencias (${pct(c.ownIncPenalty)})</th><td>−${mx(c.ownIncDiscount)}</td></tr>
+      <tr class="sup-table-emphasis"><th>Ventas propias netas</th><td>${mx(c.ownNet)}</td></tr></tbody></table>
+      <p class="sup-muted">Los folios marcados con incidencia y los de estatus no pagable se descuentan por completo antes de aplicar estos porcentajes. Las ventas propias no generan un segundo bono semanal por escalón.</p></div></details>
+    </div>`;
+}
+function supRowFee(r,c){
+  if(!candidate(r)||excluded(r)||!c.tier)return 0;
+  return c.tier.sale+(appEnabled(r)?c.tier.app:0)+(isYes(r.dental)?c.tier.dental:0)+(guaranteeType(r)==='reg'&&isYes(r.p0)?c.tier.p0:0);
+}
+function supTableMarkup(rows,c,tableKind,forReport=false){
+  const body=rows.map(r=>{
+    const incident=selectedIncident(r),app=appEnabled(r),valid=payable(r);
+    const cells=[r.fecha?fmtDay(r.fecha):'—',r.executive,r.folio||'—',guaranteeType(r)==='guar'?'Garantizada':guaranteeType(r)==='reg'?'Regular':'—',r.code||'—',isYes(r.p0)?'Sí':'—',isYes(r.dental)?'Sí':'—'];
+    const checkbox=type=>forReport?(type==='incident'?(incident?'Sí':'No'):(app?'Sí':'No')):
+      type==='incident'?`<input type="checkbox" data-sup-incident-id="${esc(r.uid||String(r.i))}" ${incident?'checked':''} aria-label="Marcar incidencia ${esc(r.folio)}">`:
+      `<input type="checkbox" data-sup-app-id="${esc(r.uid||String(r.i))}" ${app?'checked':''} ${hasCode(r)?'':'disabled'} aria-label="APP activa ${esc(r.folio)}">`;
+    return `<tr class="${incident?'sup-incident':''}">${cells.map(x=>`<td>${esc(x)}</td>`).join('')}<td>${checkbox('app')}</td><td>${checkbox('incident')}</td><td>${tableKind==='own'?(valid?mx(supRowFee(r,c)):'No paga'):(valid?'Válido':'Excluido')}</td></tr>`;
+  }).join('');
+  return `<table class="sup-record-table ${forReport?'sup-report-records':''}"><thead><tr>${['Fecha','Ejecutivo','Folio','Tipo','Código','P0','Dental','APP','Incidencia',tableKind==='own'?'Bruto por folio':'Estado'].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body||'<tr><td colspan="10">Sin registros para la selección actual.</td></tr>'}</tbody></table>`;
+}
+function renderSupervisorCalculator(){
+  const host=el('supPage');if(!host)return;
+  captureSupFolds();
+  const c=supervisorCalculator();
+  el('supSummary').innerHTML=supDetailCards(c);
+  syncSupPrintChecks();
+  if(!c.ready){el('supTeamRows').innerHTML='';el('supOwnRows').innerHTML='';el('supTeamCount').textContent='0 registros';el('supOwnCount').textContent='0 registros';return;}
+  const team=supFiltered(c.src.team).sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.i-a.i);
+  const own=supFiltered(c.src.own).sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.i-a.i);
+  el('supTeamCount').textContent=`${team.length} de ${c.src.team.length} registros`;
+  el('supOwnCount').textContent=`${own.length} de ${c.src.own.length} registros`;
+  // La búsqueda es un filtro visual: no altera el bono ni el escalón.
+  el('supTeamRows').innerHTML=supTableMarkup(team,c,'team');
+  el('supOwnRows').innerHTML=supTableMarkup(own,c,'own');
+  el('supSelectionInfo').textContent=`Semana ${weekLabel(supView.week)} · ${c.selected.module} · ${c.selected.name} · ${c.src.otherSupervisors.length} trámites de otros supervisores excluidos`;
+}
+function supervisorFactorSettingsHtml(){
+  const num=(label,key,group,value,opts='')=>`<label class="sup-setting-field">${label}<input type="number" inputmode="decimal" step="0.01" min="0" max="1000000" data-sup-group="${group}" data-sup-key="${key}" value="${value??''}" ${opts}></label>`;
+  const cols=[...SUP_FACTOR_KEYS,'quality'];
+  const factors=cols.map(k=>`<div class="sup-factor-setting"><b>${SUP_FACTOR_LABELS[k]}</b><div class="sup-setting-grid">${num('Requerido (%)',k,'required',supSettings.required[k])}${num('Mínimo de calidad (%)',k,'minimum',supSettings.minimum[k])}${num('Máximo de calidad (%)',k,'maximum',supSettings.maximum[k],'placeholder="Vacío = sin tope"')}${k==='quality'?'':num('Ponderación',k,'weights',supSettings.weights[k])}</div></div>`).join('');
+  const bonuses=supSettings.additional.map((x,i)=>`<div class="sup-setting-grid">${num('Cumplimiento requerido (%)',i,'additional-threshold',x.threshold)}${num('Bono adicional ($)',i,'additional-amount',x.amount,'placeholder="Importe por definir"')}</div>`).join('');
+  const tiers=supSettings.tiers.map((t,i)=>`<tr><th>${i+1}</th>${['min','sale','dental','app','p0'].map(k=>`<td><input type="number" min="0" step="0.01" data-sup-tier="${i}" data-sup-tier-key="${k}" value="${t[k]}"></td>`).join('')}</tr>`).join('');
+  const modules=[...new Set([...Object.keys(supervisorConfig),...Object.keys(qualityConfig.modules),(imported.data?.rows||[]).map(r=>r.module).filter(Boolean)].flat().filter(Boolean))].sort();
+  return `<p class="settings-help">Las cifras no definidas en tu instrucción (bono base y montos de los bonos de 110/115/120%) quedan sin importe hasta que las configures. Bonos adicionales acumulables; no se incluye el bono semanal de los ejecutivos dentro de las ventas propias.</p>
+    ${num('Bono base del supervisor (MXN)','baseBonus','root',supSettings.baseBonus,'placeholder="Sin configurar"')}
+    <h4>Objetivos semanales de ventas por módulo</h4><p class="settings-help">Si no ingresas una meta aquí, utiliza la meta semanal del módulo de Ajustes → 10. Si tampoco existe, suma las metas individuales de los ejecutivos del equipo.</p>
+    <div class="sup-setting-grid">${modules.map(m=>num(esc(m)+' · ventas',m,'goals',supSettings.goals[m]??'','placeholder="Heredar objetivo"')).join('')||'<span>Importa XLS para identificar módulos.</span>'}</div>
+    <h4>Calidad por variable del módulo</h4>${factors}
+    <h4>Bonos adicionales (acumulables)</h4>${bonuses}
+    <h4>Penalización de Plan Cero</h4><div class="sup-setting-grid">
+      ${num('Módulo · mínimo P0 (%)','moduleP0Threshold','root',supSettings.moduleP0Threshold)}
+      ${num('Módulo · descuento (%)','moduleP0Penalty','root',supSettings.moduleP0Penalty)}
+      ${num('Ventas propias · mínimo P0 (%)','ownP0Threshold','root',supSettings.ownP0Threshold)}
+      ${num('Ventas propias · descuento (%)','ownP0Penalty','root',supSettings.ownP0Penalty)}
+    </div><h4>Penalización por incidencias propias</h4><div class="sup-setting-grid">${[1,2,3,4].map(i=>num(i===4?'4 o más incidencias (%)':i+' incidencia(s) (%)',i,'incidence',supSettings.incidencePenalties[i])).join('')}</div>
+    <h4>Escalones para ventas propias del supervisor</h4><p class="settings-help">El escalón se determina exclusivamente con las ventas válidas de ejecutivos no supervisores del módulo. Estas tarifas son independientes de las de la página 1.</p>
+    <div class="sup-table-wrap"><table class="sup-metrics"><thead><tr><th>Escalón</th><th>Desde (%)</th><th>Venta ($)</th><th>Dental ($)</th><th>APP ($)</th><th>P0 ($)</th></tr></thead><tbody>${tiers}</tbody></table></div>
+    <div class="sup-setting-actions"><button class="btn primary small" type="button" id="supSaveSettings">Guardar configuración de supervisor</button><span id="supSettingsStatus" class="muted">Los cambios no se enviarán hasta pulsar Guardar.</span></div>`;
+}
+function renderSupervisorCalculatorSettings(){const host=el('supSettingsEditor');if(host)host.innerHTML=supervisorFactorSettingsHtml();}
+function initSupervisorCalculator(){
+  populateSupervisorCalculatorFilters();renderSupervisorCalculator();renderSupervisorCalculatorSettings();
+  el('supPage').addEventListener('click',e=>{if(e.target.closest('.sup-print-toggle'))e.stopPropagation();});
+  el('supPage').addEventListener('toggle',e=>{if(e.target.matches('details[data-sup-fold]')&&e.target.isConnected)supFoldState[e.target.dataset.supFold]=e.target.open;},true);
+  el('supPage').addEventListener('change',e=>{
+    const cb=e.target.closest('input[data-sup-print]');if(!cb)return;
+    supPrintState[cb.dataset.supPrint]=cb.checked;
+    try{localStorage.setItem(SUP_PRINT_KEY,JSON.stringify(supPrintState));}catch(_){}
+    syncSupPrintChecks();
+  });
+  el('supWeek').addEventListener('change',e=>{supView.week=e.target.value;supView.page=1;renderSupervisorCalculator();});
+  el('supSupervisor').addEventListener('change',e=>{supView.selection=e.target.value;supView.page=1;renderSupervisorCalculator();});
+  el('supSearch').addEventListener('input',()=>{supView.page=1;renderSupervisorCalculator();});
+  el('supRecordTables').addEventListener('change',event=>{
+    const target=event.target;const id=target.dataset.supIncidentId??target.dataset.supAppId;
+    if(id===undefined)return;
+    if(target.matches('[data-sup-incident-id]')){if(target.checked)imported.flags.add(id);else imported.flags.delete(id);}
+    else if(target.matches('[data-sup-app-id]')){if(!target.checked)imported.appDisabled.add(id);else imported.appDisabled.delete(id);}
+    saveFolioFlags();renderSupervisorCalculator();
+    if(importActive()){computeImportedBase();renderRecords();}
+    renderAchievements();
+  });
+  el('supSettingsEditor').addEventListener('click',event=>{
+    if(event.target.id!=='supSaveSettings')return;
+    const editor=el('supSettingsEditor');let next=structuredClone(supSettings);let invalid=null;
+    for(const input of editor.querySelectorAll('input[data-sup-group]')){
+      const {supGroup:group,supKey:key}=input.dataset;
+      const empty=input.value.trim()==='';
+      const nullable=empty&&(group==='goals'||group==='maximum'||group==='additional-amount'||(group==='root'&&key==='baseBonus'));
+      if(empty&&!nullable){invalid=`El campo ${input.closest('label')?.textContent.trim()||key} es obligatorio.`;break;}
+      const n=empty?null:supNumber(input.value,{positive:group==='required'||group==='additional-threshold',whole:group==='goals'});
+      if(n===null&&!nullable){invalid=`Revisa ${input.closest('label')?.textContent.trim()||key}.`;break;}
+      if(group==='root')next[key]=n;
+      else if(group==='goals'){if(n===null)delete next.goals[key];else next.goals[key]=n;}
+      else if(group==='additional-threshold')next.additional[Number(key)].threshold=n;
+      else if(group==='additional-amount')next.additional[Number(key)].amount=n;
+      else if(group==='incidence')next.incidencePenalties[Number(key)]=n;
+      else next[group][key]=n;
+    }
+    if(!invalid)for(const input of editor.querySelectorAll('input[data-sup-tier]')){
+      const n=supNumber(input.value,{positive:input.dataset.supTierKey==='min'});
+      if(n===null){invalid='Revisa los importes y umbrales de los escalones.';break;}
+      next.tiers[Number(input.dataset.supTier)][input.dataset.supTierKey]=n;
+    }
+    if(invalid){el('supSettingsStatus').textContent=invalid;el('supSettingsStatus').style.color='#b33939';return;}
+    supSettings=normalizeSupervisorCommission(next);saveSupervisorCalculatorSettings();
+    el('supSettingsStatus').textContent='Configuración guardada localmente'+(isAuthorized()?' · sincronización en cola.':'. Inicia sesión para sincronizarla.');
+    el('supSettingsStatus').style.color='';
+  });
+}
+
 function refreshAuthorizedPages(){
-  const auth=isAuthorized();
-  for(const tab of document.querySelectorAll('[data-page-tab="accumulated"],[data-page-tab="weekly"],[data-page-tab="visits"]'))tab.hidden=!auth;
-  if(!auth&&['accumulated','weekly','visits'].includes(activePage))switchPage('individual');
-  if(auth&&activePage==='accumulated')renderAccumulated();
-  if(auth&&activePage==='weekly')renderWeekly();
-  if(auth&&activePage==='visits')window.VISITS?.refreshSources();
+  // Las siete páginas son visibles sin sesión. Datos y guardado remoto requieren Identity.
+  for(const tab of document.querySelectorAll('[data-page-tab]'))tab.hidden=false;
+  if(activePage==='accumulated')renderAccumulated();
+  if(activePage==='weekly')renderWeekly();
+  if(activePage==='visits')window.VISITS?.refreshSources();
+  if(activePage==='achievements')renderAchievements();
+  if(activePage==='supervisor'){populateSupervisorCalculatorFilters();renderSupervisorCalculator();}
 }
 
 function switchPage(page){
-  activePage=['individual','team','daily','accumulated','weekly','visits','allrecords'].includes(page)&&!(['accumulated','weekly','visits'].includes(page)&&!isAuthorized())?page:'individual';
+  activePage=['individual','team','daily','accumulated','weekly','visits','allrecords','achievements','supervisor'].includes(page)?page:'individual';
   document.body.dataset.page=activePage;
   el('teamPage').hidden=activePage!=='team';
   el('dailyPage').hidden=activePage!=='daily';
@@ -1113,6 +1942,8 @@ function switchPage(page){
   el('weeklyPage').hidden=activePage!=='weekly';
   el('visitPage').hidden=activePage!=='visits';
   el('allRecordsPage').hidden=activePage!=='allrecords';
+  el('achievementsPage').hidden=activePage!=='achievements';
+  el('supPage').hidden=activePage!=='supervisor';
   for(const b of document.querySelectorAll('[data-page-tab]')){const yes=b.dataset.pageTab===activePage;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));}
   if(activePage==='team')renderTeam();
   if(activePage==='daily')renderDaily();
@@ -1120,6 +1951,8 @@ function switchPage(page){
   if(activePage==='weekly')renderWeekly();
   if(activePage==='visits')window.VISITS?.open();
   if(activePage==='allrecords')renderAllRecords();
+  if(activePage==='achievements'){populateAchFilters();renderAchievements();}
+  if(activePage==='supervisor'){populateSupervisorCalculatorFilters();renderSupervisorCalculator();}
   if(el('settingsPanel').open){el('settingsPanel').open=false;el('toggleSettings').setAttribute('aria-expanded','false');}
 }
 for(const b of document.querySelectorAll('[data-page-tab]'))b.addEventListener('click',()=>switchPage(b.dataset.pageTab));
@@ -1212,7 +2045,8 @@ el('teamTable').addEventListener('click',e=>{
   renderCommissionRateEditor();syncPublicTariff();
   el('rateEditorRows').addEventListener('change',event=>{
     const input=event.target.closest('[data-rate-index][data-rate-key]');if(!input)return;
-    if(!isAuthorized()){renderCommissionRateEditor();return;}
+    // Una tarifa puede ajustarse localmente también en modo invitado.
+    // Las escrituras de ajustes a PostgreSQL exigen sesión autenticada.
     const index=Number(input.dataset.rateIndex),field=input.dataset.rateKey,value=Number(input.value);
     if(!Number.isInteger(index)||index<0||index>=TIER.length||!RATE_FIELDS.includes(field)||input.value.trim()===''||!validRateAmount(value)){
       el('rateEditorStatus').textContent='Importe no válido: utiliza un valor de 0 a 1,000,000 con máximo dos decimales.';
@@ -1222,7 +2056,6 @@ el('teamTable').addEventListener('click',e=>{
     el('rateEditorStatus').textContent=`Tarifa actualizada: ${RATE_LABELS[field]}, escalón ${TIER[index].label} = ${mx(value)}.`;
   });
   el('restoreDefaultRates').addEventListener('click',()=>{
-    if(!isAuthorized())return;
     if(!confirm('¿Restaurar todas las tarifas originales del esquema de comisiones?'))return;
     DEFAULT_TIER.forEach((row,i)=>RATE_FIELDS.forEach(field=>{TIER[i][field]=row[field];}));
     saveCommissionRates();renderCommissionRateEditor();refreshAfterRateChange();
@@ -1356,6 +2189,31 @@ el('teamTable').addEventListener('click',e=>{
   el('nextTier').addEventListener('click',()=>{simDirty=true;const r=calculate(state.sim);if(!r.ok||!r.nextTarget)return;state.sim.reg+=r.needed;state.sim.app+=r.needed;update('sim');});
   el('print').addEventListener('click',()=>{refreshAuthorizedPages();buildReport();window.print();});
   el('export').addEventListener('click',()=>{
+    if(activePage==='supervisor'){
+      const c=supervisorCalculator();if(!c.ready){alert(c.reason);return;}
+      const lines=[['CALCULADORA DE SUPERVISOR','Valor'],['Supervisor',c.selected.name],['Módulo',c.selected.module],['Semana',weekLabel(supView.week)],['Objetivo de ventas',c.goal],['Ventas válidas del equipo',c.teamValid.length],['Cumplimiento %',c.completion],['Calidad total %',c.q.composite],['Alcance global %',c.q.global],['Bono base',supSettings.baseBonus??'Sin configurar'],['Cálculo base',c.base],...c.additional.map(b=>['Bono '+b.threshold+'%',b.configured?b.earned:'Sin configurar']),['Penalización Plan Cero módulo %',c.modulePenalty],['Descuento Plan Cero módulo',c.incentiveDiscount],['Bono neto módulo',c.incentiveNet],['Ventas propias brutas',c.ownGross],['Penalización Plan Cero propias %',c.ownP0Penalty],['Penalización incidencias propias %',c.ownIncPenalty],['Ventas propias netas',c.ownNet],['TOTAL ESTIMADO',c.total],[],['CALIDAD','Alcance %','Calidad %'],...SUP_FACTOR_KEYS.map(k=>[SUP_FACTOR_LABELS[k],c.q.actual[k],c.q.factors[k]]),[],['PAGO POR CONCEPTO','Cantidad','Tarifa','Total'],...c.parts.map(x=>[x.name,x.count,x.rate,x.total])];
+      for(const [title,rows] of [['FOLIOS DE EJECUTIVOS',c.src.team],['FOLIOS DE SUPERVISOR',c.src.own]]){
+        lines.push([], [title,'Fecha','Ejecutivo','Folio','Código','P0','Dental','APP','Incidencia']);
+        for(const r of [...rows].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.i-a.i))lines.push(['',r.fecha,r.executive,r.folio,r.code,r.p0,r.dental,appEnabled(r)?'Sí':'No',selectedIncident(r)?'Sí':'No']);
+      }
+      const csv='\ufeff'+lines.map(row=>row.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
+      saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),`supervisor_${supView.week||'sin_semana'}.csv`);return;
+    }
+    if(activePage==='achievements'){
+      const {metricList,counts,goals,filteredRows:records}=achData(),cols=allRecordsColumns();
+      const lines=[];
+      if(achPrintEnabled('filters'))lines.push(['FILTROS APLICADOS','Valor'],...achPrintFilters(),[]);
+      if(achPrintEnabled('goals'))lines.push(['OBJETIVOS EN CANTIDADES Y PORCENTAJES','Meta'],...Object.entries(ACH_GOAL_INPUTS).map(([key])=>[ACH_GOAL_LABELS[key],achGoalText(key,goals[key])]),[]);
+      if(achPrintEnabled('percentages'))lines.push(['LOGROS POR PORCENTAJE','Alcance real','Calidad'],...metricList.map(m=>[m.name,qualityPercentText(m.reach),qualityPercentText(m.quality)]),[]);
+      if(achPrintEnabled('quantities')){
+        const targets={'Registros':'records','Ventas con código':'sales','Plan Dental':'dental','Plan Cero':'p0','Primera compra':'purchase','APP activadas':'app'};
+        lines.push(['LOGROS EN CANTIDADES','Real','Meta / % requerido'],...counts.map(([label,value])=>[label,value,targets[label]?achGoalText(targets[label],goals[targets[label]]):'—']),[]);
+      }
+      if(achPrintEnabled('records'))lines.push(['REGISTROS XLS · '+(achValue('achWeek')?weekLabel(achValue('achWeek')):'Sin semana'),achValue('achModule')||'Todos los módulos'],cols.map(columnLabel),...records.map(r=>cols.map(c=>getCellText(r,c.key))));
+      if(!lines.length)lines.push(['Sin secciones seleccionadas para exportar']);
+      const csv='\ufeff'+lines.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
+      saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),`logros_semanales_${achValue('achWeek')||'sin_semana'}.csv`);return;
+    }
     if(activePage==='allrecords'){
       const columns=allRecordsColumns(),rows=getAllRecordsFiltered();
       const records=[columns.map(columnLabel),...rows.map(r=>columns.map(c=>c.key.startsWith('raw:')?displayXlsValue(getCellText(r,c.key)):getCellText(r,c.key)))];
@@ -1363,18 +2221,24 @@ el('teamTable').addEventListener('click',e=>{
       saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),`registros_xls_${dateIso(new Date())}.csv`);return;
     }
     if(activePage==='weekly'){
-      if(!isAuthorized()){alert('Inicia sesión para consultar la comparativa semanal.');return;}
       const {primary,previous,main,older}=weeklyVarianceData();
-      const lines=[['Sección','Semana','Módulo','Registros','Ventas totales','Regulares','Garantizadas','Programa Cero','Plan Dental','Calidad global']];
+      const lines=[['Sección','Semana','Módulo',...WEEKLY_DISPLAY_METRICS.map(k=>WEEKLY_LABELS[k]),'Calidad']];
       for(const [week,data] of [[primary,main],[previous,older]]){
-        lines.push(['OBJETIVOS',week,'TOTAL',...DAILY_METRICS.map(k=>weeklyGoalExport(week,k,primary,data.totals.metrics)),'']);
-        for(const item of data.entries)lines.push(['MÓDULO',week,item.name,...DAILY_METRICS.map(k=>item.metrics[k]),qualityPercentText(qualityResult(item.rows,'module',item.name,'weekly').global)]);
-        lines.push(['TOTAL',week,'TOTAL',...DAILY_METRICS.map(k=>data.totals.metrics[k]),qualityPercentText(weeklyGlobalQuality(week,primary,data))]);
-        lines.push(['CUMPLIMIENTO %',week,'TOTAL',...DAILY_METRICS.map(k=>{const goal=weeklyGoalFor(week,k,primary,data.totals.metrics);return goal?round(100*data.totals.metrics[k]/goal):'';}),'']);
-        lines.push(['CALIDAD DE FACTORES %',week,'TOTAL',...DAILY_METRICS.map(k=>{const goal=weeklyGoalFor(week,k,primary,data.totals.metrics);return qualityMetricFactor(goal?100*data.totals.metrics[k]/goal:NaN,100,{cap:!['sales','p0'].includes(k)})??'';}),'']);
-        lines.push(['ALCANCE GLOBAL %',week,'TOTAL',...DAILY_METRICS.map(()=>'') ,weeklyGlobalQuality(week,primary,data)??'']);
+        const value=(g,k)=>weeklyMetricValue(g.metrics,g.rows,k);
+        const q=qualityResult(data.rows,'module','TOTAL','weekly',weeklyGoalFor(week,'sales',primary,data.totals.metrics)||null);
+        lines.push(['OBJETIVOS',week,'TOTAL',...WEEKLY_DISPLAY_METRICS.map(k=>k==='reg'||k==='guar'?'':k==='app'||k==='purchase'?weeklyTargetPct(k):weeklyGoalExport(week,k,primary,data.totals.metrics)),weeklyTargetPct('quality')]);
+        for(const item of data.entries)lines.push(['MÓDULO',week,item.name,...WEEKLY_DISPLAY_METRICS.map(k=>value(item,k)),qualityPercentText(qualityResult(item.rows,'module',item.name,'weekly').global)]);
+        lines.push(['TOTAL',week,'TOTAL',...WEEKLY_DISPLAY_METRICS.map(k=>value(data.totals,k)),qualityPercentText(q.global)]);
+        lines.push(['CUMPLIMIENTO %',week,'TOTAL',...WEEKLY_DISPLAY_METRICS.map(k=>{
+          if(k==='reg'||k==='guar')return '';
+          if(k==='app'||k==='purchase')return data.totals.metrics.sales?round(100*value(data.totals,k)/data.totals.metrics.sales):'';
+          const goal=weeklyGoalFor(week,k,primary,data.totals.metrics);
+          return goal?round(100*data.totals.metrics[k]/goal):'';
+        }),qualityPercentText(q.composite)]);
+        lines.push(['CALIDAD DE FACTORES %',week,'TOTAL',...weeklyFactorValues(week,primary,data,q).map(v=>v?v.value:'' )]);
+        lines.push(['ALCANCE GLOBAL %',week,'TOTAL',...WEEKLY_DISPLAY_METRICS.map(()=>''),qualityPercentText(q.global)]);
       }
-      lines.push(['VARIACIÓN',`${primary} vs ${previous}`,'TOTAL',...DAILY_METRICS.map(k=>main.totals.metrics[k]-older.totals.metrics[k]),'']);
+      lines.push(['VARIACIÓN',`${primary} vs ${previous}`,'TOTAL',...WEEKLY_DISPLAY_METRICS.map(k=>weeklyMetricValue(main.totals.metrics,main.rows,k)-weeklyMetricValue(older.totals.metrics,older.rows,k)),'']);
       const csv='\ufeff'+lines.map(row=>row.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
       saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),`comparativa_semanal_${primary}_vs_${previous}.csv`);return;
     }
@@ -1388,7 +2252,6 @@ el('teamTable').addEventListener('click',e=>{
       saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),`comparativa_diaria_${dates.latest}.csv`);return;
     }
     if(activePage==='accumulated'){
-      if(!isAuthorized()){alert('Inicia sesión para consultar el acumulado.');return;}
       const invalid=el('accumulatedFrom').value&&el('accumulatedTo').value&&el('accumulatedFrom').value>el('accumulatedTo').value;
       const rows=invalid?[]:accumulatedRows();
       const lines=[['Agrupación','Nombre','Registros','Ventas totales','Regulares','Garantizadas','Programa Cero','Plan Dental','Calidad']];
@@ -1456,10 +2319,8 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
 
   // 1.8 · Sesión real de correo validada por Netlify Identity y las Functions.
   function isAuthorized(){return Boolean(window.APP_CLOUD?.user?.id);}
-  function requireOptions(fn){
-    if(isAuthorized())return fn();
-    window.APP_CLOUD?.openLogin(fn);
-  }
+  // Los Ajustes se pueden explorar y editar sin cuenta. La sincronización de
+  // preferencias y el historial privado permanecen protegidos por Identity.
   const settingsDialog=el('settingsPanel');
   function toggleSettings(force){
     settingsDialog.open=typeof force==='boolean'?force:!settingsDialog.open;
@@ -1467,8 +2328,10 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     if(settingsDialog.open)settingsDialog.scrollIntoView({behavior:'smooth',block:'start'});
     else el('toggleSettings').focus();
   }
-  settingsDialog.addEventListener('toggle',()=>{if(settingsDialog.open&&!isAuthorized())settingsDialog.open=false;});
-  el('toggleSettings').addEventListener('click',()=>requireOptions(()=>toggleSettings()));
+  el('guestSettingsNotice').hidden=isAuthorized();
+  el('authLogout').hidden=!isAuthorized();
+  el('authLogout').addEventListener('click',()=>{void window.APP_CLOUD?.logout?.();});
+  el('toggleSettings').addEventListener('click',()=>toggleSettings());
   el('closeSettings').addEventListener('click',()=>toggleSettings(false));
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'&&settingsDialog.open)toggleSettings(false);
@@ -1556,15 +2419,17 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     el('imageScale').addEventListener('change',e=>{uiLayout.scale=[1,2,3,4].includes(Number(e.target.value))?Number(e.target.value):3;saveLayout();});
     el('previewReport').addEventListener('click',()=>{buildReport();window.print();});
   }
-  // Versión 2.2.1: textos comunes a PDF y PNG. El título es global y el resto es por página.
+  // Versión 2.3: textos comunes a PDF y PNG. El título es global y el resto es por página.
   const REPORT_TEXT_STORAGE='wmSamsMeridaReportTextsV17';
   const REPORT_TEXT_DEFAULTS={
     individual:{subtitle:'Calculadora individual',description:'Comisiones simuladas: pueden existir variaciones respecto al monto final a pagar.',footer:'Lee los importes del escenario base y de la simulación. El desglose muestra tarifas, bono, incidencias, descuentos y pago neto estimado; los folios no comisionables no generan pago.'},
     team:{subtitle:'Comparativo de ejecutivos',description:'Comisiones simuladas: pueden existir variaciones respecto al monto final a pagar.',footer:'Cada fila corresponde a un ejecutivo. Compara su meta, ventas comisionables, nivel de cumplimiento y comisión estimada. Las incidencias y ajustes pueden modificar el importe final.'},
-    daily:{subtitle:'Comparativa diaria',description:'Actividad operativa del XLS · Totales y variación entre fechas seleccionadas.',footer:'Cada cifra presenta el resultado del día principal y su variación frente al día comparado. Calidad es el promedio ponderado de Cumplimiento, Primera compra, Programa Cero y APP con objetivos configurables; se puede excluir a supervisores desde el filtro superior.'},
-    accumulated:{subtitle:'Acumulado general',description:'Resultados consolidados del historial XLS guardado.',footer:'Totales sobre todos los XLS históricos deduplicados. La Calidad utiliza las metas semanales configuradas acumuladas por las semanas con registros y los cuatro factores de calidad. Se puede excluir a supervisores desde el filtro superior.'},
-    weekly:{subtitle:'Comparativa semanal',description:'Objetivos, resultados y cumplimiento por semana completa de lunes a domingo.',footer:'OBJETIVOS define metas por semana; CUMPLIMIENTO = resultado / objetivo; CALIDAD DE FACTORES aplica el umbral y los topes configurados a cada indicador; ALCANCE GLOBAL = calidad ponderada de Cumplimiento, Primera compra, Programa Cero y APP. Los supervisores se incluyen según la casilla superior.'},
-    allrecords:{subtitle:'Consulta de registros XLS',description:'Vista íntegra de los registros cargados, con filtros operativos combinados.',footer:'Se muestran las filas de los XLS activos que cumplen todos los filtros seleccionados. La columna Incidencia excluye pagos del folio; APP refleja la activación habilitada en el Dashboard. Filtrar no altera los cálculos.'}
+    daily:{subtitle:'Comparativa diaria',description:'Actividad operativa del XLS · Totales y variación entre fechas seleccionadas.',footer:'Cada cifra presenta el resultado del día principal y su variación frente al día comparado. Calidad es el promedio ponderado de Cumplimiento, Plan Cero, Plan Dental, APP y Primera compra con objetivos configurables; se puede excluir a supervisores desde el filtro superior.'},
+    accumulated:{subtitle:'Acumulado general',description:'Resultados consolidados del historial XLS guardado.',footer:'Totales sobre todos los XLS históricos deduplicados. La Calidad utiliza las metas semanales configuradas acumuladas por las semanas con registros y los cinco factores y el porcentaje requerido de Calidad. Se puede excluir a supervisores desde el filtro superior.'},
+    weekly:{subtitle:'Comparativa semanal',description:'Objetivos, resultados y cumplimiento por semana completa de lunes a domingo.',footer:'OBJETIVOS define metas por semana; CUMPLIMIENTO = resultado / objetivo; CALIDAD DE FACTORES aplica el porcentaje requerido, mínimo y máximo configurados para cada factor; ALCANCE GLOBAL = calidad ponderada de Cumplimiento, Plan Cero, Plan Dental, APP y Primera compra. Los supervisores se incluyen según la casilla superior.'},
+    allrecords:{subtitle:'Consulta de registros XLS',description:'Vista íntegra de los registros cargados, con filtros operativos combinados.',footer:'Se muestran las filas de los XLS activos que cumplen todos los filtros seleccionados. La columna Incidencia excluye pagos del folio; APP refleja la activación habilitada en el Dashboard. Filtrar no altera los cálculos.'},
+    achievements:{subtitle:'Logros semanales',description:'Metas de registros y ventas en cantidades; planes, APP y primera compra en porcentajes requeridos.',footer:'Alcance real (número grande) = obtenido ÷ base u objetivo. Calidad (número pequeño) = alcance ÷ porcentaje requerido, con mínimos y máximos configurados. Todos los filtros de la tabla afectan los indicadores; los folios con incidencia se muestran, pero no cuentan para sus cálculos.'},
+    supervisor:{subtitle:'Calculadora de supervisor',description:'Bono por resultados del módulo y comisiones por ventas propias del supervisor.',footer:'El escalón de ventas propias utiliza las ventas pagables del equipo sin supervisores. Las incidencias excluyen folios completos y afectan la penalización de ventas propias. Los importes de bono base y bonos adicionales deben configurarse expresamente en Ajustes → 12.'}
   };
   const REPORT_TITLE_DEFAULT='Reporte de avances merida';
   const reportTextState={title:REPORT_TITLE_DEFAULT,pages:{}};
@@ -1587,7 +2452,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return `<div class="report-heading"><div><h1>${esc(content.title)}</h1><p class="report-subtitle">${esc(content.subtitle)}</p><p class="report-disclaimer">${esc(content.description)}</p><p class="report-meta">${meta}</p></div><div class="report-brand">${brand}</div></div>`;
   }
   function reportFootMarkup(page){
-    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 2.2.1</div></footer>`;
+    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 2.4.1</div></footer>`;
   }
   function initReportTextEditor(){
     loadReportTexts();
@@ -1632,6 +2497,13 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
 .report-page .report-note{margin:8px 0 0;font-size:10px;color:#596d81}.report-page .report-input-info{border:1px solid var(--rline);border-radius:9px;padding:10px 13px;font-size:11px}.report-page .report-input-info p{margin:2px 0 5px}
 .report-page .report-section-records{break-inside:auto}.report-page .report-section-records table{table-layout:fixed}.report-page .report-section-records table th,.report-page .report-section-records table td{padding:5px 6px;text-align:left;white-space:normal;overflow-wrap:anywhere;font-size:9px}.report-page .report-section-records table thead{display:table-header-group}.report-page .report-section-records table tr{break-inside:avoid}.report-page .record-export-table tbody tr:nth-child(odd) td{background:#fff}.report-page .record-export-table tbody tr:nth-child(even) td{background:#edf3fa}.report-page .report-foot{border-top:1px solid var(--rline);padding-top:15px;margin-top:72px;font-size:10px;color:#566879;text-align:left;break-inside:avoid;page-break-inside:avoid;clear:both}.report-page .report-footnote{line-height:1.55}.report-page .report-footnote strong{display:block;color:var(--rdeep);font-size:9px;letter-spacing:.65px;margin-bottom:5px}.report-page .report-footnote p{margin:0;overflow-wrap:anywhere;white-space:pre-wrap}.report-page .report-foot-version{text-align:right;margin-top:18px;font-size:9px;color:#778698}
 @media print{.report-page{padding:0!important;width:100%!important}.report-page .report-section-records{break-before:page;page-break-before:always}.report-page .report-section{break-inside:auto}.report-page .report-section:not(.report-section-records):not(.report-section-comparison){break-inside:avoid;page-break-inside:avoid}.report-page .report-section-records:first-of-type{break-before:auto;page-break-before:auto}}
+/* Compactar solo el reporte semanal para evitar una segunda página de pie de nota. */
+.report-page:has(.weekly-report-table) .report-foot{margin-top:10px;padding-top:9px}
+.report-page:has(.weekly-report-table) .report-heading{margin-bottom:11px;padding-bottom:9px}
+.report-page:has(.weekly-report-table) .report-section{margin-bottom:10px}
+.report-page:has(.weekly-report-table) .report-daily-grid .weekly-report-table th{font-size:7px;padding:4px 2px}
+.report-page:has(.weekly-report-table) .report-daily-grid .weekly-report-table td{font-size:8px;padding:3px 2px}
+.report-page:has(.weekly-report-table) .report-foot-version{margin-top:8px}
 .report-page .report-section-allrecords{break-inside:auto;page-break-inside:auto}.report-page .report-section-allrecords table{table-layout:fixed}.report-page .report-section-allrecords th,.report-page .report-section-allrecords td{font-size:8px;padding:5px 6px;text-align:left;white-space:normal;overflow-wrap:anywhere}.report-page .report-section-allrecords thead{display:table-header-group}.report-page .report-section-allrecords tr{break-inside:avoid;page-break-inside:avoid}
 @media print{.report-page .report-section.report-section-allrecords{break-inside:auto!important;page-break-inside:auto!important;}.report-page .report-section-allrecords table{break-inside:auto!important;page-break-inside:auto!important;}}
 `;
@@ -1669,7 +2541,6 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   }
 
   function buildAccumulatedReport(){
-    if(!isAuthorized())return buildDailyEmptyReport();
     renderAccumulated();
     const rows=el('accumulatedFrom').value&&el('accumulatedTo').value&&el('accumulatedFrom').value>el('accumulatedTo').value?[]:accumulatedRows();
     const [,accent,deep]=THEME_COLORS[uiLayout.theme];
@@ -1679,31 +2550,39 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
       const cells=group=>`<tr${group.name==='TOTAL'?' class="daily-total-row"':''}><td>${esc(group.name)}</td>${DAILY_METRICS.map(key=>`<td>${group.metrics[key]}</td>`).join('')}<td>${qualityPercentText(qualityResult(group.rows,groupBy,group.name,'accumulated').global)}</td></tr>`;
       return `<div><h3>${label} · ${entries.length}</h3><table class="daily-report-table"><thead><tr><th>${groupBy==='module'?'Módulo':'Ejecutivo'}</th>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${entries.map(cells).join('')||'<tr><td colspan="8">Sin registros en el periodo</td></tr>'}</tbody><tfoot>${entries.length?cells(totals):''}</tfoot></table></div>`;
     };
-    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("accumulated",`${esc(accumulatedPeriodText())} · ${archive.reports.length} archivos históricos · ${rows.length} registros · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`)}<section class="report-section report-section-daily" data-report-section="daily"><h2>Acumulados por módulo y ejecutivo</h2><div class="report-daily-grid">${table('module','Módulos')}${table('executive','Ejecutivos')}</div><p class="report-note">Datos únicos de todos los XLS guardados en tu cuenta. Se incluyen los registros del periodo indicado. Ventas = registros con código; Programa Cero = ventas regulares con P0; Dental = ventas con PD. Sin comparación ni variaciones diarias.</p></section>${reportFootMarkup("accumulated")}</div>`;
+    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("accumulated",`${esc(accumulatedPeriodText())} · ${isAuthorized()?archive.reports.length:archive.tempReports.length} archivos XLS · ${rows.length} registros · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`)}<section class="report-section report-section-daily" data-report-section="daily"><h2>Acumulados por módulo y ejecutivo</h2><div class="report-daily-grid">${table('module','Módulos')}${table('executive','Ejecutivos')}</div><p class="report-note">Datos únicos de todos los XLS disponibles en esta sesión (guardados con login o temporales sin login). Se incluyen los registros del periodo indicado. Ventas = registros con código; Programa Cero = ventas regulares con P0; Dental = ventas con PD. Sin comparación ni variaciones diarias.</p></section>${reportFootMarkup("accumulated")}</div>`;
     el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}</style>${html}`;
     return el('printPage');
   }
 
   function buildWeeklyReport(){
-    if(!isAuthorized())return buildDailyEmptyReport();
     renderWeekly();
     const {primary,previous,main,older}=weeklyVarianceData();
     const [,accent,deep]=THEME_COLORS[uiLayout.theme];
-    const metricHeaders=['Registros','Ventas','Regul.','Garant.','P. Cero','Dental','Calidad'];
-    const variation=`<table class="daily-report-table"><thead><tr><th>Indicador</th><th>Principal</th><th>Anterior</th><th>Diferencia</th></tr></thead><tbody>${DAILY_METRICS.map(k=>{const d=main.totals.metrics[k]-older.totals.metrics[k];return `<tr><td>${WEEKLY_LABELS[k]}</td><td>${main.totals.metrics[k]}</td><td>${older.totals.metrics[k]}</td><td>${d>0?'+':''}${d}</td></tr>`;}).join('')}</tbody></table>`;
+    const metricHeaders=['Registros','Ventas','Regul.','Garant.','P. Cero','Dental','APP','1ª compra','Calidad'];
+    const variation=`<table class="daily-report-table"><thead><tr><th>Indicador</th><th>Principal</th><th>Anterior</th><th>Diferencia</th></tr></thead><tbody>${WEEKLY_DISPLAY_METRICS.map(k=>{const a=weeklyMetricValue(main.totals.metrics,main.rows,k),b=weeklyMetricValue(older.totals.metrics,older.rows,k),d=a-b;return `<tr><td>${WEEKLY_LABELS[k]}</td><td>${a}</td><td>${b}</td><td>${d>0?'+':''}${d}</td></tr>`;}).join('')}</tbody></table>`;
     const table=(week,data,title)=>{
-      const goals=DAILY_METRICS.map(k=>weeklyGoalFor(week,k,primary,data.totals.metrics));
-      const global=weeklyGlobalQuality(week,primary,data);
-      const goalRow=`<tr class="goal-row"><td>OBJETIVOS</td>${DAILY_METRICS.map(k=>{const v=weeklyGoalExport(week,k,primary,data.totals.metrics);return `<td>${v===''?'—':number.format(v)}</td>`;}).join('')}<td>—</td></tr>`;
-      const body=data.entries.map(g=>`<tr><td>${esc(g.name)}</td>${DAILY_METRICS.map(k=>`<td>${g.metrics[k]}</td>`).join('')}<td>${qualityPercentText(qualityResult(g.rows,'module',g.name,'weekly').global)}</td></tr>`).join('')||'<tr><td colspan="8">Sin registros</td></tr>';
-      const sum=`<tr class="daily-total-row"><td>TOTAL</td>${DAILY_METRICS.map(k=>`<td>${data.totals.metrics[k]}</td>`).join('')}<td>${qualityPercentText(global)}</td></tr>`;
-      const achievement=`<tr class="daily-total-row"><td>CUMPLIMIENTO</td>${DAILY_METRICS.map((k,i)=>`<td>${goals[i]?weeklyPercent(data.totals.metrics[k],goals[i]):'—'}</td>`).join('')}<td>—</td></tr>`;
-      const factors=`<tr class="daily-total-row"><td>CALIDAD FACTORES</td>${DAILY_METRICS.map((k,i)=>`<td>${qualityPercentText(qualityMetricFactor(goals[i]>0?100*data.totals.metrics[k]/goals[i]:NaN,100,{cap:!['sales','p0'].includes(k)}))}</td>`).join('')}<td>—</td></tr>`;
-      const overall=`<tr class="daily-total-row"><td>ALCANCE GLOBAL</td>${DAILY_METRICS.map(()=>'<td>—</td>').join('')}<td>${qualityPercentText(global)}</td></tr>`;
-      return `<div><h3>${title} · ${weekLabel(week)}</h3><table class="daily-report-table"><thead><tr><th>Módulo</th>${metricHeaders.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${goalRow}${body}</tbody><tfoot>${sum}${achievement}${factors}${overall}</tfoot></table></div>`;
+      const q=qualityResult(data.rows,'module','TOTAL','weekly',weeklyGoalFor(week,'sales',primary,data.totals.metrics)||null);
+      const value=(g,k)=>weeklyMetricValue(g.metrics,g.rows,k);
+      const goalRow=`<tr class="goal-row"><td>OBJETIVOS</td>${WEEKLY_DISPLAY_METRICS.map(k=>{
+        if(k==='reg'||k==='guar')return '<td>—</td>';
+        if(k==='app'||k==='purchase')return `<td>${weeklyTargetPct(k)}</td>`;
+        const v=weeklyGoalExport(week,k,primary,data.totals.metrics);
+        return `<td>${v===''?'—':number.format(v)}</td>`;
+      }).join('')}<td>${weeklyTargetPct('quality')}</td></tr>`;
+      const body=data.entries.map(g=>`<tr><td>${esc(g.name)}</td>${WEEKLY_DISPLAY_METRICS.map(k=>`<td>${value(g,k)}</td>`).join('')}<td>${qualityPercentText(qualityResult(g.rows,'module',g.name,'weekly').global)}</td></tr>`).join('')||'<tr><td colspan="10">Sin registros</td></tr>';
+      const sum=`<tr class="daily-total-row"><td>TOTAL</td>${WEEKLY_DISPLAY_METRICS.map(k=>`<td>${value(data.totals,k)}</td>`).join('')}<td>${qualityPercentText(q.global)}</td></tr>`;
+      const achievement=`<tr class="daily-total-row"><td>CUMPLIMIENTO</td>${WEEKLY_DISPLAY_METRICS.map(k=>{
+        if(k==='reg'||k==='guar')return '<td>—</td>';
+        if(k==='app'||k==='purchase')return `<td>${data.totals.metrics.sales?weeklyPercent(value(data.totals,k),data.totals.metrics.sales):'—'}</td>`;
+        const goal=weeklyGoalFor(week,k,primary,data.totals.metrics);
+        return `<td>${goal?weeklyPercent(data.totals.metrics[k],goal):'—'}</td>`;
+      }).join('')}<td>${qualityPercentText(q.composite)}</td></tr>`;
+      const factors=`<tr class="daily-total-row weekly-factor-report"><td>CALIDAD FACTORES</td>${weeklyFactorValues(week,primary,data,q).map(cell=>cell?`<td title="${esc(cell.label)}">${cell.value}</td>`:'<td>—</td>').join('')}</tr>`;
+      const overall=`<tr class="daily-total-row"><td>ALCANCE GLOBAL</td>${WEEKLY_DISPLAY_METRICS.map(()=>'<td>—</td>').join('')}<td>${qualityPercentText(q.global)}</td></tr>`;
+      return `<div><h3>${title} · ${weekLabel(week)}</h3><table class="daily-report-table weekly-report-table"><thead><tr><th>Módulo</th>${metricHeaders.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${goalRow}${body}</tbody><tfoot>${sum}${achievement}${factors}${overall}</tfoot></table></div>`;
     };
-
-    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("weekly",`${weekLabel(primary)} vs ${weekLabel(previous)} · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`)}<section class="report-section" data-report-section="weekly-variance"><h2>Variación de resultados</h2>${variation}</section><section class="report-section report-section-daily" data-report-section="daily"><h2>Resultados y objetivos por módulo</h2><div class="report-daily-grid">${table(primary,main,'Fecha de comparación 1')}${table(previous,older,'Fecha de comparación 2')}</div><p class="report-note">Registros y ventas: objetivos de captura manual. Regulares y garantizadas: cero por defecto. Plan Cero: objetivo igual a todas las ventas regulares logradas; Dental: objetivo igual a todas las ventas totales logradas en cada semana. Las metas automáticas se pueden modificar. Calidad: objetivos y factores configurables; Alcance global: promedio ponderado de cuatro factores.</p></section>${reportFootMarkup("weekly")}</div>`;
+    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("weekly",`${weekLabel(primary)} vs ${weekLabel(previous)} · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`)}<section class="report-section" data-report-section="weekly-variance"><h2>Variación de resultados</h2>${variation}</section><section class="report-section report-section-daily" data-report-section="daily"><h2>Resultados y objetivos por módulo</h2><div class="report-daily-grid">${table(primary,main,'Fecha de comparación 1')}${table(previous,older,'Fecha de comparación 2')}</div><p class="report-note">Regulares y garantizadas: solo conteos, sin objetivo ni calidad. Registros y ventas: metas de cantidad. Plan Cero y Dental: metas automáticas sobre regulares y ventas respectivamente. APP, Primera compra y Calidad: porcentaje requerido desde Ajustes. La calidad de cada factor se muestra en su columna.</p></section>${reportFootMarkup("weekly")}</div>`;
     el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}</style>${html}`;
     return el('printPage');
   }
@@ -1725,9 +2604,79 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return el('printPage');
   }
 
+
+  function buildAchievementReport(){
+    renderAchievements();
+    const {rows,filteredRows:records,incidents,metricList,counts,goals}=achData(),cols=allRecordsColumns();
+    const [,accent,deep]=THEME_COLORS[uiLayout.theme];
+    const m=achValue('achModule')||'Todos los módulos',week=achValue('achWeek');
+    const details=`${week?weekLabel(week):'Sin semana'} · ${esc(m)} · ${rows.length} válidos de ${records.length} filtrados · ${incidents.length} incidencias excluidas · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`;
+    const tableFrom=(headers,items)=>`<table class="ach-report-table"><thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${items.map(row=>`<tr>${row.map(value=>`<td>${esc(String(value??'—'))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    const goalLabels=ACH_GOAL_LABELS;
+    const parts=[];
+    if(achPrintEnabled('filters'))parts.push(`<section class="report-section" data-report-section="ach-filters"><h2>Filtros aplicados</h2>${tableFrom(['Filtro','Selección'],achPrintFilters())}</section>`);
+    if(achPrintEnabled('goals'))parts.push(`<section class="report-section" data-report-section="ach-goals"><h2>Objetivos semanales: cantidades y porcentajes</h2>${tableFrom(['Factor','Objetivo'],Object.keys(ACH_GOAL_INPUTS).map(k=>[goalLabels[k],achGoalText(k,goals[k])]))}</section>`);
+    if(achPrintEnabled('percentages'))parts.push(`<section class="report-section" data-report-section="ach-percents"><h2>Logros por porcentaje</h2>${tableFrom(['Factor','Alcance real','Calidad del factor'],metricList.map(x=>[x.name,qualityPercentText(x.reach),qualityPercentText(x.quality)]))}</section>`);
+    if(achPrintEnabled('quantities')){
+      const targets={'Registros':'records','Ventas con código':'sales','Plan Dental':'dental','Plan Cero':'p0','Primera compra':'purchase','APP activadas':'app'};
+      parts.push(`<section class="report-section" data-report-section="ach-quantities"><h2>Logros en cantidades</h2>${tableFrom(['Indicador','Real','Meta / % requerido'],counts.map(([k,v])=>[k,number.format(v),targets[k]?achGoalText(targets[k],goals[targets[k]]):'—']))}</section>`);
+    }
+    if(achPrintEnabled('records')){
+      const table=`<table class="record-export-table"><thead><tr>${cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')}</tr></thead><tbody>${records.map(r=>`<tr>${cols.map(c=>`<td>${tableCellMarkup(r,c,true)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${Math.max(1,cols.length)}">Sin registros para la búsqueda y filtros seleccionados.</td></tr>`}</tbody></table>`;
+      parts.push(`<section class="report-section report-section-allrecords" data-report-section="ach-records"><h2>Registros filtrados · ${records.length}</h2><p class="report-note">Los indicadores se calculan sobre todos los folios filtrados (en todas las páginas de la tabla), excepto los que tengan incidencia. Los folios con incidencia siguen visibles para revisión, pero no suman a los resultados.</p>${table}</section>`);
+    }
+    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup('achievements',details)}${parts.join('')||'<p>No hay apartados seleccionados para imprimir.</p>'}${reportFootMarkup('achievements')}</div>`;
+    el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}
+.report-page .ach-report-table{border-collapse:collapse;width:100%;font-size:10px;margin:5px 0 12px}
+.report-page .ach-report-table th,.report-page .ach-report-table td{border:1px solid #dbe6ef;padding:6px;text-align:left;overflow-wrap:anywhere}
+.report-page .ach-report-table th{background:#edf4fc}
+.report-page .ach-report-table td:nth-child(2){font-weight:800;color:#164f7d}
+.report-page .report-section[data-report-section="ach-records"]{break-before:page;page-break-before:always}
+.report-page .report-section[data-report-section="ach-records"]:first-of-type{break-before:auto;page-break-before:auto}
+</style>${html}`;
+    return el('printPage');
+  }
+
+  function buildSupervisorReport(){
+    const c=supervisorCalculator(),[,accent,deep]=THEME_COLORS[uiLayout.theme];
+    const tab=(heads,rows)=>`<table class="sup-report-table"><thead><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(v=>`<td>${esc(String(v??'—'))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    const sections=[];
+    if(c.ready){
+      if(supPrintEnabled('filters'))sections.push(`<section class="report-section" data-report-section="sup-filters"><h2>Parámetros de consulta</h2>${tab(['Campo','Selección'],[['Semana',supView.week?weekLabel(supView.week):'—'],['Supervisor',c.selected.name],['Módulo',c.selected.module]])}</section>`);
+      if(supPrintEnabled('overview'))sections.push(`<section class="report-section" data-report-section="sup-overview"><h2>Resumen de comisiones</h2>${tab(['Concepto','Importe'],[['Comisión total estimada',mx(c.total)],['Bono por módulo',mx(c.incentiveNet)],['Ventas propias',mx(c.ownNet)]])}</section>`);
+      if(supPrintEnabled('search'))sections.push(`<section class="report-section" data-report-section="sup-search"><h2>Búsqueda aplicada</h2>${tab(['Filtro','Valor'],[['Búsqueda de folios',el('supSearch')?.value||'Sin filtro']])}</section>`);
+      const factors=SUP_FACTOR_KEYS.map(k=>[SUP_FACTOR_LABELS[k],supText(c.q.actual[k]),supText(c.q.factors[k])]);
+      factors.push(['Calidad total',supText(c.q.composite),supText(c.q.global)]);
+      if(supPrintEnabled('team'))sections.push(`<section class="report-section" data-report-section="sup-quality"><h2>Calidad del equipo</h2>${tab(['Factor','Alcance','Calidad'],factors)}</section>`);
+      const bonus=[['Objetivo del equipo',`${number.format(c.goal)} ventas`],['Ventas pagables del equipo',c.teamValid.length],['Cumplimiento del módulo',supText(c.completion)],['Escalón aplicable',c.tier?pct(c.tier.min)+' o más':'Sin escalón'],['Calidad total',supText(c.q.composite)],['Alcance global',supText(c.q.global)],['Bono base',c.bonusConfigured?mx(supSettings.baseBonus):'Pendiente de configurar'],['Cálculo base',mx(c.base)],...c.additional.map(b=>['Bono por '+pct(b.threshold),b.configured?mx(b.earned):'Pendiente de configurar']),['Subtotal',mx(c.incentiveBefore)],['Plan Cero módulo',supText(c.moduleP0Reach)],['Descuento P0 módulo ('+pct(c.modulePenalty)+')','−'+mx(c.incentiveDiscount)],['Bono neto módulo',mx(c.incentiveNet)]];
+      if(supPrintEnabled('bonus'))sections.push(`<section class="report-section" data-report-section="sup-bonus"><h2>Bono por resultados del módulo</h2>${tab(['Concepto','Resultado'],bonus)}</section>`);
+      const own=[...c.parts.map(x=>[x.name,`${x.count} × ${mx(x.rate)}`,mx(x.total)]),['Subtotal ventas propias','',mx(c.ownGross)],['Incidencias propias',c.ownInc,''],['Plan Cero propio / requerido',supText(c.ownP0Reach)+' / '+pct(supSettings.ownP0Threshold),''],['Descuento Plan Cero ('+pct(c.ownP0Penalty)+')','','−'+mx(c.ownP0Discount)],['Descuento incidencias ('+pct(c.ownIncPenalty)+')','','−'+mx(c.ownIncDiscount)],['Neto ventas propias','',mx(c.ownNet)],['TOTAL SUPERVISOR','',mx(c.total)]];
+      if(supPrintEnabled('own'))sections.push(`<section class="report-section" data-report-section="sup-own"><h2>Ventas propias del supervisor</h2>${tab(['Concepto','Cantidad × tarifa','Pago'],own)}</section>`);
+      for(const [key,title,rows,kind] of [['sup-team-records','Folios de ejecutivos',c.src.team,'team'],['sup-own-records','Folios del supervisor',c.src.own,'own']]){
+        if(!supPrintEnabled(key==='sup-team-records'?'recordsTeam':'recordsOwn'))continue;
+        sections.push(`<section class="report-section" data-report-section="${key}"><h2>${title} (${rows.length})</h2>${supTableMarkup([...rows].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.i-a.i),c,kind,true)}</section>`);
+      }
+    }
+    const selected=c.selected||supReadSelection();
+    const meta=`${supView.week?weekLabel(supView.week):'Sin semana'} · ${selected?esc(selected.name)+' · '+esc(selected.module):'Sin supervisor'} · Cálculo simulado`;
+    el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}
+.report-page .sup-report-table{width:100%;border-collapse:collapse;font-size:10px;margin:4px 0 12px}
+.report-page .sup-report-table th,.report-page .sup-report-table td{border:1px solid #dce5ef;padding:5px 8px;text-align:left}
+.report-page .sup-report-table th{background:#edf4fc;color:#244663}
+.report-page .sup-report-table td:last-child{font-weight:750}
+.report-page .sup-report-records{width:100%;border-collapse:collapse;font-size:8px}
+.report-page .sup-report-records th,.report-page .sup-report-records td{border:1px solid #dce5ef;padding:3px 5px;overflow-wrap:anywhere}
+.report-page .sup-report-records th{background:#edf4fc}
+.report-page section[data-report-section="sup-team-records"],.report-page section[data-report-section="sup-own-records"]{break-before:page;page-break-before:always}
+</style><div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup('supervisor',meta)}${sections.join('')||'<p>Asigna supervisor e importa XLS.</p>'}${reportFootMarkup('supervisor')}</div>`;
+    return el('printPage');
+  }
+
   function buildReport(){
     if(activePage==='visits')return window.VISITS?.buildReport();
+    if(activePage==='supervisor')return buildSupervisorReport();
     if(activePage==='allrecords')return buildAllRecordsReport();
+    if(activePage==='achievements')return buildAchievementReport();
     if(activePage==='weekly')return buildWeeklyReport();
     if(activePage==='accumulated')return buildAccumulatedReport();
     if(activePage==='daily')return imported.data?buildDailyReport():buildDailyEmptyReport();
@@ -1828,12 +2777,22 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=8;
     y=paragraph(reportTexts.subtitle,margin,y,content,16,21,accent)+6;
     y=paragraph(reportTexts.description,margin,y,content,12,18,deep)+8;
-    const selection=activePage==='allrecords'?`${getAllRecordsFiltered().length} registros · Módulo ${allRecordsFilterValue('allRecordsModule')||'Todos'} · Ejecutivo ${allRecordsFilterValue('allRecordsExecutive')||'Todos'}`:activePage==='weekly'?`${weekLabel(weeklySelection().primary)} vs. ${weekLabel(weeklySelection().previous)} · Calculo manual desde google forms`:activePage==='accumulated'?`${accumulatedPeriodText()} · ${archive.reports.length} XLS guardados · Calculo manual desde google forms`:activePage==='daily'&&imported.data?`Día principal ${fmtDay(dailyDates().latest)} · Día comparado ${fmtDay(dailyDates().previous)} · Calculo manual desde google forms`:activePage==='team'&&imported.data?`Semana ${weekLabel(imported.week)} · ${filteredTeamEntries().length} ejecutivos · Calculo manual desde google forms`:importActive()?`Semana ${weekLabel(imported.week)} · ${imported.executive} · Objetivo ${state.base.goal}`:`Modo manual · Objetivo ${state.base.goal}`;
+    const selection=activePage==='supervisor'?`${supView.week?weekLabel(supView.week):'Sin semana'} · ${supReadSelection()?.name||'Sin supervisor'} · ${supReadSelection()?.module||''}`:activePage==='achievements'?`${achValue('achWeek')?weekLabel(achValue('achWeek')):'Sin semana'} · ${achValue('achModule')||'Todos los módulos'} · ${achFilteredRecords().length} folios filtrados`:activePage==='allrecords'?`${getAllRecordsFiltered().length} registros · Módulo ${allRecordsFilterValue('allRecordsModule')||'Todos'} · Ejecutivo ${allRecordsFilterValue('allRecordsExecutive')||'Todos'}`:activePage==='weekly'?`${weekLabel(weeklySelection().primary)} vs. ${weekLabel(weeklySelection().previous)} · Calculo manual desde google forms`:activePage==='accumulated'?`${accumulatedPeriodText()} · ${isAuthorized()?archive.reports.length:archive.tempReports.length} XLS ${isAuthorized()?'guardados':'temporales'} · Calculo manual desde google forms`:activePage==='daily'&&imported.data?`Día principal ${fmtDay(dailyDates().latest)} · Día comparado ${fmtDay(dailyDates().previous)} · Calculo manual desde google forms`:activePage==='team'&&imported.data?`Semana ${weekLabel(imported.week)} · ${filteredTeamEntries().length} ejecutivos · Calculo manual desde google forms`:importActive()?`Semana ${weekLabel(imported.week)} · ${imported.executive} · Objetivo ${state.base.goal}`:`Modo manual · Objetivo ${state.base.goal}`;
     y=paragraph(selection,margin,y,content,10,15)+6;
     line(margin,y,content,accent);y+=9;
     for(const section of sections){
-      const key=section.dataset.reportSection;heading(key==='allrecords'?'Registros XLS filtrados':key==='weekly-variance'?'Variación de resultados':SECTION_LABELS[key]||(key==='daily'?'Por módulo y ejecutivo':key==='team'?'Comparativo por ejecutivo':'Resumen del equipo'));
-      if(key==='weekly-variance'){
+      const key=section.dataset.reportSection;heading(key==='sup-overview'?'Resumen de comisiones':key==='sup-filters'?'Parámetros de consulta':key==='sup-search'?'Búsqueda de folios':key==='sup-quality'?'Calidad del equipo':key==='sup-bonus'?'Bono por resultados':key==='sup-own'?'Ventas propias':key==='sup-team-records'?'Folios ejecutivos':key==='sup-own-records'?'Folios supervisor':key==='ach-filters'?'Filtros aplicados':key==='ach-goals'?'Objetivos: cantidades y porcentajes':key==='ach-percents'?'Logros por porcentaje':key==='ach-quantities'?'Logros en cantidades':key==='ach-records'?'Registros XLS filtrados':key==='allrecords'?'Registros XLS filtrados':key==='weekly-variance'?'Variación de resultados':SECTION_LABELS[key]||(key==='daily'?'Por módulo y ejecutivo':key==='team'?'Comparativo por ejecutivo':'Resumen del equipo'));
+      if(['sup-overview','sup-filters','sup-search','sup-quality','sup-bonus','sup-own'].includes(key)){
+        y=tableAt(section.querySelector('.sup-report-table'),margin,y,content,{fontSize:11,rowMin:28,widths:key==='sup-quality'?[2,1,1]:key==='sup-own'?[2,1.4,1]:[3,1],striped:true})+9;
+      }
+      else if(['sup-team-records','sup-own-records'].includes(key)){
+        y=tableAt(section.querySelector('.sup-report-records'),margin,y,content,{fontSize:9,rowMin:26,widths:[1,1.6,1.2,1,1.3,.6,.7,.6,.7,1],striped:true})+9;
+      }
+      else if(['ach-filters','ach-goals','ach-percents','ach-quantities'].includes(key)){
+        const table=section.querySelector('.ach-report-table');
+        y=tableAt(table,margin,y,content,{fontSize:11,rowMin:27,widths:key==='ach-percents'?[2,1,4]:key==='ach-quantities'?[3,1,1]:[3,1],striped:true})+9;
+      }
+      else if(key==='weekly-variance'){
         y=tableAt(section.querySelector('.daily-report-table'),margin,y,content,{fontSize:11,rowMin:29,widths:[2.8,1,1,1],striped:true})+9;
       }
       else if(key==='daily'){
@@ -1842,8 +2801,10 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
         let endY=startY;
         for(let i=0;i<tables.length;i++){
           const x=margin+i*(panelW+gap);
-          write(i===0?'POR MÓDULO':'POR EJECUTIVO',x,startY,13,true,deep);
-          const end=tableAt(tables[i],x,startY+24,panelW,{fontSize:8,rowMin:25,widths:[2.45,1,1,1,1,1,1,1.1],striped:true});
+          const weeklyReport=activePage==='weekly';
+          write(weeklyReport?(i===0?'SEMANA PRINCIPAL':'SEMANA COMPARADA'):(i===0?'POR MÓDULO':'POR EJECUTIVO'),x,startY,13,true,deep);
+          const widths=weeklyReport?[2.7,1,1,1,1,1,1,1,1,1.1]:[2.45,1,1,1,1,1,1,1.1];
+          const end=tableAt(tables[i],x,startY+24,panelW,{fontSize:weeklyReport?7:8,rowMin:weeklyReport?27:25,widths,striped:true});
           endY=Math.max(endY,end);
         }
         y=endY+8;
@@ -1914,7 +2875,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
         y=tableAt(table,margin,y,content,{fontSize:11,rowMin:28,widths:[2.25,1,1,1]});
         const note=section.querySelector('.report-note');if(note){y+=8;y=paragraph(note.textContent,margin,y,content,10,14)+5;}
       }
-      else if(key==='records'||key==='allrecords'){
+      else if(key==='records'||key==='allrecords'||key==='ach-records'){
         const note=section.querySelector('.report-note');if(note){y=paragraph(note.textContent,margin,y,content,10,15)+8;}
         const table=section.querySelector('.record-export-table');
         if(table){const heads=[...table.querySelectorAll('thead th')].map(z=>normalize(z.textContent));const weights=heads.map(h=>h==='INCIDENCIA'?8:h==='APP'?6:h==='CODIGO'?18:h==='VALIDACION DE PAGO'?14:h==='PRODUCTO'?13:h==='FECHA'?11:h==='ESTATUS'?11:h==='GARANTIZADA'?12:12);
@@ -1927,7 +2888,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=70;line(margin,y,content);y+=16;
     write('NOTA PARA LEER EL REPORTE',margin,y,10,true,deep);y+=20;
     y=paragraph(reportTexts.footer,margin,y,content,11,17,'#4b5c70')+19;
-    write('Versión 2.2.1',margin+content-84,y,10,false,'#6b7b8e');y+=32;
+    write('Versión 2.4.1',margin+content-84,y,10,false,'#6b7b8e');y+=32;
     return Math.ceil(y);
   }
   function exportPng(){
@@ -1946,7 +2907,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
       paintReportCanvas(ctx,true);
       canvas.toBlob(blob=>{
         button.disabled=false;button.textContent=before;
-        if(blob)saveBlob(blob,activePage==='allrecords'?`registros_xls_${dateIso(new Date())}.png`:activePage==='weekly'?`comparativa_semanal_${weeklySelection().primary}_vs_${weeklySelection().previous}.png`:activePage==='accumulated'?`acumulado_general_${el('accumulatedFrom').value||'todo'}_${el('accumulatedTo').value||'todo'}.png`:activePage==='daily'?`comparativa_diaria_${imported.data?dailyDates().latest:'sin_datos'}.png`:activePage==='team'?`comisiones_equipo_${imported.week}.png`:`comisiones_simuladas_${importActive()?imported.week:'manual'}.png`);
+        if(blob)saveBlob(blob,activePage==='supervisor'?`calculadora_supervisor_${supView.week||'sin_semana'}.png`:activePage==='achievements'?`logros_semanales_${achValue('achWeek')||'sin_semana'}.png`:activePage==='allrecords'?`registros_xls_${dateIso(new Date())}.png`:activePage==='weekly'?`comparativa_semanal_${weeklySelection().primary}_vs_${weeklySelection().previous}.png`:activePage==='accumulated'?`acumulado_general_${el('accumulatedFrom').value||'todo'}_${el('accumulatedTo').value||'todo'}.png`:activePage==='daily'?`comparativa_diaria_${imported.data?dailyDates().latest:'sin_datos'}.png`:activePage==='team'?`comisiones_equipo_${imported.week}.png`:`comisiones_simuladas_${importActive()?imported.week:'manual'}.png`);
         else alert('No se pudo guardar la imagen PNG. Prueba un periodo con menos folios.');
       },'image/png');
     }catch(err){button.disabled=false;button.textContent=before;alert('No se pudo generar el PNG: '+err.message);}
@@ -1956,7 +2917,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   window.addEventListener('beforeprint',buildReport);
   window.CALC_REPORT={buildReport,layout:uiLayout};
 
-  initAllRecordsPage();initQualitySettings();
+  initAllRecordsPage();initAchievements();initQualitySettings();initSupervisorCalculator();
   restore();setForm('base');setForm('sim');render();initializeWeeklyDates();refreshAuthorizedPages();initArchive();
   window.APP_CLOUD?.registerRefresh(async()=>{
     if(!isAuthorized())return;
@@ -1968,7 +2929,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   window.VISIT_SOURCE={
     isAuthorized,
     rows(){
-      const data=combinedArchiveData(archive.reports);
+      const data=combinedArchiveData(isAuthorized()?archive.reports:archive.tempReports);
       if(!data)return [];
       const indexes=Object.fromEntries(data.headers.map((h,i)=>[normalize(h),i]));
       const find=(row,terms)=>{

@@ -1,7 +1,7 @@
 {
   "name": "dashboard-comisiones-merida-netlify",
   "private": true,
-  "version": "2.2.0",
+  "version": "2.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@netlify/database": "^2.0.3",
-    "@netlify/identity": "^2.0.1"
+    "@netlify/identity": "^2.0.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "vite": "^7.0.0"

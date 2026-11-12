@@ -1,4 +1,4 @@
-/* Acuse de visita de coordinación · v2.2
+/* Acuse de visita de coordinación · v2.2.2
    Los filtros, la captura y los cálculos son locales. Solo Guardar visita
    envía un acta a PostgreSQL. La configuración personalizable usa el
    sistema existente de preferencias sincronizadas de Netlify.
@@ -136,7 +136,7 @@ async function request(path,options={}){
  if(!response.ok)throw Error(data.error||`Error ${response.status}`);return data;
 }
 async function refreshHistory(force=false){
- if(!source.isAuthorized())return;
+ if(!source.isAuthorized()){$('visitHistoryList').innerHTML='<p class="visit-muted">Sin sesión: puedes preparar y exportar una visita con XLS temporales. Inicia sesión para guardar y consultar el historial en PostgreSQL.</p>';return;}
  if(loadedOnce&&!force)return;
  try{const data=await request('');history=data.visits||[];loadedOnce=true;historyRender();}
  catch(e){$('visitHistoryList').textContent='No se pudieron recuperar las visitas: '+e.message;}
@@ -284,7 +284,6 @@ function buildReport(){
 }
 function image(url){return new Promise((resolve,reject)=>{if(!url){resolve(null);return;}const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(Error('No se pudo cargar una imagen del reporte.'));im.src=url;});}
 async function exportPng(){
- if(!source.isAuthorized())return;
  const btn=$('visitPng');btn.disabled=true;btn.textContent='Generando…';
  try{
    const d=prepareReportData(),pageW=816,pageH=1056,margin=18,contentW=pageW-2*margin;
@@ -407,7 +406,7 @@ function setup(){
  renderSettings();sourceRefresh();
 }
 window.VISITS={
- open(){if(!source.isAuthorized())return;active=true;config=readConfig();renderSettings();sourceRefresh();void refreshHistory();},
+ open(){active=true;config=readConfig();renderSettings();sourceRefresh();void refreshHistory();},
  refreshSources:sourceRefresh,buildReport,exportPng
 };
 setup();
