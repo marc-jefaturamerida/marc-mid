@@ -142,3 +142,6 @@ Esta calculadora es una simulación de los criterios proporcionados, no una conf
 
 ## V2.4.2
 Secciones de calculadora de supervisor plegables con opción de impresión individual, tablas contraídas por defecto, tarjetas compactas de tres columnas y penalización P0 propia detallada.
+
+## Corrección de supervisor V2.4.5
+Bono base = bono configurado × min(cumplimiento,100)/100 × alcance global/100. Alcance global sin tope. La casilla de Ajustes 12, marcada por defecto, incluye las ventas válidas de supervisores del módulo para cumplimiento y su factor de calidad; desmarcada las excluye. El escalón de pago de ventas propias, otros factores y penalizaciones permanecen sin cambios. Bono adicional único y configurable.

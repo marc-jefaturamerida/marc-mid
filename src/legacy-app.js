@@ -1596,7 +1596,7 @@ const SUP_COMMISSION_KEY='wmSamsMeridaSupervisorCommissionV24';
 const SUP_FACTOR_KEYS=['completion','purchase','p0','app'];
 const SUP_FACTOR_LABELS={completion:'Cumplimiento',purchase:'Primera compra',p0:'Programa Cero',app:'Activación por APP',quality:'Calidad total'};
 const SUP_BASE_RULES={
-  baseBonus:null,goals:{},
+  baseBonus:null,goals:{},includeSupervisorSales:true,
   required:{completion:100,purchase:90,p0:30,app:90,quality:90},
   minimum:{completion:0,purchase:0,p0:0,app:0,quality:0},
   maximum:{completion:null,purchase:100,p0:null,app:100,quality:null},
@@ -1632,6 +1632,7 @@ function normalizeSupervisorCommission(saved){
   // La calidad global del supervisor nunca tiene tope superior, incluso si una configuración anterior lo guardó en 100%.
   out.maximum.quality=null;
   if(typeof saved.ownP0UseModule==='boolean')out.ownP0UseModule=saved.ownP0UseModule;
+  if(typeof saved.includeSupervisorSales==='boolean')out.includeSupervisorSales=saved.includeSupervisorSales;
   for(const key of ['moduleP0Threshold','moduleP0Penalty','ownP0Threshold','ownP0Penalty']){
     const n=supNumber(saved[key]);if(n!==null)out[key]=n;
   }
@@ -1720,9 +1721,9 @@ function supFiltered(rows){
   return rows.filter(r=>normalize([r.folio,r.fecha,r.executive,r.module,r.code,r.status,r.p0,r.dental,selectedIncident(r)?'INCIDENCIA':'',appEnabled(r)?'APP':''].join(' ')).includes(q));
 }
 function supIncidentRate(n){return supSettings.incidencePenalties[Math.min(4,Math.max(0,n))]||0;}
-function supervisorQuality(validRows,goal){
+function supervisorQuality(validRows,goal,completionSales=null){
   const base=countQualityRows(validRows);
-  const actual={completion:goal>0?100*base.sales/goal:null,
+  const actual={completion:goal>0?100*(completionSales===null?base.sales:completionSales)/goal:null,
     purchase:base.sales?100*base.purchase/base.sales:0,
     p0:base.regular?100*base.p0/base.regular:0,
     app:base.sales?100*base.apps/base.sales:0};
@@ -1746,11 +1747,14 @@ function supervisorCalculator(){
   const teamValid=src.team.filter(r=>candidate(r)&&!excluded(r));
   const teamReg=teamValid.filter(r=>guaranteeType(r)==='reg');
   const teamP0=teamReg.filter(r=>isYes(r.p0));
-  const completion=goal>0?teamValid.length/goal*100:null;
-  const q=supervisorQuality(teamValid,goal);
-  const tier=completion===null?null:supTier(completion);
+  const supervisorValid=supSettings.includeSupervisorSales?[...src.own,...src.otherSupervisors].filter(r=>candidate(r)&&!excluded(r)):[];
+  const completionSales=teamValid.length+supervisorValid.length;
+  const completion=goal>0?completionSales/goal*100:null;
+  const q=supervisorQuality(teamValid,goal,completionSales);
+  const teamOnlyCompletion=goal>0?teamValid.length/goal*100:null;
+  const tier=teamOnlyCompletion===null?null:supTier(teamOnlyCompletion);
   const bonusConfigured=supSettings.baseBonus!==null;
-  const base=bonusConfigured&&completion!==null&&q.global!==null?round(supSettings.baseBonus*(completion/100)*(q.global/100)):0;
+  const base=bonusConfigured&&completion!==null&&q.global!==null?round(supSettings.baseBonus*(Math.min(100,completion)/100)*(q.global/100)):0;
   // Un solo bono: se selecciona exclusivamente el tramo más alto alcanzado.
   const earnedTier=completion===null?null:[...supSettings.additional].filter(t=>completion>=t.threshold).sort((a,b)=>b.threshold-a.threshold)[0]||null;
   const additional=supSettings.additional.map(t=>({threshold:t.threshold,amount:t.amount,configured:true,earned:earnedTier?.threshold===t.threshold?round(t.amount):0}));
@@ -1789,7 +1793,7 @@ function supervisorCalculator(){
   const ownP0Discount=round(ownGross*ownP0Penalty/100);
   const ownIncDiscount=round(ownGross*ownIncPenalty/100);
   const ownNet=round(ownGross-ownP0Discount-ownIncDiscount);
-  return {ready:true,selected,goal,src,teamValid,teamReg,teamP0,completion,q,tier,
+  return {ready:true,selected,goal,src,teamValid,teamReg,teamP0,supervisorValid,completionSales,teamOnlyCompletion,completion,q,tier,
     bonusConfigured,base,additional,extras,moduleP0Reach,modulePenalty,incentiveBefore,incentiveDiscount,incentiveNet,
     ownValid,ownReg,ownDental,ownApp,ownP0,ownInc,parts,ownGross,ownP0Reach,ownP0UseModule,ownP0Basis,ownP0ComparedReach,ownP0ComparedThreshold,ownP0HasRegular,ownP0BelowTarget,ownP0Penalty,ownIncPenalty,ownP0Discount,ownIncDiscount,ownNet,
     total:round(incentiveNet+ownNet)};
@@ -1808,14 +1812,14 @@ function supDetailCards(c){
       <div class="sup-big-card"><small>Ventas propias</small><strong>${mx(c.ownNet)}</strong><span>Tarifas del escalón sin ventas de supervisores</span></div>
     </div></div></details>
     <div class="sup-detail-grid">
-      <details class="sup-panel sup-fold" data-sup-fold="team" ${supFoldOpen('team')?'open':''}>${supFoldHeading('Resultados del equipo (sin supervisores)','team')}<div class="sup-fold-body"><div class="sup-facts">
-        <span>Objetivo: <b>${number.format(c.goal)} ventas</b></span><span>Ventas válidas: <b>${c.teamValid.length}</b></span>
+      <details class="sup-panel sup-fold" data-sup-fold="team" ${supFoldOpen('team')?'open':''}>${supFoldHeading('Resultados del módulo','team')}<div class="sup-fold-body"><div class="sup-facts">
+        <span>Objetivo: <b>${number.format(c.goal)} ventas</b></span><span>Ventas del equipo: <b>${c.teamValid.length}</b></span><span>Ventas de supervisores incluidas: <b>${c.supervisorValid.length}</b></span>
         <span>Cumplimiento: <b>${supText(c.completion)}</b></span><span>Escalón aplicable: <b>${c.tier?esc(c.tier.min+'% o más'):'Sin escalón pagable'}</b></span>
         <span>P0 del módulo: <b>${supText(c.moduleP0Reach)}</b></span><span>Calidad total: <b>${supText(c.q.composite)}</b></span>
         <span>Alcance global: <b>${supText(c.q.global)}</b></span>
       </div><table class="sup-metrics"><thead><tr><th>Factor</th><th>Alcance</th><th>Calidad</th></tr></thead><tbody>${factorRows}
         <tr class="sup-table-emphasis"><th>Calidad total</th><td>${supText(c.q.composite)}</td><td>${supText(c.q.global)}</td></tr></tbody></table></div></details>
-      <details class="sup-panel sup-fold" data-sup-fold="bonus" ${supFoldOpen('bonus')?'open':''}>${supFoldHeading('Desglose del bono del módulo','bonus')}<div class="sup-fold-body"><div class="sup-formula">Bono base × ${supText(c.completion)} × ${supText(c.q.global)}</div>
+      <details class="sup-panel sup-fold" data-sup-fold="bonus" ${supFoldOpen('bonus')?'open':''}>${supFoldHeading('Desglose del bono del módulo','bonus')}<div class="sup-fold-body"><div class="sup-formula">Bono base × ${supText(Math.min(100,c.completion))} (cumplimiento topado) × ${supText(c.q.global)}</div>
         <table class="sup-metrics"><tbody><tr><th>Bono base ${!c.bonusConfigured?'(sin configurar)':''}</th><td>${c.bonusConfigured?mx(supSettings.baseBonus):'—'}</td></tr>
         <tr><th>Cálculo base</th><td>${mx(c.base)}</td></tr>${bonusRows}
         <tr><th>Base + bono adicional</th><td>${mx(c.incentiveBefore)}</td></tr>
@@ -1877,6 +1881,7 @@ function supervisorFactorSettingsHtml(){
     ${num('Bono base del supervisor (MXN)','baseBonus','root',supSettings.baseBonus,'placeholder="Sin configurar"')}
     <h4>Objetivos semanales de ventas por módulo</h4><p class="settings-help">Si no ingresas una meta aquí, utiliza la meta semanal del módulo de Ajustes → 10. Si tampoco existe, suma las metas individuales de los ejecutivos del equipo.</p>
     <div class="sup-setting-grid">${modules.map(m=>num(esc(m)+' · ventas',m,'goals',supSettings.goals[m]??'','placeholder="Heredar objetivo"')).join('')||'<span>Importa XLS para identificar módulos.</span>'}</div>
+    <label class="sup-checkbox-setting"><input type="checkbox" data-sup-include-sales ${supSettings.includeSupervisorSales?'checked':''}><span><b>Incluir ventas de supervisores en el cumplimiento del módulo</b><small>Activado por defecto. Al desmarcar, solo las ventas de ejecutivos cuentan para el cumplimiento y el bono adicional. El escalón de ventas propias sigue usando solo ejecutivos.</small></span></label>
     <h4>Calidad por variable del módulo</h4>${factors}
     <h4>Bono adicional por sobrecumplimiento (único, no acumulable)</h4><p class="settings-help">Modifica los porcentajes requeridos y los montos de cada tramo. Se paga únicamente el bono del umbral más alto alcanzado, nunca la suma de varios.</p>${bonuses}
     <h4>Penalización de Plan Cero</h4><div class="sup-setting-grid">
@@ -1938,6 +1943,7 @@ function initSupervisorCalculator(){
     }
     if(invalid){el('supSettingsStatus').textContent=invalid;el('supSettingsStatus').style.color='#b33939';return;}
     next.ownP0UseModule=editor.querySelector('[data-sup-p0-basis="module"]')?.checked===true;
+    next.includeSupervisorSales=editor.querySelector('[data-sup-include-sales]')?.checked===true;
     supSettings=normalizeSupervisorCommission(next);saveSupervisorCalculatorSettings();
     el('supSettingsStatus').textContent='Configuración guardada localmente'+(isAuthorized()?' · sincronización en cola.':'. Inicia sesión para sincronizarla.');
     el('supSettingsStatus').style.color='';
@@ -2212,7 +2218,7 @@ el('teamTable').addEventListener('click',e=>{
   el('export').addEventListener('click',()=>{
     if(activePage==='supervisor'){
       const c=supervisorCalculator();if(!c.ready){alert(c.reason);return;}
-      const lines=[['CALCULADORA DE SUPERVISOR','Valor'],['Supervisor',c.selected.name],['Módulo',c.selected.module],['Semana',weekLabel(supView.week)],['Objetivo de ventas',c.goal],['Ventas válidas del equipo',c.teamValid.length],['Cumplimiento %',c.completion],['Calidad total %',c.q.composite],['Alcance global %',c.q.global],['Bono base',supSettings.baseBonus??'Sin configurar'],['Cálculo base',c.base],...c.additional.map(b=>['Bono '+b.threshold+'%',b.configured?b.earned:'Sin configurar']),['Penalización Plan Cero módulo %',c.modulePenalty],['Descuento Plan Cero módulo',c.incentiveDiscount],['Bono neto módulo',c.incentiveNet],['Ventas propias brutas',c.ownGross],['Penalización Plan Cero propias %',c.ownP0Penalty],['Penalización incidencias propias %',c.ownIncPenalty],['Ventas propias netas',c.ownNet],['TOTAL ESTIMADO',c.total],[],['CALIDAD','Alcance %','Calidad %'],...SUP_FACTOR_KEYS.map(k=>[SUP_FACTOR_LABELS[k],c.q.actual[k],c.q.factors[k]]),[],['PAGO POR CONCEPTO','Cantidad','Tarifa','Total'],...c.parts.map(x=>[x.name,x.count,x.rate,x.total])];
+      const lines=[['CALCULADORA DE SUPERVISOR','Valor'],['Supervisor',c.selected.name],['Módulo',c.selected.module],['Semana',weekLabel(supView.week)],['Objetivo de ventas',c.goal],['Ventas válidas del equipo',c.teamValid.length],['Ventas de supervisores incluidas',c.supervisorValid.length],['Cumplimiento %',c.completion],['Calidad total %',c.q.composite],['Alcance global %',c.q.global],['Bono base',supSettings.baseBonus??'Sin configurar'],['Cálculo base',c.base],...c.additional.map(b=>['Bono '+b.threshold+'%',b.configured?b.earned:'Sin configurar']),['Penalización Plan Cero módulo %',c.modulePenalty],['Descuento Plan Cero módulo',c.incentiveDiscount],['Bono neto módulo',c.incentiveNet],['Ventas propias brutas',c.ownGross],['Penalización Plan Cero propias %',c.ownP0Penalty],['Penalización incidencias propias %',c.ownIncPenalty],['Ventas propias netas',c.ownNet],['TOTAL ESTIMADO',c.total],[],['CALIDAD','Alcance %','Calidad %'],...SUP_FACTOR_KEYS.map(k=>[SUP_FACTOR_LABELS[k],c.q.actual[k],c.q.factors[k]]),[],['PAGO POR CONCEPTO','Cantidad','Tarifa','Total'],...c.parts.map(x=>[x.name,x.count,x.rate,x.total])];
       for(const [title,rows] of [['FOLIOS DE EJECUTIVOS',c.src.team],['FOLIOS DE SUPERVISOR',c.src.own]]){
         lines.push([], [title,'Fecha','Ejecutivo','Folio','Código','P0','Dental','APP','Incidencia']);
         for(const r of [...rows].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.i-a.i))lines.push(['',r.fecha,r.executive,r.folio,r.code,r.p0,r.dental,appEnabled(r)?'Sí':'No',selectedIncident(r)?'Sí':'No']);
@@ -2669,7 +2675,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
       const factors=SUP_FACTOR_KEYS.map(k=>[SUP_FACTOR_LABELS[k],supText(c.q.actual[k]),supText(c.q.factors[k])]);
       factors.push(['Calidad total',supText(c.q.composite),supText(c.q.global)]);
       if(supPrintEnabled('team'))sections.push(`<section class="report-section" data-report-section="sup-quality"><h2>Calidad del equipo</h2>${tab(['Factor','Alcance','Calidad'],factors)}</section>`);
-      const bonus=[['Objetivo del equipo',`${number.format(c.goal)} ventas`],['Ventas pagables del equipo',c.teamValid.length],['Cumplimiento del módulo',supText(c.completion)],['Escalón aplicable',c.tier?pct(c.tier.min)+' o más':'Sin escalón'],['Calidad total',supText(c.q.composite)],['Alcance global',supText(c.q.global)],['Bono base',c.bonusConfigured?mx(supSettings.baseBonus):'Pendiente de configurar'],['Cálculo base',mx(c.base)],...c.additional.map(b=>['Bono por '+pct(b.threshold),b.configured?mx(b.earned):'Pendiente de configurar']),['Subtotal',mx(c.incentiveBefore)],['Plan Cero módulo',supText(c.moduleP0Reach)],['Descuento P0 módulo ('+pct(c.modulePenalty)+')','−'+mx(c.incentiveDiscount)],['Bono neto módulo',mx(c.incentiveNet)]];
+      const bonus=[['Objetivo del equipo',`${number.format(c.goal)} ventas`],['Ventas pagables del equipo',c.teamValid.length],['Ventas de supervisores incluidas',c.supervisorValid.length],['Cumplimiento del módulo',supText(c.completion)],['Escalón aplicable',c.tier?pct(c.tier.min)+' o más':'Sin escalón'],['Calidad total',supText(c.q.composite)],['Alcance global',supText(c.q.global)],['Bono base',c.bonusConfigured?mx(supSettings.baseBonus):'Pendiente de configurar'],['Cálculo base',mx(c.base)],...c.additional.map(b=>['Bono por '+pct(b.threshold),b.configured?mx(b.earned):'Pendiente de configurar']),['Subtotal',mx(c.incentiveBefore)],['Plan Cero módulo',supText(c.moduleP0Reach)],['Descuento P0 módulo ('+pct(c.modulePenalty)+')','−'+mx(c.incentiveDiscount)],['Bono neto módulo',mx(c.incentiveNet)]];
       if(supPrintEnabled('bonus'))sections.push(`<section class="report-section" data-report-section="sup-bonus"><h2>Bono por resultados del módulo</h2>${tab(['Concepto','Resultado'],bonus)}</section>`);
       const own=[...c.parts.map(x=>[x.name,`${x.count} × ${mx(x.rate)}`,mx(x.total)]),['Subtotal ventas propias','',mx(c.ownGross)],['Incidencias propias',c.ownInc,''],['Base para penalización P0',c.ownP0Basis,''],['Plan Cero evaluado / requerido',supText(c.ownP0ComparedReach)+' / '+pct(c.ownP0ComparedThreshold),''],['Descuento Plan Cero ('+pct(c.ownP0Penalty)+')','','−'+mx(c.ownP0Discount)],['Descuento incidencias ('+pct(c.ownIncPenalty)+')','','−'+mx(c.ownIncDiscount)],['Neto ventas propias','',mx(c.ownNet)],['TOTAL SUPERVISOR','',mx(c.total)]];
       if(supPrintEnabled('own'))sections.push(`<section class="report-section" data-report-section="sup-own"><h2>Ventas propias del supervisor</h2>${tab(['Concepto','Cantidad × tarifa','Pago'],own)}</section>`);
