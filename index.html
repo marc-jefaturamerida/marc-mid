@@ -699,6 +699,35 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 @media(max-width:760px){.sup-detail-grid{grid-template-columns:1fr;gap:10px}.sup-panel .sup-metrics{font-size:11px}.sup-panel .sup-metrics th,.sup-panel .sup-metrics td{padding:7px 6px}.sup-panel .sup-fold-body{padding:12px}.sup-fold>summary{font-size:13px}.sup-records .sup-block .sup-fold-actions small{max-width:80px;overflow:hidden;text-overflow:ellipsis}}
 @media(max-width:380px){.sup-print-toggle{font-size:9px;padding:3px 4px}.sup-fold>summary{font-size:11px;padding:9px 7px}}
 
+
+/* V2.4.2 · Las tablas del resumen no heredan el mínimo global de 640 px. */
+#supPage .sup-detail-grid{min-width:0;width:100%;max-width:100%;}
+#supPage .sup-panel{min-width:0;max-width:100%;}
+#supPage .sup-panel .sup-fold-body{min-width:0;max-width:100%;overflow-x:auto;}
+#supPage .sup-panel .sup-metrics{width:100%;min-width:0!important;max-width:100%;table-layout:fixed;border-collapse:collapse;}
+#supPage .sup-panel .sup-metrics th,#supPage .sup-panel .sup-metrics td{min-width:0;padding:5px 3px;overflow-wrap:anywhere;word-break:normal;white-space:normal;letter-spacing:0;line-height:1.32;}
+#supPage .sup-panel .sup-metrics th:first-child,#supPage .sup-panel .sup-metrics td:first-child{text-align:left;width:auto;}
+#supPage .sup-panel .sup-metrics th:not(:first-child),#supPage .sup-panel .sup-metrics td:not(:first-child){text-align:right;width:auto;}
+#supPage .sup-panel .sup-metrics:not(:has(thead)) th:first-child{width:67%;}
+#supPage .sup-panel .sup-metrics:not(:has(thead)) td:last-child{width:33%;}
+#supPage .sup-panel .sup-metrics:has(thead) th:first-child{width:46%;}
+#supPage .sup-panel .sup-metrics:has(thead) th:not(:first-child){width:27%;}
+#supPage .sup-panel .sup-metrics:has(thead) td:first-child{width:46%;}
+#supPage .sup-panel .sup-metrics:has(thead) td:not(:first-child){width:27%;}
+#supPage .sup-panel .sup-metrics td{font-variant-numeric:tabular-nums;}
+#supPage .sup-panel .sup-facts{max-width:100%;}
+#supPage .sup-table-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;}
+#supPage .sup-record-table{min-width:840px;width:max-content;max-width:none;}
+#supPage .sup-record-table th,#supPage .sup-record-table td{padding:5px 6px;letter-spacing:0;font-size:10px;}
+#supPage .sup-record-table input[type=checkbox]{width:16px;height:16px;}
+.sup-checkbox-setting{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--line);border-radius:9px;padding:12px;margin:10px 0 16px;background:var(--blue-soft);color:var(--ink);}
+.sup-checkbox-setting input{flex:none;width:20px;height:20px;margin:1px 0 0;accent-color:var(--blue);}
+.sup-checkbox-setting span{display:grid;gap:4px;}
+.sup-checkbox-setting b{font-size:12px;}
+.sup-checkbox-setting small{font-weight:400;color:var(--sub);font-size:11px;line-height:1.4;}
+@media(max-width:850px){#supPage .sup-detail-grid{grid-template-columns:1fr;}#supPage .sup-panel .sup-metrics th,#supPage .sup-panel .sup-metrics td{padding:5px 5px;font-size:10.5px;}}
+@media(max-width:370px){#supPage .sup-panel .sup-metrics th,#supPage .sup-panel .sup-metrics td{padding:4px 3px;font-size:10px;}}
+
 @media print{#supPage{display:none!important}}
 </style>
 </head>
@@ -1058,7 +1087,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="all-records-help">Las columnas se muestran según <strong>Ajustes → Tabla de folios</strong>. Incidencia y APP permanecen a la vista para validarlas. Desliza horizontalmente para ver más columnas.</div>
   <div class="table-wrap all-records-table-wrap"><table id="allRecordsTable" class="record-table all-records-table"><thead id="allRecordsHead"></thead><tbody id="allRecordsBody"><tr><td>Importa un XLS para mostrar registros.</td></tr></tbody></table></div>
   <div class="all-records-pagination"><span id="allRecordsPageStatus">0 registros</span><div class="all-records-page-actions"><label for="allRecordsPageSize">Filas por página</label><select id="allRecordsPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" type="button" id="allRecordsPrev">Anterior</button><button class="btn small" type="button" id="allRecordsNext">Siguiente</button></div></div>
-  <footer class="foot">Consulta de registros XLS · Versión 2.4.1</footer>
+  <footer class="foot">Consulta de registros XLS · Versión 2.4.2</footer>
 </section>
 
 
@@ -1084,7 +1113,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
     </div></details>
   </div>
   <p class="sup-footnote">Cálculo informativo. Los importes de bono base y bonos adicionales permanecen sin configurar hasta que se indiquen en Ajustes → 12. Solo se transmiten cambios a Netlify al guardar ajustes o validaciones de folios; consultar semanas y supervisores es local.</p>
-  <footer class="foot">Calculadora de supervisor · Versión 2.4.1</footer>
+  <footer class="foot">Calculadora de supervisor · Versión 2.4.2</footer>
 </section>
 <section id="achievementsPage" class="achievements-page" hidden aria-label="Logros semanales por módulo">
   <div class="achievements-hero">
@@ -1157,7 +1186,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
       <div class="achievements-pager"><span id="achRecordStatus">0 registros</span><div class="achievements-pager-options"><label for="achPageSize">Filas</label><select id="achPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" id="achPrev" type="button">Anterior</button><button class="btn small" id="achNext" type="button">Siguiente</button></div></div>
     </div>
   </details>
-  <footer class="foot">Logros semanales · Versión 2.4.1</footer>
+  <footer class="foot">Logros semanales · Versión 2.4.2</footer>
 </section>
 
 <section id="visitPage" class="visit-page" hidden aria-label="Acuse de visita de coordinación">
@@ -1165,14 +1194,14 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 2.4.1</footer>
+  <footer class="foot">Acuse de coordinación · Versión 2.4.2</footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 2.4.1</footer>
+<footer class="foot">Final de la presentacion · Versión 2.4.2</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 

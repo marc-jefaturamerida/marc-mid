@@ -864,6 +864,14 @@ function qualityMetricFactor(actual,target,{minimum=0,maximum=null}={}){
   if(normalized<minimum)return 0;
   return maximum===null?normalized:Math.min(maximum,normalized);
 }
+// V2.4.3: cuatro calidades, Calidad Total topada y Alcance Global sin tope.
+const GLOBAL_FOUR_FACTORS=['completion','purchase','p0','app'];
+function correctedGlobalQuality(factors){
+  const values=GLOBAL_FOUR_FACTORS.map(k=>factors[k]);
+  if(!values.every(Number.isFinite))return {composite:null,global:null};
+  const composite=Math.min(100,values.reduce((sum,v)=>sum+v,0)/4);
+  return {composite,global:(values.reduce((sum,v)=>sum+v,0)+composite)/5};
+}
 function qualityPercentText(value){return Number.isFinite(value)?pct(value):'—';}
 function countQualityRows(rows){
   const salesRows=rows.filter(r=>hasCode(r));
@@ -906,15 +914,13 @@ function qualityResult(rows,groupBy,name,granularity='weekly',goalOverride=null)
   const factors={};let weighted=0,weightTotal=0;
   for(const key of QUALITY_FACTORS){
     const rule=qualityRule(key,name,groupBy);
-    const value=qualityMetricFactor(actual[key],rule.required,{minimum:rule.minimum,maximum:rule.maximum})??0;
-    factors[key]=value;
+    const value=qualityMetricFactor(actual[key],rule.required,{minimum:rule.minimum,maximum:(key==='completion'||key==='p0'?null:rule.maximum)})??0;
+    factors[key]=key==='purchase'||key==='app'?Math.min(100,value):value;
     const weight=groupBy==='module'?(moduleQualityOptions(name).weights?.[key]??qualityConfig.weights[key]):qualityConfig.weights[key];
     weighted+=value*weight;weightTotal+=weight;
   }
-  const composite=weightTotal>0?weighted/weightTotal:null;
-  const finalRule=qualityRule('quality',name,groupBy);
-  const global=composite===null?null:qualityMetricFactor(composite,finalRule.required,{minimum:finalRule.minimum,maximum:finalRule.maximum});
-  factors.quality=global;actual.quality=composite;
+  const {composite,global}=correctedGlobalQuality(factors);
+  factors.quality=composite;actual.quality=composite;
   return {goal,actual,factors,composite,global,counters};
 }
 
@@ -982,7 +988,7 @@ function achPrintFilters(){
 }
 function achTargetQuality(alcancePct,requeridoPct,key,module){
   const rule=qualityRule(key,module,'module');
-  return requeridoPct?qualityMetricFactor(alcancePct,requeridoPct,{minimum:rule.minimum,maximum:rule.maximum}):null;
+  return requeridoPct?qualityMetricFactor(alcancePct,requeridoPct,{minimum:rule.minimum,maximum:(key==='completion'||key==='p0'?null:rule.maximum)}):null;
 }
 
 const ACH_ADDITIONAL=['achExec','achPayment','achIncident','achApp','achCode','achGuarantee','achP0','achDental'];
@@ -1028,15 +1034,14 @@ function achData(){
   for(const key of QUALITY_FACTORS){
     const required=goals[key==='completion'?'sales':key];
     const value=achTargetQuality(alcances[key],key==='completion'?100:required,key,module);
-    factors[key]=value;
+    factors[key]=value===null?null:(key==='purchase'||key==='app'?Math.min(100,value):value);
     if(value===null){complete=false;continue;}
     const w=module?(moduleQualityOptions(module).weights?.[key]??qualityConfig.weights[key]):qualityConfig.weights[key];
     weighted+=value*w;weightTotal+=w;
   }
-  const composite=complete&&weightTotal>0?weighted/weightTotal:null;
+  const {composite,global}=correctedGlobalQuality(factors);
   const qualityRequirement=qualityRule('quality',module,'module');
-  const globalReach=composite===null||!(qualityRequirement.required>0)?null:100*composite/qualityRequirement.required;
-  const global=composite===null?null:qualityMetricFactor(composite,qualityRequirement.required,{minimum:qualityRequirement.minimum,maximum:qualityRequirement.maximum});
+  const globalReach=global;
   // 'Alcance' es siempre el porcentaje grande; el resultado sujeto a mínimos y
   // máximos configurables se expone abajo como 'Calidad' en cada tarjeta.
   const factorIndicator=(name,key)=>({name,reach:alcances[key],quality:factors[key],
@@ -1048,7 +1053,7 @@ function achData(){
     factorIndicator('Plan Cero','p0'),
     factorIndicator('Activación APP','app'),
     factorIndicator('Primera compra','purchase'),
-    {name:'Calidad',reach:composite,quality:global,required:qualityRequirement.required},
+    {name:'Calidad',reach:composite,quality:composite,required:qualityRequirement.required},
     {name:'Alcance global',reach:globalReach,quality:global,required:qualityRequirement.required,global:true}
   ];
   const counts=[
@@ -1584,7 +1589,7 @@ el('weeklyPage').addEventListener('change',event=>{
   renderWeekly();
 });
 
-// V2.4.1 · Calculadora de comisiones para supervisores.
+// V2.4.2 · Calculadora de comisiones para supervisores.
 // Separa el incentivo por el equipo de las comisiones de ventas propias.
 // NO hay solicitudes remotas durante la navegación o el cálculo.
 const SUP_COMMISSION_KEY='wmSamsMeridaSupervisorCommissionV24';
@@ -1594,10 +1599,10 @@ const SUP_BASE_RULES={
   baseBonus:null,goals:{},
   required:{completion:100,purchase:90,p0:30,app:90,quality:90},
   minimum:{completion:0,purchase:0,p0:0,app:0,quality:0},
-  maximum:{completion:null,purchase:100,p0:null,app:100,quality:100},
+  maximum:{completion:null,purchase:100,p0:null,app:100,quality:null},
   weights:{completion:25,purchase:25,p0:25,app:25},
-  additional:[{threshold:110,amount:null},{threshold:115,amount:null},{threshold:120,amount:null}],
-  moduleP0Threshold:30,moduleP0Penalty:15,ownP0Threshold:30,ownP0Penalty:15,
+  additional:[{threshold:110,amount:1000},{threshold:115,amount:1500},{threshold:120,amount:2000}],
+  moduleP0Threshold:30,moduleP0Penalty:15,ownP0Threshold:30,ownP0Penalty:15,ownP0UseModule:false,
   incidencePenalties:[0,0,10,20,30],
   tiers:DEFAULT_TIER.map(t=>({min:t.min,sale:t.sale,dental:t.dental,app:t.app,p0:t.p0}))
 };
@@ -1624,13 +1629,19 @@ function normalizeSupervisorCommission(saved){
       if(n!==null)out[group][k]=n;
     }
   }
+  // La calidad global del supervisor nunca tiene tope superior, incluso si una configuración anterior lo guardó en 100%.
+  out.maximum.quality=null;
+  if(typeof saved.ownP0UseModule==='boolean')out.ownP0UseModule=saved.ownP0UseModule;
   for(const key of ['moduleP0Threshold','moduleP0Penalty','ownP0Threshold','ownP0Penalty']){
     const n=supNumber(saved[key]);if(n!==null)out[key]=n;
   }
+  // Mantener los tramos editables guardados por el usuario; los valores iniciales son solo predeterminados.
   if(Array.isArray(saved.additional))out.additional=out.additional.map((row,i)=>{
-    const src=saved.additional[i]||{};
-    const threshold=supNumber(src.threshold,{positive:true});const amount=supNumber(src.amount,{nullable:true});
-    return {threshold:threshold??row.threshold,amount:amount===null?null:amount};
+    const entry=saved.additional[i];
+    if(!entry||typeof entry!=='object')return row;
+    const threshold=supNumber(entry.threshold,{positive:true});
+    const amount=supNumber(entry.amount);
+    return {threshold:threshold===null?row.threshold:threshold,amount:amount===null?row.amount:amount};
   });
   if(Array.isArray(saved.incidencePenalties))for(let i=1;i<=4;i++){
     const n=supNumber(saved.incidencePenalties[i]);if(n!==null)out.incidencePenalties[i]=n;
@@ -1719,14 +1730,12 @@ function supervisorQuality(validRows,goal){
   for(const k of SUP_FACTOR_KEYS){
     const raw=actual[k];
     const quality=raw===null?null:qualityMetricFactor(raw,supSettings.required[k],{
-      minimum:supSettings.minimum[k],maximum:supSettings.maximum[k]});
-    factors[k]=quality;
+      minimum:supSettings.minimum[k],maximum:(k==='completion'||k==='p0'?null:supSettings.maximum[k])});
+    factors[k]=quality===null?null:(k==='purchase'||k==='app'?Math.min(100,quality):quality);
     const weight=supSettings.weights[k];
     if(Number.isFinite(quality)&&weight>0){numerator+=quality*weight;denominator+=weight;}
   }
-  const composite=denominator?numerator/denominator:null;
-  const global=composite===null?null:qualityMetricFactor(composite,supSettings.required.quality,{
-    minimum:supSettings.minimum.quality,maximum:supSettings.maximum.quality});
+  const {composite,global}=correctedGlobalQuality(factors);
   return {actual,factors,composite,global,base};
 }
 function supTier(teamCompletion){return [...supSettings.tiers].sort((a,b)=>b.min-a.min).find(t=>teamCompletion>=t.min)||null;}
@@ -1742,8 +1751,10 @@ function supervisorCalculator(){
   const tier=completion===null?null:supTier(completion);
   const bonusConfigured=supSettings.baseBonus!==null;
   const base=bonusConfigured&&completion!==null&&q.global!==null?round(supSettings.baseBonus*(completion/100)*(q.global/100)):0;
-  const additional=supSettings.additional.map(t=>({threshold:t.threshold,amount:t.amount||0,configured:t.amount!==null,earned:completion!==null&&completion>=t.threshold?round(t.amount||0):0}));
-  const extras=round(additional.reduce((s,b)=>s+b.earned,0));
+  // Un solo bono: se selecciona exclusivamente el tramo más alto alcanzado.
+  const earnedTier=completion===null?null:[...supSettings.additional].filter(t=>completion>=t.threshold).sort((a,b)=>b.threshold-a.threshold)[0]||null;
+  const additional=supSettings.additional.map(t=>({threshold:t.threshold,amount:t.amount,configured:true,earned:earnedTier?.threshold===t.threshold?round(t.amount):0}));
+  const extras=earnedTier?round(earnedTier.amount):0;
   const moduleP0Reach=teamReg.length?100*teamP0.length/teamReg.length:null;
   const modulePenalty=teamReg.length&&moduleP0Reach<supSettings.moduleP0Threshold?supSettings.moduleP0Penalty:0;
   const incentiveBefore=round(base+extras);
@@ -1764,9 +1775,15 @@ function supervisorCalculator(){
   ];
   const ownGross=round(parts.reduce((s,p)=>s+p.total,0));
   const ownP0Reach=ownReg.length?100*ownP0.length/ownReg.length:null;
-  // Las ventas propias tienen penalización P0 INDEPENDIENTE del bono del módulo.
-  // 0 ventas regulares => no existe denominador aplicable y no se penaliza.
-  const ownP0BelowTarget=ownReg.length>0&&ownP0Reach<supSettings.ownP0Threshold;
+  // La penalización sobre comisiones propias elige una sola base: módulo sin supervisores
+  // O ventas propias válidas. El descuento del bono del módulo conserva su propia regla.
+  const ownP0UseModule=supSettings.ownP0UseModule===true;
+  const ownP0Basis=ownP0UseModule?'Módulo sin supervisores':'Ventas propias del supervisor';
+  const ownP0ComparedReach=ownP0UseModule?moduleP0Reach:ownP0Reach;
+  const ownP0ComparedThreshold=ownP0UseModule?supSettings.moduleP0Threshold:supSettings.ownP0Threshold;
+  const ownP0HasRegular=ownP0UseModule?teamReg.length>0:ownReg.length>0;
+  // Sin ventas regulares en la base elegida no existe denominador; se evita la penalización.
+  const ownP0BelowTarget=ownP0HasRegular&&ownP0ComparedReach<ownP0ComparedThreshold;
   const ownP0Penalty=ownP0BelowTarget?supSettings.ownP0Penalty:0;
   const ownIncPenalty=supIncidentRate(ownInc);
   const ownP0Discount=round(ownGross*ownP0Penalty/100);
@@ -1774,7 +1791,7 @@ function supervisorCalculator(){
   const ownNet=round(ownGross-ownP0Discount-ownIncDiscount);
   return {ready:true,selected,goal,src,teamValid,teamReg,teamP0,completion,q,tier,
     bonusConfigured,base,additional,extras,moduleP0Reach,modulePenalty,incentiveBefore,incentiveDiscount,incentiveNet,
-    ownValid,ownReg,ownDental,ownApp,ownP0,ownInc,parts,ownGross,ownP0Reach,ownP0BelowTarget,ownP0Penalty,ownIncPenalty,ownP0Discount,ownIncDiscount,ownNet,
+    ownValid,ownReg,ownDental,ownApp,ownP0,ownInc,parts,ownGross,ownP0Reach,ownP0UseModule,ownP0Basis,ownP0ComparedReach,ownP0ComparedThreshold,ownP0HasRegular,ownP0BelowTarget,ownP0Penalty,ownIncPenalty,ownP0Discount,ownIncDiscount,ownNet,
     total:round(incentiveNet+ownNet)};
 }
 function supText(v){return Number.isFinite(v)?pct(v):'—';}
@@ -1787,7 +1804,7 @@ function supDetailCards(c){
   const partsRows=c.parts.map(p=>`<tr><th>${p.name}</th><td>${number.format(p.count)} × ${mx(p.rate)}</td><td>${mx(p.total)}</td></tr>`).join('');
   return `<details class="sup-fold sup-overview" data-sup-fold="overview" ${supFoldOpen('overview')?'open':''}>${supFoldHeading('Resumen de comisiones','overview')}<div class="sup-fold-body"><div class="sup-top-summary">
       <div class="sup-big-card"><small>Comisión total estimada</small><strong>${mx(c.total)}</strong><span>${esc(c.selected.name)} · ${esc(c.selected.module)}</span></div>
-      <div class="sup-big-card"><small>Bono por módulo</small><strong>${mx(c.incentiveNet)}</strong><span>Base + adicionales − descuento P0</span></div>
+      <div class="sup-big-card"><small>Bono por módulo</small><strong>${mx(c.incentiveNet)}</strong><span>Base + bono único − descuento P0</span></div>
       <div class="sup-big-card"><small>Ventas propias</small><strong>${mx(c.ownNet)}</strong><span>Tarifas del escalón sin ventas de supervisores</span></div>
     </div></div></details>
     <div class="sup-detail-grid">
@@ -1801,17 +1818,18 @@ function supDetailCards(c){
       <details class="sup-panel sup-fold" data-sup-fold="bonus" ${supFoldOpen('bonus')?'open':''}>${supFoldHeading('Desglose del bono del módulo','bonus')}<div class="sup-fold-body"><div class="sup-formula">Bono base × ${supText(c.completion)} × ${supText(c.q.global)}</div>
         <table class="sup-metrics"><tbody><tr><th>Bono base ${!c.bonusConfigured?'(sin configurar)':''}</th><td>${c.bonusConfigured?mx(supSettings.baseBonus):'—'}</td></tr>
         <tr><th>Cálculo base</th><td>${mx(c.base)}</td></tr>${bonusRows}
-        <tr><th>Base + bonos adicionales</th><td>${mx(c.incentiveBefore)}</td></tr>
+        <tr><th>Base + bono adicional</th><td>${mx(c.incentiveBefore)}</td></tr>
         <tr><th>Descuento P0 módulo (${pct(c.modulePenalty)})</th><td>−${mx(c.incentiveDiscount)}</td></tr>
         <tr class="sup-table-emphasis"><th>Bono neto módulo</th><td>${mx(c.incentiveNet)}</td></tr></tbody></table></div></details>
       <details class="sup-panel sup-fold" data-sup-fold="own" ${supFoldOpen('own')?'open':''}>${supFoldHeading('Ventas propias del supervisor','own')}<div class="sup-fold-body"><div class="sup-facts">
         <span>Registros propios: <b>${c.src.own.length}</b></span><span>Ventas pagables: <b>${c.ownValid.length}</b></span>
         <span>Incidencias propias: <b>${c.ownInc}</b></span><span>Plan Cero propio: <b>${supText(c.ownP0Reach)}</b></span>
-        <span>Requerido P0 propio: <b>${pct(supSettings.ownP0Threshold)}</b></span>
-        <span>${!c.ownReg.length?'Sin regulares: penalización P0 no aplicable':c.ownP0BelowTarget?'P0 por debajo del requerido: se aplica penalización':'Objetivo P0 alcanzado: sin penalización'}</span>
+        <span>Base P0 para penalización: <b>${esc(c.ownP0Basis)}</b></span>
+        <span>P0 evaluado: <b>${supText(c.ownP0ComparedReach)}</b> / requerido <b>${pct(c.ownP0ComparedThreshold)}</b></span>
+        <span>${!c.ownP0HasRegular?'Sin ventas regulares en la base elegida: no aplica penalización':c.ownP0BelowTarget?'P0 debajo del requerido: se aplica penalización':'Objetivo P0 alcanzado: sin penalización'}</span>
       </div><table class="sup-metrics"><thead><tr><th>Concepto</th><th>Cantidad × tarifa</th><th>Total</th></tr></thead><tbody>${partsRows}</tbody></table>
       <table class="sup-metrics"><tbody><tr><th>Subtotal ventas propias</th><td>${mx(c.ownGross)}</td></tr>
-      <tr><th>Descuento P0 (${pct(c.ownP0Penalty)}) · requerido ${pct(supSettings.ownP0Threshold)}</th><td>−${mx(c.ownP0Discount)}</td></tr>
+      <tr><th>Descuento P0 (${pct(c.ownP0Penalty)}) · ${esc(c.ownP0Basis)}</th><td>−${mx(c.ownP0Discount)}</td></tr>
       <tr><th>Descuento incidencias (${pct(c.ownIncPenalty)})</th><td>−${mx(c.ownIncDiscount)}</td></tr>
       <tr class="sup-table-emphasis"><th>Ventas propias netas</th><td>${mx(c.ownNet)}</td></tr></tbody></table>
       <p class="sup-muted">Los folios marcados con incidencia y los de estatus no pagable se descuentan por completo antes de aplicar estos porcentajes. Las ventas propias no generan un segundo bono semanal por escalón.</p></div></details>
@@ -1851,22 +1869,24 @@ function renderSupervisorCalculator(){
 function supervisorFactorSettingsHtml(){
   const num=(label,key,group,value,opts='')=>`<label class="sup-setting-field">${label}<input type="number" inputmode="decimal" step="0.01" min="0" max="1000000" data-sup-group="${group}" data-sup-key="${key}" value="${value??''}" ${opts}></label>`;
   const cols=[...SUP_FACTOR_KEYS,'quality'];
-  const factors=cols.map(k=>`<div class="sup-factor-setting"><b>${SUP_FACTOR_LABELS[k]}</b><div class="sup-setting-grid">${num('Requerido (%)',k,'required',supSettings.required[k])}${num('Mínimo de calidad (%)',k,'minimum',supSettings.minimum[k])}${num('Máximo de calidad (%)',k,'maximum',supSettings.maximum[k],'placeholder="Vacío = sin tope"')}${k==='quality'?'':num('Ponderación',k,'weights',supSettings.weights[k])}</div></div>`).join('');
+  const factors=cols.map(k=>`<div class="sup-factor-setting"><b>${SUP_FACTOR_LABELS[k]}</b><div class="sup-setting-grid">${num('Requerido (%)',k,'required',supSettings.required[k])}${num('Mínimo de calidad (%)',k,'minimum',supSettings.minimum[k])}${k==='quality'?'<p class="settings-help">Sin límite máximo: el alcance global puede superar el 100%.</p>':num('Máximo de calidad (%)',k,'maximum',supSettings.maximum[k],'placeholder="Vacío = sin tope"')}${k==='quality'?'':num('Ponderación',k,'weights',supSettings.weights[k])}</div></div>`).join('');
   const bonuses=supSettings.additional.map((x,i)=>`<div class="sup-setting-grid">${num('Cumplimiento requerido (%)',i,'additional-threshold',x.threshold)}${num('Bono adicional ($)',i,'additional-amount',x.amount,'placeholder="Importe por definir"')}</div>`).join('');
   const tiers=supSettings.tiers.map((t,i)=>`<tr><th>${i+1}</th>${['min','sale','dental','app','p0'].map(k=>`<td><input type="number" min="0" step="0.01" data-sup-tier="${i}" data-sup-tier-key="${k}" value="${t[k]}"></td>`).join('')}</tr>`).join('');
   const modules=[...new Set([...Object.keys(supervisorConfig),...Object.keys(qualityConfig.modules),(imported.data?.rows||[]).map(r=>r.module).filter(Boolean)].flat().filter(Boolean))].sort();
-  return `<p class="settings-help">Las cifras no definidas en tu instrucción (bono base y montos de los bonos de 110/115/120%) quedan sin importe hasta que las configures. Bonos adicionales acumulables; no se incluye el bono semanal de los ejecutivos dentro de las ventas propias.</p>
+  return `<p class="settings-help">El bono base, los porcentajes y los importes por sobrecumplimiento son editables. El bono adicional es único, no acumulable: solo se paga el tramo más alto alcanzado. No se incluye el bono semanal de los ejecutivos dentro de las ventas propias.</p>
     ${num('Bono base del supervisor (MXN)','baseBonus','root',supSettings.baseBonus,'placeholder="Sin configurar"')}
     <h4>Objetivos semanales de ventas por módulo</h4><p class="settings-help">Si no ingresas una meta aquí, utiliza la meta semanal del módulo de Ajustes → 10. Si tampoco existe, suma las metas individuales de los ejecutivos del equipo.</p>
     <div class="sup-setting-grid">${modules.map(m=>num(esc(m)+' · ventas',m,'goals',supSettings.goals[m]??'','placeholder="Heredar objetivo"')).join('')||'<span>Importa XLS para identificar módulos.</span>'}</div>
     <h4>Calidad por variable del módulo</h4>${factors}
-    <h4>Bonos adicionales (acumulables)</h4>${bonuses}
+    <h4>Bono adicional por sobrecumplimiento (único, no acumulable)</h4><p class="settings-help">Modifica los porcentajes requeridos y los montos de cada tramo. Se paga únicamente el bono del umbral más alto alcanzado, nunca la suma de varios.</p>${bonuses}
     <h4>Penalización de Plan Cero</h4><div class="sup-setting-grid">
       ${num('Módulo · mínimo P0 (%)','moduleP0Threshold','root',supSettings.moduleP0Threshold)}
       ${num('Módulo · descuento (%)','moduleP0Penalty','root',supSettings.moduleP0Penalty)}
       ${num('Ventas propias · mínimo P0 (%)','ownP0Threshold','root',supSettings.ownP0Threshold)}
       ${num('Ventas propias · descuento (%)','ownP0Penalty','root',supSettings.ownP0Penalty)}
-    </div><h4>Penalización por incidencias propias</h4><div class="sup-setting-grid">${[1,2,3,4].map(i=>num(i===4?'4 o más incidencias (%)':i+' incidencia(s) (%)',i,'incidence',supSettings.incidencePenalties[i])).join('')}</div>
+    </div>
+    <label class="sup-checkbox-setting"><input type="checkbox" data-sup-p0-basis="module" ${supSettings.ownP0UseModule?'checked':''}><span><b>Usar el Plan Cero del módulo para penalizar las ventas propias</b><small>Marcado: compara el Plan Cero de ventas regulares válidas de ejecutivos, sin supervisores, con el mínimo P0 del módulo. Desmarcado: utiliza solo las ventas regulares propias y su mínimo P0. En ambos casos se aplica el descuento de «Ventas propias» configurado arriba.</small></span></label>
+    <h4>Penalización por incidencias propias</h4><div class="sup-setting-grid">${[1,2,3,4].map(i=>num(i===4?'4 o más incidencias (%)':i+' incidencia(s) (%)',i,'incidence',supSettings.incidencePenalties[i])).join('')}</div>
     <h4>Escalones para ventas propias del supervisor</h4><p class="settings-help">El escalón se determina exclusivamente con las ventas válidas de ejecutivos no supervisores del módulo. Estas tarifas son independientes de las de la página 1.</p>
     <div class="sup-table-wrap"><table class="sup-metrics"><thead><tr><th>Escalón</th><th>Desde (%)</th><th>Venta ($)</th><th>Dental ($)</th><th>APP ($)</th><th>P0 ($)</th></tr></thead><tbody>${tiers}</tbody></table></div>
     <div class="sup-setting-actions"><button class="btn primary small" type="button" id="supSaveSettings">Guardar configuración de supervisor</button><span id="supSettingsStatus" class="muted">Los cambios no se enviarán hasta pulsar Guardar.</span></div>`;
@@ -1917,6 +1937,7 @@ function initSupervisorCalculator(){
       next.tiers[Number(input.dataset.supTier)][input.dataset.supTierKey]=n;
     }
     if(invalid){el('supSettingsStatus').textContent=invalid;el('supSettingsStatus').style.color='#b33939';return;}
+    next.ownP0UseModule=editor.querySelector('[data-sup-p0-basis="module"]')?.checked===true;
     supSettings=normalizeSupervisorCommission(next);saveSupervisorCalculatorSettings();
     el('supSettingsStatus').textContent='Configuración guardada localmente'+(isAuthorized()?' · sincronización en cola.':'. Inicia sesión para sincronizarla.');
     el('supSettingsStatus').style.color='';
@@ -2426,7 +2447,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     team:{subtitle:'Comparativo de ejecutivos',description:'Comisiones simuladas: pueden existir variaciones respecto al monto final a pagar.',footer:'Cada fila corresponde a un ejecutivo. Compara su meta, ventas comisionables, nivel de cumplimiento y comisión estimada. Las incidencias y ajustes pueden modificar el importe final.'},
     daily:{subtitle:'Comparativa diaria',description:'Actividad operativa del XLS · Totales y variación entre fechas seleccionadas.',footer:'Cada cifra presenta el resultado del día principal y su variación frente al día comparado. Calidad es el promedio ponderado de Cumplimiento, Plan Cero, Plan Dental, APP y Primera compra con objetivos configurables; se puede excluir a supervisores desde el filtro superior.'},
     accumulated:{subtitle:'Acumulado general',description:'Resultados consolidados del historial XLS guardado.',footer:'Totales sobre todos los XLS históricos deduplicados. La Calidad utiliza las metas semanales configuradas acumuladas por las semanas con registros y los cinco factores y el porcentaje requerido de Calidad. Se puede excluir a supervisores desde el filtro superior.'},
-    weekly:{subtitle:'Comparativa semanal',description:'Objetivos, resultados y cumplimiento por semana completa de lunes a domingo.',footer:'OBJETIVOS define metas por semana; CUMPLIMIENTO = resultado / objetivo; CALIDAD DE FACTORES aplica el porcentaje requerido, mínimo y máximo configurados para cada factor; ALCANCE GLOBAL = calidad ponderada de Cumplimiento, Plan Cero, Plan Dental, APP y Primera compra. Los supervisores se incluyen según la casilla superior.'},
+    weekly:{subtitle:'Comparativa semanal',description:'Objetivos, resultados y cumplimiento por semana completa de lunes a domingo.',footer:'OBJETIVOS define metas por semana; CUMPLIMIENTO = resultado / objetivo; CALIDAD DE FACTORES aplica el porcentaje requerido, mínimo y máximo configurados para cada factor; ALCANCE GLOBAL = promedio de las cuatro calidades (Cumplimiento, Primera compra, Programa Cero y Activaciones) más Calidad Total, dividido entre cinco; sin tope. Los supervisores se incluyen según la casilla superior.'},
     allrecords:{subtitle:'Consulta de registros XLS',description:'Vista íntegra de los registros cargados, con filtros operativos combinados.',footer:'Se muestran las filas de los XLS activos que cumplen todos los filtros seleccionados. La columna Incidencia excluye pagos del folio; APP refleja la activación habilitada en el Dashboard. Filtrar no altera los cálculos.'},
     achievements:{subtitle:'Logros semanales',description:'Metas de registros y ventas en cantidades; planes, APP y primera compra en porcentajes requeridos.',footer:'Alcance real (número grande) = obtenido ÷ base u objetivo. Calidad (número pequeño) = alcance ÷ porcentaje requerido, con mínimos y máximos configurados. Todos los filtros de la tabla afectan los indicadores; los folios con incidencia se muestran, pero no cuentan para sus cálculos.'},
     supervisor:{subtitle:'Calculadora de supervisor',description:'Bono por resultados del módulo y comisiones por ventas propias del supervisor.',footer:'El escalón de ventas propias utiliza las ventas pagables del equipo sin supervisores. Las incidencias excluyen folios completos y afectan la penalización de ventas propias. Los importes de bono base y bonos adicionales deben configurarse expresamente en Ajustes → 12.'}
@@ -2452,7 +2473,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return `<div class="report-heading"><div><h1>${esc(content.title)}</h1><p class="report-subtitle">${esc(content.subtitle)}</p><p class="report-disclaimer">${esc(content.description)}</p><p class="report-meta">${meta}</p></div><div class="report-brand">${brand}</div></div>`;
   }
   function reportFootMarkup(page){
-    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 2.4.1</div></footer>`;
+    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 2.4.2</div></footer>`;
   }
   function initReportTextEditor(){
     loadReportTexts();
@@ -2650,7 +2671,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
       if(supPrintEnabled('team'))sections.push(`<section class="report-section" data-report-section="sup-quality"><h2>Calidad del equipo</h2>${tab(['Factor','Alcance','Calidad'],factors)}</section>`);
       const bonus=[['Objetivo del equipo',`${number.format(c.goal)} ventas`],['Ventas pagables del equipo',c.teamValid.length],['Cumplimiento del módulo',supText(c.completion)],['Escalón aplicable',c.tier?pct(c.tier.min)+' o más':'Sin escalón'],['Calidad total',supText(c.q.composite)],['Alcance global',supText(c.q.global)],['Bono base',c.bonusConfigured?mx(supSettings.baseBonus):'Pendiente de configurar'],['Cálculo base',mx(c.base)],...c.additional.map(b=>['Bono por '+pct(b.threshold),b.configured?mx(b.earned):'Pendiente de configurar']),['Subtotal',mx(c.incentiveBefore)],['Plan Cero módulo',supText(c.moduleP0Reach)],['Descuento P0 módulo ('+pct(c.modulePenalty)+')','−'+mx(c.incentiveDiscount)],['Bono neto módulo',mx(c.incentiveNet)]];
       if(supPrintEnabled('bonus'))sections.push(`<section class="report-section" data-report-section="sup-bonus"><h2>Bono por resultados del módulo</h2>${tab(['Concepto','Resultado'],bonus)}</section>`);
-      const own=[...c.parts.map(x=>[x.name,`${x.count} × ${mx(x.rate)}`,mx(x.total)]),['Subtotal ventas propias','',mx(c.ownGross)],['Incidencias propias',c.ownInc,''],['Plan Cero propio / requerido',supText(c.ownP0Reach)+' / '+pct(supSettings.ownP0Threshold),''],['Descuento Plan Cero ('+pct(c.ownP0Penalty)+')','','−'+mx(c.ownP0Discount)],['Descuento incidencias ('+pct(c.ownIncPenalty)+')','','−'+mx(c.ownIncDiscount)],['Neto ventas propias','',mx(c.ownNet)],['TOTAL SUPERVISOR','',mx(c.total)]];
+      const own=[...c.parts.map(x=>[x.name,`${x.count} × ${mx(x.rate)}`,mx(x.total)]),['Subtotal ventas propias','',mx(c.ownGross)],['Incidencias propias',c.ownInc,''],['Base para penalización P0',c.ownP0Basis,''],['Plan Cero evaluado / requerido',supText(c.ownP0ComparedReach)+' / '+pct(c.ownP0ComparedThreshold),''],['Descuento Plan Cero ('+pct(c.ownP0Penalty)+')','','−'+mx(c.ownP0Discount)],['Descuento incidencias ('+pct(c.ownIncPenalty)+')','','−'+mx(c.ownIncDiscount)],['Neto ventas propias','',mx(c.ownNet)],['TOTAL SUPERVISOR','',mx(c.total)]];
       if(supPrintEnabled('own'))sections.push(`<section class="report-section" data-report-section="sup-own"><h2>Ventas propias del supervisor</h2>${tab(['Concepto','Cantidad × tarifa','Pago'],own)}</section>`);
       for(const [key,title,rows,kind] of [['sup-team-records','Folios de ejecutivos',c.src.team,'team'],['sup-own-records','Folios del supervisor',c.src.own,'own']]){
         if(!supPrintEnabled(key==='sup-team-records'?'recordsTeam':'recordsOwn'))continue;
@@ -2888,7 +2909,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=70;line(margin,y,content);y+=16;
     write('NOTA PARA LEER EL REPORTE',margin,y,10,true,deep);y+=20;
     y=paragraph(reportTexts.footer,margin,y,content,11,17,'#4b5c70')+19;
-    write('Versión 2.4.1',margin+content-84,y,10,false,'#6b7b8e');y+=32;
+    write('Versión 2.4.2',margin+content-84,y,10,false,'#6b7b8e');y+=32;
     return Math.ceil(y);
   }
   function exportPng(){

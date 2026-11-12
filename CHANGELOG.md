@@ -1,3 +1,12 @@
+## 2.4.5 — Bonos editables y no acumulables
+- Los tres umbrales y montos vuelven a ser editables y se conservan en la configuración.
+- Solo se paga el tramo de mayor umbral alcanzado.
+
+## 2.4.4 — Bono de sobrecumplimiento
+- Bonos fijos excluyentes: 110% $1,000; 115% $1,500; 120%+ $2,000.
+- No acumulables; se aplica únicamente el tramo mayor alcanzado.
+- Se mantiene el alcance global corregido de 2.4.3.
+
 ## V2.4.3 — Corrección Alcance Global
 - Calidad Total = min(100%, promedio simple de Cumplimiento, Primera Compra, Programa Cero y Activaciones).
 - Alcance Global = promedio simple de esas cuatro calidades y Calidad Total, sin tope.

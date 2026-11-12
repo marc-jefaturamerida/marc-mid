@@ -1,4 +1,4 @@
-# Dashboard Mérida V2.4.1 — Actualización
+# Dashboard Mérida V2.4.2 — Actualización
 
 1. Descomprime el ZIP y sube su contenido conservando `index.html`, `src/`, `netlify/` y `public/` en sus ubicaciones originales.
 2. En GitHub realiza un commit de los cambios; Netlify publicará el nuevo despliegue con `npm run build` y `dist`.
@@ -8,3 +8,10 @@
 6. En Ajustes → 12 se configuran por separado el umbral P0 del equipo y el de ventas propias. La penalización P0 de ventas propias no se aplica si no hubo ventas regulares válidas.
 
 No se requieren migraciones SQL ni volver a importar XLS.
+
+
+### Cambios de la 2.4.2
+
+En **Ajustes → 12 → Penalización de Plan Cero**, marca la nueva casilla para usar los resultados del módulo (sin supervisores) como referencia para el descuento por P0 de las ventas propias. Desmárcala para evaluar solamente las ventas propias. Pulsa **Guardar configuración de supervisor**; con sesión iniciada los cambios se sincronizarán. El alcance global no tiene tope del 100%.
+
+Versión 2.4.5: bono adicional de sobrecumplimiento excluyente.

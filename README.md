@@ -123,7 +123,7 @@ El botón **Cargar XLS** acepta ahora `.xls` (HTML o binario), `.xlsx`, `.csv` y
 Los archivos existentes en PostgreSQL permanecen inalterados. Al publicar la actualización, Netlify debe instalar la nueva dependencia; comprueba el resultado de `npm run build` en el registro de despliegue. Para libros enormes sigue aplicando el límite de 5 MB por petición a la Function de guardado.
 
 
-## Versión 2.4.1: Calculadora de supervisor
+## Versión 2.4.2: Calculadora de supervisor
 
 La novena página permite escoger una semana y un supervisor previamente marcado en **Ajustes → 11**. Un supervisor debe encontrarse entre los nombres de los XLS cargados y debe estar asignado a un módulo.
 
@@ -140,5 +140,5 @@ La novena página permite escoger una semana y un supervisor previamente marcado
 Esta calculadora es una simulación de los criterios proporcionados, no una confirmación del monto pagable. Los ajustes nuevos se guardan en el mismo almacenamiento de configuraciones por cuenta; no se necesitan migraciones SQL adicionales.
 
 
-## V2.4.1
+## V2.4.2
 Secciones de calculadora de supervisor plegables con opción de impresión individual, tablas contraídas por defecto, tarjetas compactas de tres columnas y penalización P0 propia detallada.
