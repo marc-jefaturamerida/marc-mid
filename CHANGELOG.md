@@ -1,3 +1,41 @@
+## V2.4.8 — Reporte diario listo para WhatsApp (13 de noviembre de 2026)
+
+- Botón flotante **Copiar para WhatsApp** visible solo en la página **Comparativa diaria**. Se desactiva cuando no hay registros o se seleccionan dos fechas idénticas.
+- Copia los **totales de la tabla Por módulo**, respetando fechas, inclusión/exclusión de supervisores, métricas y calidad operativa calculadas por la aplicación. No reutiliza cifras de ejemplo ni de la tabla de ejecutivos.
+- Indicadores: Registros, Ventas, Regulares, Garantizadas, Programa Cero, Plan Dental y Calidad (Alcance Global de la tabla). Cantidad del día principal y diferencia positiva, negativa o cero; Calidad se presenta en puntos porcentuales.
+- Mensaje con título, fechas y bloque monoespaciado de WhatsApp (tres acentos graves), etiquetas/números alineados a ancho uniforme y aviso de copia exitosa o bloqueo de permisos. Soporta portapapeles seguro y mecanismo alternativo en navegadores compatibles.
+- Sin alteraciones a cálculos, base de datos, login, comisiones ni exportaciones. Se actualiza a **V2.4.8**.
+
+## V2.4.7 — Exportación de supervisor rediseñada (13 de noviembre de 2026)
+
+- Nuevo estado de comisión de supervisor para **Imprimir / PDF** y **PNG**, basado en el diseño de referencia entregado: encabezado azul, datos de supervisor/módulo/semana, indicadores, bono, color naranja para A PAGAR, equipo, ventas propias y folios.
+- Fuentes de datos exclusivamente propias de la V2.4.6: `supervisorCalculator()`, ajustes editables, objetivo del módulo, metas individuales y marcas de folio. No se inventan pagos individuales de ejecutivos ni ajustes de otras semanas.
+- Calidad Total y Alcance Global respetan las reglas actuales. Bono por dinámica se muestra como concepto final separado, sin duplicaciones ni nuevas penalizaciones.
+- La tabla de folios propios incorpora componente bruto, distribución de neto, y dinámica; el total de netos reconcilia el agregado de ventas propias.
+- Los controles de impresión permiten ocultar los detalles. Por defecto, se omite el listado íntegro de folios del equipo para mantener un estado compacto; se puede activar.
+- El PDF usa estilos propios de impresión A4 vertical; la imagen se dibuja como Canvas nativo con los mismos datos, sin dependencias nuevas. El CSV no cambia.
+- Actualizados `package.json` y los pies visibles a **2.4.7**. Sin cambios SQL ni reimportación de XLS.
+
+## V2.4.6 — Bono por dinámica y guardar/cerrar ajustes (13 de noviembre de 2026)
+
+- Nueva sección **Ajustes → 13 · Bono por dinámica**: importe fijo editable en MXN, inicial $0.00; se sincroniza por usuario utilizando la infraestructura de ajustes de Netlify existente.
+- Nueva columna de registros **Bono adicional**, visible de forma predeterminada y fija en los listados principales, logros y supervisor. Las casillas se comparten mediante el UID de folio y se conservan en las mismas preferencias de marcas de Incidencia y APP.
+- Cada folio de venta válida marcado cobra una vez el importe fijo de dinámica. Una venta rechazada, cancelada, incompleta, sin código o con incidencia no cobra la dinámica; si después deja de estar excluida, su marca se conserva.
+- La dinámica se agrega **después** de aplicar todos los descuentos, penalizaciones y recuperaciones: Total ejecutivo = Neto anterior + Nº de folios pagables marcados × monto dinámico.
+- Supervisor = Bono neto del módulo + Neto de ventas propias + dinámica pagable **solo de ventas propias**. El bono del módulo no duplica los bonos de ejecutivos.
+- Las tablas de folios, impresión/PDF/PNG y CSV incluyen la casilla/valor, y los resúmenes financieros revelan el concepto por separado.
+- **Guardar ajustes y cerrar** valida conjuntamente los ajustes de supervisor y dinámica. Los botones individuales «Guardar» también cierran tras finalizar sin errores.
+- Versiones visibles y archivo `package.json` alineados en **2.4.6**. No hay cambios de SQL ni necesidad de reimportar XLS.
+
+## V2.4.5 corregida — 13 de noviembre de 2026
+- Pies de página y exportaciones PDF/PNG alineados con la versión real 2.4.5.
+- Mínimos predeterminados de calidad individual 60% editables. Configuraciones antiguas con ceros predeterminados migran a 60%; los mínimos personalizados distintos de cero se preservan y los nuevos ceros explícitos son válidos.
+- Calidad Total sigue siendo media simple de cuatro, topada al 100%; Alcance Global media de cinco, sin tope.
+- Bono base del supervisor = base × alcance global × min(1, cumplimiento módulo); no aplica multiplicación adicional por 110%, 120%, etc.
+- Casilla en Ajustes 12 activada por defecto: incluir ventas pagables propias en cumplimiento del módulo. Tarifas de ventas propias continúan usando el escalón del equipo sin supervisores.
+- Resumen, CSV, PDF/PNG y notas de cálculo actualizados; se quitan controles de ponderación obsoletos para evitar falsas expectativas.
+- Se mantienen los tres bonos adicionales editables (110%/$1,000, 115%/$1,500, 120%/$2,000), siempre excluyentes. Sin nuevas migraciones SQL.
+
 ## 2.4.5 — Bonos editables y no acumulables
 - Los tres umbrales y montos vuelven a ser editables y se conservan en la configuración.
 - Solo se paga el tramo de mayor umbral alcanzado.

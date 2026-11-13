@@ -1,3 +1,5 @@
+import {createSupervisorStatement,supervisorStatementHtml,SUPERVISOR_STATEMENT_CSS,paintSupervisorStatement} from './supervisor-statement.js';
+import {buildDailyWhatsAppReport} from './daily-whatsapp-report.js';
 
 (() => {
   'use strict';
@@ -35,6 +37,17 @@
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
+  const APP_VERSION='2.4.8';
+const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
+function loadDynamicBonus(){
+  try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
+    if(config&&validRateAmount(config.amount))return {amount:config.amount};
+  }catch(_){}
+  return {amount:0};
+}
+let dynamicBonusConfig=loadDynamicBonus();
+function dynamicBonusAmount(){return validRateAmount(dynamicBonusConfig.amount)?dynamicBonusConfig.amount:0;}
+
   const el=id=>document.getElementById(id);
   const state={base:{...DEFAULT_BASE},sim:{...DEFAULT_SIM}};
 
@@ -62,7 +75,7 @@ const isYes=v=>['SI','S','TRUE','VERDADERO','1','ACTIVADA','ACTIVADO'].includes(
 const isNo=v=>['NO','N','FALSE','FALSO','0'].includes(normalize(v));
 const isNonPayableStatus=v=>['CANCELADA','INCOMPLETA','RECHAZO'].includes(normalize(v));
 let simDirty=false;
-  const imported={data:null,week:'',executive:'',flags:new Set(),appDisabled:new Set(),recoverManual:0,sourceName:''};
+  const imported={data:null,week:'',executive:'',flags:new Set(),appDisabled:new Set(),dynamicBonuses:new Set(),recoverManual:0,sourceName:''};
 const tableView={columns:[],visible:new Set(),showNoCode:false};
 const TABLE_VIEW_STORAGE='wmSamsTablaVisualV18';
 // Filtros operativos: sólo en esta pestaña; nunca se envían a PostgreSQL.
@@ -238,6 +251,7 @@ function statusBox(text,kind=''){
 function importActive(){return inputMode==='import'&&!!imported.data;}
 function resetToManual(){
   inputMode='manual';document.body.classList.remove('import-mode');
+  state.base.dynamicBonusCount=0;state.sim.dynamicBonusCount=0;
   el('recordsSection').hidden=true;el('printRecordsSection').hidden=true;el('sec-records').hidden=true;
   el('base-goal').readOnly=false;
   for(const k of KEYS)el('base-'+k).readOnly=false;
@@ -256,6 +270,10 @@ const candidate=r=>hasCode(r)&&!!guaranteeType(r);
 const autoSkipped=r=>isNonPayableStatus(r.status);
 const selectedIncident=r=>imported.flags.has(r.uid||String(r.i));
 const appEnabled=r=>hasCode(r)&&!imported.appDisabled.has(r.uid||String(r.i));
+const dynamicBonusMarked=r=>imported.dynamicBonuses.has(r.uid||String(r.i));
+const dynamicBonusPayable=r=>payable(r)&&dynamicBonusMarked(r);
+const dynamicBonusRows=rows=>rows.filter(dynamicBonusPayable);
+const dynamicBonusForRows=rows=>round(dynamicBonusRows(rows).length*dynamicBonusAmount());
 const excluded=r=>autoSkipped(r)||selectedIncident(r);
 const payable=r=>candidate(r)&&!excluded(r);
 function buildImportedCounts(rows,goal,recover=0){
@@ -278,6 +296,7 @@ function buildImportedCounts(rows,goal,recover=0){
     }
   }
   next.recover=recover;
+  next.dynamicBonusCount=dynamicBonusRows(rows).length;
   return next;
 }
 function computeImportedBase(){
@@ -288,6 +307,7 @@ function computeImportedBase(){
   const next=buildImportedCounts(rows,goal,imported.recoverManual);
   state.base=next;
   if(!simDirty){state.sim={...next};setForm('sim');}
+  else state.sim.dynamicBonusCount=next.dynamicBonusCount;
   const valid=next.reg+next.guar-next.xreg-next.xguar;
   for(const k of KEYS)el('base-'+k).readOnly=!['goal','recover'].includes(k);
   el('baseImportCounts').innerHTML=`<strong>${rows.length}</strong> registros en filtro · <strong>${valid}</strong> ventas comisionables · <strong>${next.app-next.xapp}</strong> APP activas comisionables · <strong>${next.xreg+next.xguar}</strong> ventas descartadas · <strong>${next.inc}</strong> incidencias marcadas`;
@@ -342,8 +362,9 @@ function archiveSelectionSave(){try{localStorage.setItem(ARCHIVE_SELECTION_KEY,J
 function loadFolioFlags(){try{const o=JSON.parse(localStorage.getItem(FOLIO_FLAGS_KEY)||'{}');
   imported.flags=new Set(Array.isArray(o.incidents)?o.incidents:[]);
   imported.appDisabled=new Set(Array.isArray(o.appsOff)?o.appsOff:[]);
-  }catch(_){imported.flags=new Set();imported.appDisabled=new Set();}}
-function saveFolioFlags(){if(archive.temporaryMode||!isAuthorized())return;try{localStorage.setItem(FOLIO_FLAGS_KEY,JSON.stringify({incidents:[...imported.flags],appsOff:[...imported.appDisabled]}));}catch(_){}}
+  imported.dynamicBonuses=new Set(Array.isArray(o.dynamicBonuses)?o.dynamicBonuses:[]);
+  }catch(_){imported.flags=new Set();imported.appDisabled=new Set();imported.dynamicBonuses=new Set();}}
+function saveFolioFlags(){if(archive.temporaryMode||!isAuthorized())return;try{localStorage.setItem(FOLIO_FLAGS_KEY,JSON.stringify({incidents:[...imported.flags],appsOff:[...imported.appDisabled],dynamicBonuses:[...imported.dynamicBonuses]}));}catch(_){}}
 function openArchiveDB(){return new Promise((resolve,reject)=>{
   if(!window.indexedDB){reject(Error('El navegador no permite IndexedDB. Abre la página en un navegador moderno.'));return;}
   const req=indexedDB.open(ARCHIVE_DB,1);
@@ -474,7 +495,7 @@ async function initArchive(){
   }catch(err){archive.ready=false;renderArchiveList();statusBox('No se pudo conectar al historial en línea: '+esc(err.message||String(err))+'. Comprueba la conexión, la sesión y Netlify Database.','error');}
 }
 // Columnas configurables y filtros visuales (no alteran las métricas por sí mismos).
-function columnLabel(c){return c.key==='incident'?'Incidencia':c.key==='app'?'APP':c.key==='payment'?'Validación de pago':c.name;}
+function columnLabel(c){return c.key==='dynamicBonus'?'Bono adicional':c.key==='incident'?'Incidencia':c.key==='app'?'APP':c.key==='payment'?'Validación de pago':c.name;}
 // Conversión estrictamente visual: los valores del XLS siguen intactos para las comisiones.
 function displayXlsValue(raw){
   const value=String(raw??'').trim();
@@ -483,6 +504,7 @@ function displayXlsValue(raw){
   return value;
 }
 function getCellText(r,key){
+  if(key==='dynamicBonus')return dynamicBonusMarked(r)?`Sí (${mx(dynamicBonusPayable(r)?dynamicBonusAmount():0)})`:'No';
   if(key==='incident')return selectedIncident(r)?'Sí':'No';
   if(key==='app')return appEnabled(r)?'Sí':'No';
   if(key==='payment')return payable(r)?'Comisionable':hasCode(r)?'No pagable':'No se completó la venta';
@@ -490,7 +512,7 @@ function getCellText(r,key){
   return '';
 }
 function initializeTableView(data){
-  tableView.columns=[{key:'incident',name:'Incidencia'},{key:'app',name:'APP'},...data.headers.map((h,i)=>({key:'raw:'+i,name:h||'Columna '+(i+1)})),{key:'payment',name:'Validación de pago'}];
+  tableView.columns=[{key:'incident',name:'Incidencia'},{key:'app',name:'APP'},{key:'dynamicBonus',name:'Bono adicional'},...data.headers.map((h,i)=>({key:'raw:'+i,name:h||'Columna '+(i+1)})),{key:'payment',name:'Validación de pago'}];
   resetTableView();
   el('tableColumnFilter').innerHTML='<option value="">Sin filtro de columna</option>'+tableView.columns.map(c=>`<option value="${esc(c.key)}">${esc(columnLabel(c))}</option>`).join('');
   refreshValueFilter();
@@ -535,11 +557,13 @@ function restoreTableView(){
       }
     }
   }catch(err){console.warn('Filtros temporales inválidos',err);}
+  // Nueva columna obligatoria incluso cuando los ajustes visuales vienen de V2.4.5.
+  tableView.visible.add('dynamicBonus');
   redrawColumnSettings();
 }
 function resetTableView(){
   const base=['FOLIO','GARANTIZADA','FECHA','PROGRAMA CERO','SALUD DENTAL'];
-  tableView.visible=new Set(tableView.columns.filter(c=>['incident','app','payment'].includes(c.key)||(c.key.startsWith('raw:')&&base.includes(normalize(c.name)))).map(c=>c.key));
+  tableView.visible=new Set(tableView.columns.filter(c=>['incident','app','dynamicBonus','payment'].includes(c.key)||(c.key.startsWith('raw:')&&base.includes(normalize(c.name)))).map(c=>c.key));
   tableView.showNoCode=true;
   for(const [id,value] of [['tableScope','filtered'],['tableFilter',''],['tablePaymentFilter',''],['tableIncFilter',''],['tableAppFilter',''],['tableColumnFilter',''],['tableColumnValue','']]){const elem=el(id);if(elem)elem.value=value;}
   if(el('showNoCode'))el('showNoCode').checked=true;
@@ -548,7 +572,7 @@ function resetTableView(){
 }
 function redrawColumnSettings(){
   if(!el('columnChooser'))return;
-  el('columnChooser').innerHTML=tableView.columns.map(c=>`<label class="${tableView.visible.has(c.key)?'selected':''}"><input type="checkbox" data-column="${esc(c.key)}" ${tableView.visible.has(c.key)?'checked':''}><span>${esc(columnLabel(c))}</span></label>`).join('');
+  el('columnChooser').innerHTML=tableView.columns.map(c=>`<label class="${tableView.visible.has(c.key)?'selected':''}"><input type="checkbox" data-column="${esc(c.key)}" ${tableView.visible.has(c.key)?'checked':''} ${c.key==='dynamicBonus'?'disabled':''}><span>${esc(columnLabel(c))}</span></label>`).join('');
 }
 function refreshValueFilter(){
   if(!imported.data)return;
@@ -573,11 +597,12 @@ function applyTableFilters(rows){
   const col=el('tableColumnFilter').value,val=el('tableColumnValue').value;
   if(col&&val)visual=visual.filter(r=>(getCellText(r,col)||'__EMPTY__')===val);
   const search=normalize(el('tableFilter').value);
-  if(search)visual=visual.filter(r=>normalize([...r.raw,getCellText(r,'incident'),getCellText(r,'app'),getCellText(r,'payment')].join(' ')).includes(search));
+  if(search)visual=visual.filter(r=>normalize([...r.raw,getCellText(r,'incident'),getCellText(r,'app'),getCellText(r,'dynamicBonus'),getCellText(r,'payment')].join(' ')).includes(search));
   // Orden estable: todos los registros con código primero; al final, los que no lo tienen.
   return [...visual].sort((a,b)=>Number(hasCode(b))-Number(hasCode(a)) || a.i-b.i);
 }
 function tableCellMarkup(r,c,forPrint=false){
+  if(c.key==='dynamicBonus')return forPrint?esc(getCellText(r,c.key)):`<label class="dynamic-bonus-cell"><input type="checkbox" data-dynamic-bonus-id="${esc(r.uid||String(r.i))}" aria-label="Bono adicional en folio ${esc(r.folio)}" title="Bono por dinámica: ${mx(dynamicBonusAmount())} por venta válida" ${dynamicBonusMarked(r)?'checked':''} ${!payable(r)?'disabled':''}><span>${dynamicBonusMarked(r)&&payable(r)?mx(dynamicBonusAmount()):''}</span></label>`;
   if(c.key==='incident')return forPrint?(selectedIncident(r)?'Sí':'No'):`<input type="checkbox" data-incident-id="${esc(r.uid||String(r.i))}" aria-label="Incidencia en folio ${esc(r.folio)}" title="Excluir todos los conceptos del folio" ${selectedIncident(r)?'checked':''}>`;
   if(c.key==='app')return forPrint?(appEnabled(r)?'Sí':'No'):`<input type="checkbox" class="app-check" data-app-id="${esc(r.uid||String(r.i))}" aria-label="APP en folio ${esc(r.folio)}" title="Pagar APP de este folio" ${appEnabled(r)?'checked':''} ${!hasCode(r)?'disabled':''}>`;
   if(c.key==='payment')return forPrint?esc(getCellText(r,c.key)):(payable(r)?'<span class="tiny-pill">Comisionable</span>':hasCode(r)?'<span class="tiny-pill bad">No pagable</span>':'<span class="tiny-pill skip">No se completó la venta</span>');
@@ -590,7 +615,7 @@ const allRecordsView={page:1,pageSize:100,selectedValues:new Set()};
 const ALL_RECORDS_FILTER_IDS=['allRecordsSearch','allRecordsFrom','allRecordsTo','allRecordsPay','allRecordsInc','allRecordsApp','allRecordsCode','allRecordsGuaranteed','allRecordsP0','allRecordsDental'];
 const allRecordsFilterValue=id=>el(id)?.value||'';
 function allRecordsColumns(){
-  const pinned=new Set(['incident','app']);
+  const pinned=new Set(['incident','app','dynamicBonus']);
   return tableView.columns.filter(c=>pinned.has(c.key)||tableView.visible.has(c.key));
 }
 function setAllRecordsOptions(select,values,placeholder){
@@ -653,7 +678,7 @@ function getAllRecordsFiltered(){
   if(dental==='yes')rows=rows.filter(r=>isYes(r.dental));
   if(dental==='no')rows=rows.filter(r=>isNo(r.dental));
   if(col&&chosen.size)rows=rows.filter(r=>chosen.has(getCellText(r,col)));
-  if(q)rows=rows.filter(r=>normalize([...r.raw,getCellText(r,'incident'),getCellText(r,'app'),getCellText(r,'payment')].join(' ')).includes(q));
+  if(q)rows=rows.filter(r=>normalize([...r.raw,getCellText(r,'incident'),getCellText(r,'app'),getCellText(r,'dynamicBonus'),getCellText(r,'payment')].join(' ')).includes(q));
   return [...rows].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||b.i-a.i);
 }
 function allRecordsActiveFilterCount(){return ALL_RECORDS_FILTER_IDS.filter(id=>allRecordsFilterValue(id)).length+(allRecordsFilterValue('allRecordsColumn')&&allRecordsView.selectedValues.size?1:0);}
@@ -680,15 +705,16 @@ function resetAllRecordsAdvanced(){
   renderAllRecordsValueChoices();renderAllRecords();
 }
 function applyFolioValidationChange(target){
-  const id=target.dataset.incidentId??target.dataset.appId;if(id===undefined)return false;
+  const id=target.dataset.incidentId??target.dataset.appId??target.dataset.dynamicBonusId;if(id===undefined)return false;
   if(target.matches('input[data-incident-id]')){if(target.checked)imported.flags.add(id);else imported.flags.delete(id);}
   else if(target.matches('input[data-app-id]')){if(target.checked)imported.appDisabled.delete(id);else imported.appDisabled.add(id);}
+  else if(target.matches('input[data-dynamic-bonus-id]')){if(target.checked)imported.dynamicBonuses.add(id);else imported.dynamicBonuses.delete(id);}
   else return false;
   saveFolioFlags();
   if(importActive()){computeImportedBase();renderRecords();renderTeam();}
   drawImportMeta(imported.sourceName||'Reporte.xls');
   renderAllRecords();
-  renderAchievements();
+  renderAchievements();renderSupervisorCalculator();
   return true;
 }
 function initAllRecordsPage(){
@@ -812,24 +838,28 @@ const QUALITY_RULE_KEYS=[...QUALITY_FACTORS,'quality'];
 const QUALITY_FACTOR_LABELS={completion:'Cumplimiento',p0:'Plan Cero',dental:'Plan Dental',app:'Activación por APP',purchase:'Primera compra (P0 o Dental)',quality:'Calidad'};
 const QUALITY_DEFAULTS={execWeeklyGoal:10,
   targets:{completion:100,p0:30,dental:95,app:90,purchase:90,quality:90},
-  minima:{completion:0,p0:0,dental:0,app:0,purchase:0,quality:0},
+  minima:{completion:60,p0:60,dental:60,app:60,purchase:60,quality:0},
   maxima:{completion:null,p0:null,dental:100,app:100,purchase:100,quality:100},
-  weights:{completion:20,p0:20,dental:20,app:20,purchase:20},modules:{}};
+  weights:{completion:20,p0:20,dental:20,app:20,purchase:20},modules:{},minimumRuleVersion:1};
 function storedJson(key){try{return JSON.parse(localStorage.getItem(key)||'null')}catch(_){return null}}
 function validQualityNumber(value,{positive=false}={}){return typeof value==='number'&&Number.isFinite(value)&&(positive?value>0:value>=0)&&value<=100000;}
 function cleanQualityConfig(saved){
   const result=structuredClone(QUALITY_DEFAULTS);
   if(!saved||typeof saved!=='object'||Array.isArray(saved))return result;
+  // Configuraciones antiguas guardaban ceros por defecto: migrarlos a 60%.
+  // Desde esta revisión un 0 guardado expresamente se respeta (mínimo editable).
+  const previousZeroDefaults=saved.minimumRuleVersion!==1;
   if(validQualityNumber(Number(saved.execWeeklyGoal),{positive:true}))result.execWeeklyGoal=Number(saved.execWeeklyGoal);
   for(const kind of ['targets','minima','maxima','weights'])for(const key of (kind==='weights'?QUALITY_FACTORS:QUALITY_RULE_KEYS)){
     const original=saved[kind]?.[key];
     if(original===undefined)continue;
     if(kind==='maxima'&&(original===null||original==='')){result.maxima[key]=null;continue;}
     const val=Number(original);
+    if(kind==='minima'&&key!=='quality'&&previousZeroDefaults&&val===0)continue;
     if(validQualityNumber(val,{positive:kind==='targets'}))result[kind][key]=val;
   }
-  // La V2.2.1 usaba cuatro ponderaciones de 25. Incluir Dental en igualdad
-  // de condiciones requiere 25; la media normaliza por la suma (125).
+  // Conserva ponderaciones antiguas únicamente para compatibilidad de datos:
+  // no participan en Calidad Total ni en Alcance Global.
   if(saved.weights?.dental===undefined&&saved.weights&&typeof saved.weights==='object')result.weights.dental=25;
   if(saved.modules&&typeof saved.modules==='object'&&!Array.isArray(saved.modules))for(const [module,opts] of Object.entries(saved.modules)){
     if(!module||!opts||typeof opts!=='object'||Array.isArray(opts))continue;
@@ -840,6 +870,7 @@ function cleanQualityConfig(saved){
       if(original===undefined||original==='')continue;
       if(kind==='maxima'&&original===null){item.maxima[key]=null;continue;}
       const val=Number(original);
+      if(kind==='minima'&&key!=='quality'&&previousZeroDefaults&&val===0)continue;
       if(validQualityNumber(val,{positive:kind==='targets'}))item[kind][key]=val;
     }
     result.modules[module]=item;
@@ -911,13 +942,11 @@ function qualityResult(rows,groupBy,name,granularity='weekly',goalOverride=null)
     dental:counters.sales>0?100*counters.dental/counters.sales:0,
     app:counters.sales>0?100*counters.apps/counters.sales:0,
     purchase:counters.sales>0?100*counters.purchase/counters.sales:0};
-  const factors={};let weighted=0,weightTotal=0;
+  const factors={};
   for(const key of QUALITY_FACTORS){
     const rule=qualityRule(key,name,groupBy);
     const value=qualityMetricFactor(actual[key],rule.required,{minimum:rule.minimum,maximum:(key==='completion'||key==='p0'?null:rule.maximum)})??0;
     factors[key]=key==='purchase'||key==='app'?Math.min(100,value):value;
-    const weight=groupBy==='module'?(moduleQualityOptions(name).weights?.[key]??qualityConfig.weights[key]):qualityConfig.weights[key];
-    weighted+=value*weight;weightTotal+=weight;
   }
   const {composite,global}=correctedGlobalQuality(factors);
   factors.quality=composite;actual.quality=composite;
@@ -1030,14 +1059,11 @@ function achData(){
     purchase:bases.purchase?100*c.purchase/bases.purchase:0,
     app:bases.app?100*c.apps/bases.app:0
   };
-  const factors={};let weighted=0,weightTotal=0,complete=true;
+  const factors={};
   for(const key of QUALITY_FACTORS){
     const required=goals[key==='completion'?'sales':key];
     const value=achTargetQuality(alcances[key],key==='completion'?100:required,key,module);
     factors[key]=value===null?null:(key==='purchase'||key==='app'?Math.min(100,value):value);
-    if(value===null){complete=false;continue;}
-    const w=module?(moduleQualityOptions(module).weights?.[key]??qualityConfig.weights[key]):qualityConfig.weights[key];
-    weighted+=value*w;weightTotal+=w;
   }
   const {composite,global}=correctedGlobalQuality(factors);
   const qualityRequirement=qualityRule('quality',module,'module');
@@ -1211,9 +1237,9 @@ function qualityRuleInput(key,kind,module=''){
   return `<div class="quality-rule-field"><label>${baseLabel} (%)<input aria-label="${esc(baseLabel+' '+QUALITY_FACTOR_LABELS[key]+' '+(module||'global'))}" type="number" min="${kind==='targets'?'0.01':'0'}" max="100000" step="0.1" data-quality-kind="${kindName}" data-quality-key="${key}" ${module?`data-quality-module="${esc(module)}"`:''} value="${val??''}" placeholder="${esc(placeholder)}" title="${esc(hint)}"></label>${noCap}</div>`;
 }
 function qualityFactorCard(key,module=''){
-  const weightValue=module?moduleQualityOptions(module).weights?.[key]:qualityConfig.weights[key];
-  const weight=key==='quality'?'':`<label>Ponderación<input aria-label="Ponderación ${esc(QUALITY_FACTOR_LABELS[key])}" type="number" min="0" max="100000" step="0.1" data-quality-kind="${module?'module-weight':'weight'}" data-quality-key="${key}" ${module?`data-quality-module="${esc(module)}"`:''} placeholder="${module?'Global '+qualityConfig.weights[key]+'%':''}" value="${weightValue??''}"></label>`;
-  return `<div class="quality-factor-card"><strong>${esc(QUALITY_FACTOR_LABELS[key])}</strong>${key==='quality'?'<small>Resultado compuesto de los otros cinco factores. No se pondera a sí mismo.</small>':''}<div class="quality-factor-fields">${qualityRuleInput(key,'targets',module)}${qualityRuleInput(key,'minima',module)}${qualityRuleInput(key,'maxima',module)}${weight}</div></div>`;
+  if(key==='quality')return `<div class="quality-factor-card"><strong>Calidad Total y Alcance Global</strong><small>Calidad Total = mínimo entre 100% y el promedio simple de Cumplimiento, Primera compra, Programa Cero y APP. Alcance Global = promedio de esos cuatro y Calidad Total, sin tope. No se utiliza un quinto requerido ni ponderaciones.</small></div>`;
+  const cap=key==='completion'||key==='p0'?' <small>Sin tope superior.</small>':qualityRuleInput(key,'maxima',module);
+  return `<div class="quality-factor-card"><strong>${esc(QUALITY_FACTOR_LABELS[key])}</strong>${key==='dental'?'<small>Indicador informativo: no se suma como quinto factor de Calidad Total.</small>':''}<div class="quality-factor-fields">${qualityRuleInput(key,'targets',module)}${qualityRuleInput(key,'minima',module)}${cap}</div></div>`;
 }
 function renderQualitySettings(){
   const host=el('qualityGlobalInputs');if(!host)return;
@@ -1279,7 +1305,7 @@ function initQualitySettings(){
     const names=new Set(supervisorConfig[module]||[]);if(x.checked)names.add(name);else names.delete(name);
     supervisorConfig[module]=[...names];saveSupervisorConfig();el('supervisorSaveStatus').textContent='Asignaciones actualizadas.';
   });
-  el('qualityReset').addEventListener('click',()=>{if(!confirm('¿Restaurar porcentajes requeridos, límites, metas y pesos?'))return;qualityConfig=cleanQualityConfig(null);saveQualityConfig();renderQualitySettings();});
+  el('qualityReset').addEventListener('click',()=>{if(!confirm('¿Restaurar porcentajes requeridos, límites y metas?'))return;qualityConfig=cleanQualityConfig(null);saveQualityConfig();renderQualitySettings();});
   for(const id of ['includeSupervisorsDaily','includeSupervisorsAccumulated','includeSupervisorsWeekly'])el(id)?.addEventListener('change',renderQualityPages);
 }
 
@@ -1344,6 +1370,7 @@ function dailyRowMarkup(g,isTotal=false,groupBy='module'){
 function renderDaily(){
   if(!el('dailyModuleRows'))return;
   if(!imported.data){
+    el('dailyCopyWhatsApp').disabled=true;
     el('dailyPeriod').textContent='Importa un archivo XLS';
     el('dailyModulesCount').textContent='—';el('dailyExecutivesCount').textContent='—';
     el('dailyCurrentDate').disabled=true;el('dailyPreviousDate').disabled=true;
@@ -1354,7 +1381,9 @@ function renderDaily(){
     return;
   }
   const dates=dailyDates();
-  if(!dates)return;
+  if(!dates){el('dailyCopyWhatsApp').disabled=true;return;}
+  const hasComparedRows=filterPageSupervisors(imported.data.rows,'daily').some(r=>r.fecha===dates.latest||r.fecha===dates.previous);
+  el('dailyCopyWhatsApp').disabled=!hasComparedRows||dates.latest===dates.previous;
   el('dailyPeriod').textContent=`${fmtDay(dates.latest)} vs. ${fmtDay(dates.previous)}`;
   const previousRows=filterPageSupervisors(imported.data.rows,'daily').filter(r=>r.fecha===dates.previous).length;
   el('dailyDataNotice').textContent=previousRows?`${el('dailyDateMode').value==='auto'?'Comparación automática':'Comparación personalizada'} · ${previousRows} registros en el día comparado.`:'El día comparado no tiene registros en los XLS activos: variación frente a cero.';
@@ -1367,6 +1396,51 @@ function renderDaily(){
     el(totalId).innerHTML=entries.length?dailyRowMarkup(totals,true,key):'';
     el(countId).textContent=`${entries.length} ${field}`;
   }
+}
+
+
+// V2.4.8 · Copia el TOTAL de «Por módulo» con el mismo origen de cifras que renderDaily().
+function dailyWhatsAppText(){
+  if(!imported.data)throw new Error('Importa un XLS para generar el reporte de WhatsApp.');
+  const dates=dailyDates();
+  if(!dates||dates.latest===dates.previous)throw new Error('Selecciona dos fechas distintas para comparar.');
+  const rows=filterPageSupervisors(imported.data.rows,'daily');
+  if(!rows.some(r=>r.fecha===dates.latest||r.fecha===dates.previous))throw new Error('No existen registros para las fechas seleccionadas.');
+  const {totals}=dailyGroups('module',dates);
+  return buildDailyWhatsAppReport({
+    currentDate:dates.latest,previousDate:dates.previous,
+    current:totals.current,previous:totals.previous,
+    currentQuality:qualityResult(totals.currentRows,'module','TOTAL','daily').global,
+    previousQuality:qualityResult(totals.previousRows,'module','TOTAL','daily').global,
+    todayIso:dateIso(new Date())
+  });
+}
+async function copyWhatsAppText(value){
+  if(navigator.clipboard?.writeText){
+    try{await navigator.clipboard.writeText(value);return true;}catch(_){/* Reintentar con selección tradicional. */}
+  }
+  const input=document.createElement('textarea');
+  input.value=value;input.setAttribute('readonly','');
+  input.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';
+  document.body.appendChild(input);input.focus();input.select();
+  let copied=false;
+  try{copied=!!document.execCommand('copy');}catch(_){}
+  input.remove();return copied;
+}
+let dailyCopyStatusTimer=null;
+function dailyCopyFeedback(text){
+  const msg=el('dailyWhatsAppStatus');msg.textContent=text;msg.hidden=false;
+  if(dailyCopyStatusTimer!==null)clearTimeout(dailyCopyStatusTimer);
+  dailyCopyStatusTimer=setTimeout(()=>{msg.hidden=true;dailyCopyStatusTimer=null;},4200);
+}
+async function copyDailyWhatsApp(){
+  const button=el('dailyCopyWhatsApp');
+  try{
+    const report=dailyWhatsAppText();
+    if(!await copyWhatsAppText(report))throw new Error('El navegador bloqueó la copia. Permite el portapapeles o usa HTTPS.');
+    dailyCopyFeedback('Reporte copiado. Pégalo en WhatsApp conservando las tres comillas invertidas.');
+  }catch(error){dailyCopyFeedback(error?.message||'No se pudo copiar el reporte.');}
+  finally{button.blur();}
 }
 
 
@@ -1512,7 +1586,7 @@ function weeklyGroups(week){
 }
 function weeklyGlobalQuality(week,primaryWeek,data){
   // El objetivo de ventas capturado en la tabla semanal tiene prioridad para
-  // Cumplimiento; los demás factores usan los objetivos y pesos de Ajustes.
+  // Cumplimiento; los demás factores usan los porcentajes requeridos de Ajustes.
   const salesGoal=weeklyGoalFor(week,'sales',primaryWeek,data.totals.metrics);
   return qualityResult(data.rows,'module','TOTAL','weekly',salesGoal>0?salesGoal:null).global;
 }
@@ -1589,20 +1663,20 @@ el('weeklyPage').addEventListener('change',event=>{
   renderWeekly();
 });
 
-// V2.4.2 · Calculadora de comisiones para supervisores.
+// V2.4.7 · Calculadora de comisiones para supervisores.
 // Separa el incentivo por el equipo de las comisiones de ventas propias.
 // NO hay solicitudes remotas durante la navegación o el cálculo.
 const SUP_COMMISSION_KEY='wmSamsMeridaSupervisorCommissionV24';
 const SUP_FACTOR_KEYS=['completion','purchase','p0','app'];
 const SUP_FACTOR_LABELS={completion:'Cumplimiento',purchase:'Primera compra',p0:'Programa Cero',app:'Activación por APP',quality:'Calidad total'};
 const SUP_BASE_RULES={
-  baseBonus:null,goals:{},includeSupervisorSales:true,
+  baseBonus:null,goals:{},
   required:{completion:100,purchase:90,p0:30,app:90,quality:90},
-  minimum:{completion:0,purchase:0,p0:0,app:0,quality:0},
+  minimum:{completion:60,purchase:60,p0:60,app:60,quality:0},
   maximum:{completion:null,purchase:100,p0:null,app:100,quality:null},
   weights:{completion:25,purchase:25,p0:25,app:25},
   additional:[{threshold:110,amount:1000},{threshold:115,amount:1500},{threshold:120,amount:2000}],
-  moduleP0Threshold:30,moduleP0Penalty:15,ownP0Threshold:30,ownP0Penalty:15,ownP0UseModule:false,
+  moduleP0Threshold:30,moduleP0Penalty:15,ownP0Threshold:30,ownP0Penalty:15,ownP0UseModule:false,includeSupervisorSales:true,minimumRuleVersion:1,
   incidencePenalties:[0,0,10,20,30],
   tiers:DEFAULT_TIER.map(t=>({min:t.min,sale:t.sale,dental:t.dental,app:t.app,p0:t.p0}))
 };
@@ -1615,6 +1689,7 @@ function supNumber(value,{nullable=false,positive=false,whole=false}={}){
 function normalizeSupervisorCommission(saved){
   const out=structuredClone(SUP_BASE_RULES);
   if(!saved||typeof saved!=='object'||Array.isArray(saved))return out;
+  const previousZeroDefaults=saved.minimumRuleVersion!==1;
   if(supNumber(saved.baseBonus)!==null)out.baseBonus=Number(saved.baseBonus);
   if(saved.baseBonus===null)out.baseBonus=null;
   for(const m of Object.keys(saved.goals||{})){
@@ -1626,6 +1701,7 @@ function normalizeSupervisorCommission(saved){
       if(!Object.prototype.hasOwnProperty.call(saved[group]||{},k))continue;
       if(group==='maximum'&&(saved.maximum[k]===null||saved.maximum[k]==='')){out.maximum[k]=null;continue;}
       const n=supNumber(saved[group][k],{positive:group==='required'});
+      if(group==='minimum'&&k!=='quality'&&previousZeroDefaults&&n===0)continue;
       if(n!==null)out[group][k]=n;
     }
   }
@@ -1659,7 +1735,7 @@ let supSettings=normalizeSupervisorCommission(storedJson(SUP_COMMISSION_KEY));
 const supView={week:'',selection:'',search:'',pageSize:100,page:1};
 // Opciones solo de presentación/exportación: no se guardan en PostgreSQL.
 const SUP_PRINT_KEY='wmSamsMeridaSupPrintV241';
-const SUP_PRINT_DEFAULTS={filters:false,overview:true,search:false,team:true,bonus:true,own:true,recordsTeam:true,recordsOwn:true};
+const SUP_PRINT_DEFAULTS={filters:false,overview:true,search:false,team:true,bonus:true,own:true,recordsTeam:false,recordsOwn:true};
 const supPrintState={...SUP_PRINT_DEFAULTS};
 try{const stored=JSON.parse(localStorage.getItem(SUP_PRINT_KEY)||'null');if(stored&&typeof stored==='object')for(const k of Object.keys(SUP_PRINT_DEFAULTS))if(typeof stored[k]==='boolean')supPrintState[k]=stored[k];}catch(_){}
 const supFoldState={filters:true,overview:true,search:true,team:true,bonus:true,own:true,recordsTeam:false,recordsOwn:false};
@@ -1721,20 +1797,18 @@ function supFiltered(rows){
   return rows.filter(r=>normalize([r.folio,r.fecha,r.executive,r.module,r.code,r.status,r.p0,r.dental,selectedIncident(r)?'INCIDENCIA':'',appEnabled(r)?'APP':''].join(' ')).includes(q));
 }
 function supIncidentRate(n){return supSettings.incidencePenalties[Math.min(4,Math.max(0,n))]||0;}
-function supervisorQuality(validRows,goal,completionSales=null){
+function supervisorQuality(validRows,goal,completionSales=validRows.length){
   const base=countQualityRows(validRows);
-  const actual={completion:goal>0?100*(completionSales===null?base.sales:completionSales)/goal:null,
+  const actual={completion:goal>0?100*completionSales/goal:null,
     purchase:base.sales?100*base.purchase/base.sales:0,
     p0:base.regular?100*base.p0/base.regular:0,
     app:base.sales?100*base.apps/base.sales:0};
-  const factors={};let numerator=0,denominator=0;
+  const factors={};
   for(const k of SUP_FACTOR_KEYS){
     const raw=actual[k];
     const quality=raw===null?null:qualityMetricFactor(raw,supSettings.required[k],{
       minimum:supSettings.minimum[k],maximum:(k==='completion'||k==='p0'?null:supSettings.maximum[k])});
     factors[k]=quality===null?null:(k==='purchase'||k==='app'?Math.min(100,quality):quality);
-    const weight=supSettings.weights[k];
-    if(Number.isFinite(quality)&&weight>0){numerator+=quality*weight;denominator+=weight;}
   }
   const {composite,global}=correctedGlobalQuality(factors);
   return {actual,factors,composite,global,base};
@@ -1747,14 +1821,18 @@ function supervisorCalculator(){
   const teamValid=src.team.filter(r=>candidate(r)&&!excluded(r));
   const teamReg=teamValid.filter(r=>guaranteeType(r)==='reg');
   const teamP0=teamReg.filter(r=>isYes(r.p0));
-  const supervisorValid=supSettings.includeSupervisorSales?[...src.own,...src.otherSupervisors].filter(r=>candidate(r)&&!excluded(r)):[];
-  const completionSales=teamValid.length+supervisorValid.length;
+  const ownValid=src.own.filter(r=>candidate(r)&&!excluded(r));
+  const includeSupervisorSales=supSettings.includeSupervisorSales!==false;
+  const completionSales=teamValid.length+(includeSupervisorSales?ownValid.length:0);
   const completion=goal>0?completionSales/goal*100:null;
+  const teamCompletion=goal>0?teamValid.length/goal*100:null;
+  // Solo Cumplimiento incorpora las ventas del supervisor. P0, compra y APP
+  // del equipo, el escalón de tarifas y sus penalizaciones siguen sin supervisores.
   const q=supervisorQuality(teamValid,goal,completionSales);
-  const teamOnlyCompletion=goal>0?teamValid.length/goal*100:null;
-  const tier=teamOnlyCompletion===null?null:supTier(teamOnlyCompletion);
+  const tier=teamCompletion===null?null:supTier(teamCompletion);
   const bonusConfigured=supSettings.baseBonus!==null;
-  const base=bonusConfigured&&completion!==null&&q.global!==null?round(supSettings.baseBonus*(Math.min(100,completion)/100)*(q.global/100)):0;
+  const completionMultiplier=completion===null?0:Math.min(1,Math.max(0,completion/100));
+  const base=bonusConfigured&&q.global!==null?round(supSettings.baseBonus*(q.global/100)*completionMultiplier):0;
   // Un solo bono: se selecciona exclusivamente el tramo más alto alcanzado.
   const earnedTier=completion===null?null:[...supSettings.additional].filter(t=>completion>=t.threshold).sort((a,b)=>b.threshold-a.threshold)[0]||null;
   const additional=supSettings.additional.map(t=>({threshold:t.threshold,amount:t.amount,configured:true,earned:earnedTier?.threshold===t.threshold?round(t.amount):0}));
@@ -1764,7 +1842,6 @@ function supervisorCalculator(){
   const incentiveBefore=round(base+extras);
   const incentiveDiscount=round(incentiveBefore*modulePenalty/100);
   const incentiveNet=round(incentiveBefore-incentiveDiscount);
-  const ownValid=src.own.filter(r=>candidate(r)&&!excluded(r));
   const ownReg=ownValid.filter(r=>guaranteeType(r)==='reg');
   const ownDental=ownValid.filter(r=>isYes(r.dental));
   const ownApp=ownValid.filter(appEnabled);
@@ -1793,10 +1870,14 @@ function supervisorCalculator(){
   const ownP0Discount=round(ownGross*ownP0Penalty/100);
   const ownIncDiscount=round(ownGross*ownIncPenalty/100);
   const ownNet=round(ownGross-ownP0Discount-ownIncDiscount);
-  return {ready:true,selected,goal,src,teamValid,teamReg,teamP0,supervisorValid,completionSales,teamOnlyCompletion,completion,q,tier,
+  // La dinámica se paga una vez por venta propia válida marcada; no es base
+  // para descuentos porcentuales, y nunca se suma al bono del módulo.
+  const ownDynamicBonusCount=dynamicBonusRows(src.own).length;
+  const ownDynamicBonus=round(ownDynamicBonusCount*dynamicBonusAmount());
+  return {ready:true,selected,goal,src,teamValid,teamReg,teamP0,completionSales,includeSupervisorSales,teamCompletion,completion,completionMultiplier,q,tier,
     bonusConfigured,base,additional,extras,moduleP0Reach,modulePenalty,incentiveBefore,incentiveDiscount,incentiveNet,
-    ownValid,ownReg,ownDental,ownApp,ownP0,ownInc,parts,ownGross,ownP0Reach,ownP0UseModule,ownP0Basis,ownP0ComparedReach,ownP0ComparedThreshold,ownP0HasRegular,ownP0BelowTarget,ownP0Penalty,ownIncPenalty,ownP0Discount,ownIncDiscount,ownNet,
-    total:round(incentiveNet+ownNet)};
+    ownValid,ownReg,ownDental,ownApp,ownP0,ownInc,parts,ownGross,ownP0Reach,ownP0UseModule,ownP0Basis,ownP0ComparedReach,ownP0ComparedThreshold,ownP0HasRegular,ownP0BelowTarget,ownP0Penalty,ownIncPenalty,ownP0Discount,ownIncDiscount,ownNet,ownDynamicBonusCount,ownDynamicBonus,
+    total:round(incentiveNet+ownNet+ownDynamicBonus)};
 }
 function supText(v){return Number.isFinite(v)?pct(v):'—';}
 function supMoneyValue(v){return Number.isFinite(v)?mx(v):'—';}
@@ -1809,17 +1890,17 @@ function supDetailCards(c){
   return `<details class="sup-fold sup-overview" data-sup-fold="overview" ${supFoldOpen('overview')?'open':''}>${supFoldHeading('Resumen de comisiones','overview')}<div class="sup-fold-body"><div class="sup-top-summary">
       <div class="sup-big-card"><small>Comisión total estimada</small><strong>${mx(c.total)}</strong><span>${esc(c.selected.name)} · ${esc(c.selected.module)}</span></div>
       <div class="sup-big-card"><small>Bono por módulo</small><strong>${mx(c.incentiveNet)}</strong><span>Base + bono único − descuento P0</span></div>
-      <div class="sup-big-card"><small>Ventas propias</small><strong>${mx(c.ownNet)}</strong><span>Tarifas del escalón sin ventas de supervisores</span></div>
-    </div></div></details>
+      <div class="sup-big-card"><small>Ventas propias</small><strong>${mx(c.ownNet)}</strong><span>Sin dinámica, antes de sumar el bono fijo por folio</span></div>
+    </div><p class="sup-muted">Bono por dinámica: ${c.ownDynamicBonusCount} × ${mx(dynamicBonusAmount())} = <b>${mx(c.ownDynamicBonus)}</b>, agregado al final, sin penalización.</p></div></details>
     <div class="sup-detail-grid">
-      <details class="sup-panel sup-fold" data-sup-fold="team" ${supFoldOpen('team')?'open':''}>${supFoldHeading('Resultados del módulo','team')}<div class="sup-fold-body"><div class="sup-facts">
-        <span>Objetivo: <b>${number.format(c.goal)} ventas</b></span><span>Ventas del equipo: <b>${c.teamValid.length}</b></span><span>Ventas de supervisores incluidas: <b>${c.supervisorValid.length}</b></span>
-        <span>Cumplimiento: <b>${supText(c.completion)}</b></span><span>Escalón aplicable: <b>${c.tier?esc(c.tier.min+'% o más'):'Sin escalón pagable'}</b></span>
+      <details class="sup-panel sup-fold" data-sup-fold="team" ${supFoldOpen('team')?'open':''}>${supFoldHeading('Resultados del módulo y calidad','team')}<div class="sup-fold-body"><div class="sup-facts">
+        <span>Objetivo: <b>${number.format(c.goal)} ventas</b></span><span>Ventas equipo: <b>${c.teamValid.length}</b></span><span>Ventas propias incluidas: <b>${c.includeSupervisorSales?c.ownValid.length:0}</b></span><span>Ventas módulo para cumplimiento: <b>${c.completionSales}</b></span>
+        <span>Cumplimiento del módulo: <b>${supText(c.completion)}</b></span><span>Cumplimiento para tarifas propias: <b>${supText(c.teamCompletion)}</b></span><span>Escalón aplicable: <b>${c.tier?esc(c.tier.min+'% o más'):'Sin escalón pagable'}</b></span>
         <span>P0 del módulo: <b>${supText(c.moduleP0Reach)}</b></span><span>Calidad total: <b>${supText(c.q.composite)}</b></span>
         <span>Alcance global: <b>${supText(c.q.global)}</b></span>
       </div><table class="sup-metrics"><thead><tr><th>Factor</th><th>Alcance</th><th>Calidad</th></tr></thead><tbody>${factorRows}
-        <tr class="sup-table-emphasis"><th>Calidad total</th><td>${supText(c.q.composite)}</td><td>${supText(c.q.global)}</td></tr></tbody></table></div></details>
-      <details class="sup-panel sup-fold" data-sup-fold="bonus" ${supFoldOpen('bonus')?'open':''}>${supFoldHeading('Desglose del bono del módulo','bonus')}<div class="sup-fold-body"><div class="sup-formula">Bono base × ${supText(Math.min(100,c.completion))} (cumplimiento topado) × ${supText(c.q.global)}</div>
+        <tr class="sup-table-emphasis"><th>Calidad Total</th><td colspan="2">${supText(c.q.composite)}</td></tr><tr class="sup-table-emphasis"><th>Alcance Global</th><td colspan="2">${supText(c.q.global)}</td></tr></tbody></table></div></details>
+      <details class="sup-panel sup-fold" data-sup-fold="bonus" ${supFoldOpen('bonus')?'open':''}>${supFoldHeading('Desglose del bono del módulo','bonus')}<div class="sup-fold-body"><div class="sup-formula">Bono base × Alcance Global (${supText(c.q.global)})${c.completion<100?' × cumplimiento módulo ('+supText(c.completion)+')':' · sin reducción por ventas (cumplimiento ≥ 100%)'}</div>
         <table class="sup-metrics"><tbody><tr><th>Bono base ${!c.bonusConfigured?'(sin configurar)':''}</th><td>${c.bonusConfigured?mx(supSettings.baseBonus):'—'}</td></tr>
         <tr><th>Cálculo base</th><td>${mx(c.base)}</td></tr>${bonusRows}
         <tr><th>Base + bono adicional</th><td>${mx(c.incentiveBefore)}</td></tr>
@@ -1835,7 +1916,7 @@ function supDetailCards(c){
       <table class="sup-metrics"><tbody><tr><th>Subtotal ventas propias</th><td>${mx(c.ownGross)}</td></tr>
       <tr><th>Descuento P0 (${pct(c.ownP0Penalty)}) · ${esc(c.ownP0Basis)}</th><td>−${mx(c.ownP0Discount)}</td></tr>
       <tr><th>Descuento incidencias (${pct(c.ownIncPenalty)})</th><td>−${mx(c.ownIncDiscount)}</td></tr>
-      <tr class="sup-table-emphasis"><th>Ventas propias netas</th><td>${mx(c.ownNet)}</td></tr></tbody></table>
+      <tr class="sup-table-emphasis"><th>Ventas propias netas</th><td>${mx(c.ownNet)}</td></tr><tr><th>Bono por dinámica (${c.ownDynamicBonusCount} × ${mx(dynamicBonusAmount())})</th><td>+${mx(c.ownDynamicBonus)}</td></tr><tr class="sup-table-emphasis"><th>Total módulo + propias + dinámica</th><td>${mx(c.total)}</td></tr></tbody></table>
       <p class="sup-muted">Los folios marcados con incidencia y los de estatus no pagable se descuentan por completo antes de aplicar estos porcentajes. Las ventas propias no generan un segundo bono semanal por escalón.</p></div></details>
     </div>`;
 }
@@ -1847,12 +1928,14 @@ function supTableMarkup(rows,c,tableKind,forReport=false){
   const body=rows.map(r=>{
     const incident=selectedIncident(r),app=appEnabled(r),valid=payable(r);
     const cells=[r.fecha?fmtDay(r.fecha):'—',r.executive,r.folio||'—',guaranteeType(r)==='guar'?'Garantizada':guaranteeType(r)==='reg'?'Regular':'—',r.code||'—',isYes(r.p0)?'Sí':'—',isYes(r.dental)?'Sí':'—'];
-    const checkbox=type=>forReport?(type==='incident'?(incident?'Sí':'No'):(app?'Sí':'No')):
+    const checkbox=type=>type==='dynamicBonus'?
+      (forReport?getCellText(r,'dynamicBonus'):`<label class="dynamic-bonus-cell"><input type="checkbox" data-sup-dynamic-bonus-id="${esc(r.uid||String(r.i))}" ${dynamicBonusMarked(r)?'checked':''} ${valid?'':'disabled'} aria-label="Bono adicional ${esc(r.folio)}"><span>${dynamicBonusMarked(r)&&valid?mx(dynamicBonusAmount()):''}</span></label>`):
+      forReport?(type==='incident'?(incident?'Sí':'No'):(app?'Sí':'No')):
       type==='incident'?`<input type="checkbox" data-sup-incident-id="${esc(r.uid||String(r.i))}" ${incident?'checked':''} aria-label="Marcar incidencia ${esc(r.folio)}">`:
       `<input type="checkbox" data-sup-app-id="${esc(r.uid||String(r.i))}" ${app?'checked':''} ${hasCode(r)?'':'disabled'} aria-label="APP activa ${esc(r.folio)}">`;
-    return `<tr class="${incident?'sup-incident':''}">${cells.map(x=>`<td>${esc(x)}</td>`).join('')}<td>${checkbox('app')}</td><td>${checkbox('incident')}</td><td>${tableKind==='own'?(valid?mx(supRowFee(r,c)):'No paga'):(valid?'Válido':'Excluido')}</td></tr>`;
+    return `<tr class="${incident?'sup-incident':''}">${cells.map(x=>`<td>${esc(x)}</td>`).join('')}<td>${checkbox('app')}</td><td>${checkbox('incident')}</td><td>${checkbox('dynamicBonus')}</td><td>${tableKind==='own'?(valid?mx(supRowFee(r,c)):'No paga'):(valid?'Válido':'Excluido')}</td></tr>`;
   }).join('');
-  return `<table class="sup-record-table ${forReport?'sup-report-records':''}"><thead><tr>${['Fecha','Ejecutivo','Folio','Tipo','Código','P0','Dental','APP','Incidencia',tableKind==='own'?'Bruto por folio':'Estado'].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body||'<tr><td colspan="10">Sin registros para la selección actual.</td></tr>'}</tbody></table>`;
+  return `<table class="sup-record-table ${forReport?'sup-report-records':''}"><thead><tr>${['Fecha','Ejecutivo','Folio','Tipo','Código','P0','Dental','APP','Incidencia','Bono adicional',tableKind==='own'?'Bruto por folio':'Estado'].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body||'<tr><td colspan="11">Sin registros para la selección actual.</td></tr>'}</tbody></table>`;
 }
 function renderSupervisorCalculator(){
   const host=el('supPage');if(!host)return;
@@ -1868,21 +1951,20 @@ function renderSupervisorCalculator(){
   // La búsqueda es un filtro visual: no altera el bono ni el escalón.
   el('supTeamRows').innerHTML=supTableMarkup(team,c,'team');
   el('supOwnRows').innerHTML=supTableMarkup(own,c,'own');
-  el('supSelectionInfo').textContent=`Semana ${weekLabel(supView.week)} · ${c.selected.module} · ${c.selected.name} · ${c.src.otherSupervisors.length} trámites de otros supervisores excluidos`;
+  el('supSelectionInfo').textContent=`Semana ${weekLabel(supView.week)} · ${c.selected.module} · ${c.selected.name} · Ventas propias ${c.includeSupervisorSales?'incluidas':'excluidas'} del cumplimiento · ${c.src.otherSupervisors.length} trámites de otros supervisores excluidos`;
 }
 function supervisorFactorSettingsHtml(){
   const num=(label,key,group,value,opts='')=>`<label class="sup-setting-field">${label}<input type="number" inputmode="decimal" step="0.01" min="0" max="1000000" data-sup-group="${group}" data-sup-key="${key}" value="${value??''}" ${opts}></label>`;
-  const cols=[...SUP_FACTOR_KEYS,'quality'];
-  const factors=cols.map(k=>`<div class="sup-factor-setting"><b>${SUP_FACTOR_LABELS[k]}</b><div class="sup-setting-grid">${num('Requerido (%)',k,'required',supSettings.required[k])}${num('Mínimo de calidad (%)',k,'minimum',supSettings.minimum[k])}${k==='quality'?'<p class="settings-help">Sin límite máximo: el alcance global puede superar el 100%.</p>':num('Máximo de calidad (%)',k,'maximum',supSettings.maximum[k],'placeholder="Vacío = sin tope"')}${k==='quality'?'':num('Ponderación',k,'weights',supSettings.weights[k])}</div></div>`).join('');
+  const factors=SUP_FACTOR_KEYS.map(k=>`<div class="sup-factor-setting"><b>${SUP_FACTOR_LABELS[k]}</b><div class="sup-setting-grid">${num('Requerido (%)',k,'required',supSettings.required[k])}${num('Mínimo de calidad (%)',k,'minimum',supSettings.minimum[k])}${k==='completion'||k==='p0'?'<p class="settings-help">Sin tope superior.</p>':num('Máximo de calidad (%)',k,'maximum',supSettings.maximum[k])}</div></div>`).join('');
   const bonuses=supSettings.additional.map((x,i)=>`<div class="sup-setting-grid">${num('Cumplimiento requerido (%)',i,'additional-threshold',x.threshold)}${num('Bono adicional ($)',i,'additional-amount',x.amount,'placeholder="Importe por definir"')}</div>`).join('');
   const tiers=supSettings.tiers.map((t,i)=>`<tr><th>${i+1}</th>${['min','sale','dental','app','p0'].map(k=>`<td><input type="number" min="0" step="0.01" data-sup-tier="${i}" data-sup-tier-key="${k}" value="${t[k]}"></td>`).join('')}</tr>`).join('');
   const modules=[...new Set([...Object.keys(supervisorConfig),...Object.keys(qualityConfig.modules),(imported.data?.rows||[]).map(r=>r.module).filter(Boolean)].flat().filter(Boolean))].sort();
   return `<p class="settings-help">El bono base, los porcentajes y los importes por sobrecumplimiento son editables. El bono adicional es único, no acumulable: solo se paga el tramo más alto alcanzado. No se incluye el bono semanal de los ejecutivos dentro de las ventas propias.</p>
     ${num('Bono base del supervisor (MXN)','baseBonus','root',supSettings.baseBonus,'placeholder="Sin configurar"')}
+    <label class="sup-checkbox-setting"><input type="checkbox" data-sup-include-sales ${supSettings.includeSupervisorSales?'checked':''}><span><b>Incluir las ventas propias del supervisor en el cumplimiento del módulo</b><small>Activado de forma predeterminada. Solo suma sus ventas pagables al cumplimiento para Calidad y bono del módulo; no modifica el escalón de tarifas propias ni P0, Primera compra o APP del equipo. Otros supervisores no se incluyen.</small></span></label>
     <h4>Objetivos semanales de ventas por módulo</h4><p class="settings-help">Si no ingresas una meta aquí, utiliza la meta semanal del módulo de Ajustes → 10. Si tampoco existe, suma las metas individuales de los ejecutivos del equipo.</p>
     <div class="sup-setting-grid">${modules.map(m=>num(esc(m)+' · ventas',m,'goals',supSettings.goals[m]??'','placeholder="Heredar objetivo"')).join('')||'<span>Importa XLS para identificar módulos.</span>'}</div>
-    <label class="sup-checkbox-setting"><input type="checkbox" data-sup-include-sales ${supSettings.includeSupervisorSales?'checked':''}><span><b>Incluir ventas de supervisores en el cumplimiento del módulo</b><small>Activado por defecto. Al desmarcar, solo las ventas de ejecutivos cuentan para el cumplimiento y el bono adicional. El escalón de ventas propias sigue usando solo ejecutivos.</small></span></label>
-    <h4>Calidad por variable del módulo</h4>${factors}
+    <h4>Calidad por variable del módulo</h4><p class="settings-help">El mínimo predeterminado es 60% de la <b>calidad calculada</b> (Alcance ÷ Requerido × 100), editable por factor. Si queda debajo, vale 0%. Calidad Total = min(100%, promedio de cuatro calidades); Alcance Global = promedio de cuatro calidades más Calidad Total, sin tope. Plan Dental se cuenta en Primera compra y no se agrega como factor individual. Los pesos antiguos y el antiguo requerido de Calidad Total ya no se aplican.</p>${factors}
     <h4>Bono adicional por sobrecumplimiento (único, no acumulable)</h4><p class="settings-help">Modifica los porcentajes requeridos y los montos de cada tramo. Se paga únicamente el bono del umbral más alto alcanzado, nunca la suma de varios.</p>${bonuses}
     <h4>Penalización de Plan Cero</h4><div class="sup-setting-grid">
       ${num('Módulo · mínimo P0 (%)','moduleP0Threshold','root',supSettings.moduleP0Threshold)}
@@ -1911,13 +1993,14 @@ function initSupervisorCalculator(){
   el('supSupervisor').addEventListener('change',e=>{supView.selection=e.target.value;supView.page=1;renderSupervisorCalculator();});
   el('supSearch').addEventListener('input',()=>{supView.page=1;renderSupervisorCalculator();});
   el('supRecordTables').addEventListener('change',event=>{
-    const target=event.target;const id=target.dataset.supIncidentId??target.dataset.supAppId;
+    const target=event.target;const id=target.dataset.supIncidentId??target.dataset.supAppId??target.dataset.supDynamicBonusId;
     if(id===undefined)return;
     if(target.matches('[data-sup-incident-id]')){if(target.checked)imported.flags.add(id);else imported.flags.delete(id);}
     else if(target.matches('[data-sup-app-id]')){if(!target.checked)imported.appDisabled.add(id);else imported.appDisabled.delete(id);}
+    else if(target.matches('[data-sup-dynamic-bonus-id]')){if(target.checked)imported.dynamicBonuses.add(id);else imported.dynamicBonuses.delete(id);}
     saveFolioFlags();renderSupervisorCalculator();
     if(importActive()){computeImportedBase();renderRecords();}
-    renderAchievements();
+    renderAchievements();renderAllRecords();renderTeam();
   });
   el('supSettingsEditor').addEventListener('click',event=>{
     if(event.target.id!=='supSaveSettings')return;
@@ -1942,11 +2025,13 @@ function initSupervisorCalculator(){
       next.tiers[Number(input.dataset.supTier)][input.dataset.supTierKey]=n;
     }
     if(invalid){el('supSettingsStatus').textContent=invalid;el('supSettingsStatus').style.color='#b33939';return;}
+    if(!saveDynamicSettings())return;
     next.ownP0UseModule=editor.querySelector('[data-sup-p0-basis="module"]')?.checked===true;
     next.includeSupervisorSales=editor.querySelector('[data-sup-include-sales]')?.checked===true;
     supSettings=normalizeSupervisorCommission(next);saveSupervisorCalculatorSettings();
     el('supSettingsStatus').textContent='Configuración guardada localmente'+(isAuthorized()?' · sincronización en cola.':'. Inicia sesión para sincronizarla.');
     el('supSettingsStatus').style.color='';
+    toggleSettings(false);
   });
 }
 
@@ -1983,6 +2068,7 @@ function switchPage(page){
   if(el('settingsPanel').open){el('settingsPanel').open=false;el('toggleSettings').setAttribute('aria-expanded','false');}
 }
 for(const b of document.querySelectorAll('[data-page-tab]'))b.addEventListener('click',()=>switchPage(b.dataset.pageTab));
+el('dailyCopyWhatsApp').addEventListener('click',copyDailyWhatsApp);
 el('dailyDateMode').addEventListener('change',()=>{renderDaily();});
 for(const id of ['dailyCurrentDate','dailyPreviousDate'])el(id).addEventListener('change',()=>renderDaily());
 for(const id of ['accumulatedFrom','accumulatedTo'])el(id).addEventListener('change',renderAccumulated);
@@ -2048,10 +2134,13 @@ el('teamTable').addEventListener('click',e=>{
     const incidenceDiscount=round(beforePenalty*incPenalty/100);
     const discounts=round(beforePenalty*penalty/100);
     const afterPenalty=round(beforePenalty-discounts);
-    const net=round(afterPenalty-d.recover);
+    const dynamicBonusCount=Math.min(validSales,Math.max(0,Math.floor(Number(d.dynamicBonusCount)||0)));
+    const dynamicBonus=round(dynamicBonusCount*dynamicBonusAmount());
+    const netBeforeDynamic=round(afterPenalty-d.recover);
+    const net=round(netBeforeDynamic+dynamicBonus);
     const nextTarget=TIER.find(x=>x.min>completion);
     const needed=nextTarget?Math.max(0,Math.ceil(nextTarget.min*d.goal/100-1e-10)-validSales):0;
-    return {ok:true,warnings,validReg,validGuar,validSales,validDental,validApp,validP0,excludedSales,completion,tier,p0rate,p0Penalty,incPenalty,penalty,salePay,dentalPay,appPay,p0Pay,gross,bonus,beforePenalty,p0Discount,incidenceDiscount,discounts,afterPenalty,recover:d.recover,net,nextTarget,needed,inc:d.inc,goal:d.goal};
+    return {ok:true,warnings,validReg,validGuar,validSales,validDental,validApp,validP0,excludedSales,completion,tier,p0rate,p0Penalty,incPenalty,penalty,salePay,dentalPay,appPay,p0Pay,gross,bonus,beforePenalty,p0Discount,incidenceDiscount,discounts,afterPenalty,recover:d.recover,dynamicBonusCount,dynamicBonus,netBeforeDynamic,net,nextTarget,needed,inc:d.inc,goal:d.goal};
   }
   // V14 · Edición autorizada de importes por escalón (sin cambiar umbrales ni penalizaciones).
   function renderCommissionRateEditor(){
@@ -2091,7 +2180,7 @@ el('teamTable').addEventListener('click',e=>{
   window.CALC_ENGINE={calculate,tiers:TIER};
 
   function setForm(which){for(const k of KEYS){const input=document.querySelector(`[data-scenario="${which}"] [data-field="${k}"]`);input.value=state[which][k];}}
-  function syncForm(which){const d={};for(const k of KEYS){const input=document.querySelector(`[data-scenario="${which}"] [data-field="${k}"]`);d[k]=input.value===''?NaN:Number(input.value);}state[which]=d;}
+  function syncForm(which){const d={dynamicBonusCount:state[which].dynamicBonusCount||0};for(const k of KEYS){const input=document.querySelector(`[data-scenario="${which}"] [data-field="${k}"]`);d[k]=input.value===''?NaN:Number(input.value);}state[which]=d;}
   function persist(){try{localStorage.setItem(storageKey,JSON.stringify(state));}catch(_){}}
   function restore(){try{const saved=JSON.parse(localStorage.getItem(storageKey)||'null');if(saved&&saved.base&&saved.sim){for(const s of ['base','sim'])for(const k of KEYS){if(Number.isFinite(saved[s][k]))state[s][k]=saved[s][k];}}}catch(_){}}
   function update(which){setForm(which);render();persist();}
@@ -2106,15 +2195,15 @@ el('teamTable').addEventListener('click',e=>{
   ];
   function paymentConcepts(r){
     if(!r.ok)return [];
-    return PAYMENT_CONCEPTS.map(([label,totalKey,qtyKey,rateKey])=>({
+    return [...PAYMENT_CONCEPTS,['Bono por dinámica','dynamicBonus','dynamicBonusCount','dynamicBonus']].map(([label,totalKey,qtyKey,rateKey])=>({
       label,totalKey,quantity:qtyKey?r[qtyKey]:(r.inc===0&&r.tier?1:0),
-      rate:r.tier?.[rateKey]||0,total:r[totalKey]
+      rate:rateKey==='dynamicBonus'?dynamicBonusAmount():r.tier?.[rateKey]||0,total:r[totalKey]
     }));
   }
   function paymentBreakdownHtml(r){
     if(!r.ok)return '';
     const items=paymentConcepts(r);
-    return `<div class="commission-detail"><div class="commission-detail-title">Pago por concepto <span>cantidad × tarifa unitaria</span></div><div class="concept-pay-list">${items.map(item=>`<div class="concept-pay-row"><span class="concept-name">${esc(item.label)}</span><span class="concept-amount"><strong>${mx(item.total)}</strong> <small>(${number.format(item.quantity)} × ${mx(item.rate)})</small></span></div>`).join('')}</div><div class="commission-detail-foot">Antes de descuentos: <b>${mx(r.beforePenalty)}</b> · Descuentos: <b>−${mx(r.discounts)}</b>${r.recover?` · Recuperación: <b>−${mx(r.recover)}</b>`:''}</div></div>`;
+    return `<div class="commission-detail"><div class="commission-detail-title">Pago por concepto <span>cantidad × tarifa unitaria</span></div><div class="concept-pay-list">${items.map(item=>`<div class="concept-pay-row"><span class="concept-name">${esc(item.label)}</span><span class="concept-amount"><strong>${mx(item.total)}</strong> <small>(${number.format(item.quantity)} × ${mx(item.rate)})</small></span></div>`).join('')}</div><div class="commission-detail-foot">Bono por dinámica ${r.dynamicBonusCount} × ${mx(dynamicBonusAmount())}: <b>+${mx(r.dynamicBonus)}</b> (se suma después de todos los descuentos). Antes de descuentos: <b>${mx(r.beforePenalty)}</b> · Descuentos: <b>−${mx(r.discounts)}</b>${r.recover?` · Recuperación: <b>−${mx(r.recover)}</b>`:''}</div></div>`;
   }
   function htmlSummary(r){
     if(!r.ok){return `<div class="hero-line"><strong>Corrige los datos</strong><span class="pill alert">Sin cálculo</span></div><div class="scenario-flag">Verifica las cantidades de folios y sus complementos.</div>`;}
@@ -2158,7 +2247,7 @@ el('teamTable').addEventListener('click',e=>{
       ['Ventas: comisión','salePay','money'],['Plan Dental: comisión','dentalPay','money'],['ACT APP: comisión','appPay','money'],['Programa Cero: comisión','p0Pay','money'],
       ['Subtotal de conceptos','gross','money','subtotal'],['Bono por calidad','bonus','money'],['Base para descuentos','beforePenalty','money','subtotal'],
       ['Descuento P0','p0Discount','negMoney'],['Descuento por incidencias','incidenceDiscount','negMoney'],['Descuento total combinado','discounts','negMoney','subtotal'],
-      ['Neto después de porcentajes','afterPenalty','money','subtotal'],['Folios pagados antes: recuperación','recover','negMoney'],['TOTAL NETO SEMANAL','net','money','final']
+      ['Neto después de porcentajes','afterPenalty','money','subtotal'],['Folios pagados antes: recuperación','recover','negMoney'],['Bono por dinámica (al final)','dynamicBonus','money'],['TOTAL NETO SEMANAL','net','money','final']
     ];
     const renderValue=(r,k,t)=>{
       if(!r.ok)return '—';
@@ -2218,10 +2307,10 @@ el('teamTable').addEventListener('click',e=>{
   el('export').addEventListener('click',()=>{
     if(activePage==='supervisor'){
       const c=supervisorCalculator();if(!c.ready){alert(c.reason);return;}
-      const lines=[['CALCULADORA DE SUPERVISOR','Valor'],['Supervisor',c.selected.name],['Módulo',c.selected.module],['Semana',weekLabel(supView.week)],['Objetivo de ventas',c.goal],['Ventas válidas del equipo',c.teamValid.length],['Ventas de supervisores incluidas',c.supervisorValid.length],['Cumplimiento %',c.completion],['Calidad total %',c.q.composite],['Alcance global %',c.q.global],['Bono base',supSettings.baseBonus??'Sin configurar'],['Cálculo base',c.base],...c.additional.map(b=>['Bono '+b.threshold+'%',b.configured?b.earned:'Sin configurar']),['Penalización Plan Cero módulo %',c.modulePenalty],['Descuento Plan Cero módulo',c.incentiveDiscount],['Bono neto módulo',c.incentiveNet],['Ventas propias brutas',c.ownGross],['Penalización Plan Cero propias %',c.ownP0Penalty],['Penalización incidencias propias %',c.ownIncPenalty],['Ventas propias netas',c.ownNet],['TOTAL ESTIMADO',c.total],[],['CALIDAD','Alcance %','Calidad %'],...SUP_FACTOR_KEYS.map(k=>[SUP_FACTOR_LABELS[k],c.q.actual[k],c.q.factors[k]]),[],['PAGO POR CONCEPTO','Cantidad','Tarifa','Total'],...c.parts.map(x=>[x.name,x.count,x.rate,x.total])];
+      const lines=[['CALCULADORA DE SUPERVISOR','Valor'],['Supervisor',c.selected.name],['Módulo',c.selected.module],['Semana',weekLabel(supView.week)],['Objetivo de ventas',c.goal],['Ventas válidas del equipo',c.teamValid.length],['Incluir ventas del supervisor',c.includeSupervisorSales?'Sí':'No'],['Ventas propias incluidas en cumplimiento',c.includeSupervisorSales?c.ownValid.length:0],['Ventas válidas del módulo para cumplimiento',c.completionSales],['Cumplimiento para escalón propio %',c.teamCompletion],['Cumplimiento %',c.completion],['Calidad total %',c.q.composite],['Alcance global %',c.q.global],['Bono base',supSettings.baseBonus??'Sin configurar'],['Cálculo base',c.base],...c.additional.map(b=>['Bono '+b.threshold+'%',b.configured?b.earned:'Sin configurar']),['Penalización Plan Cero módulo %',c.modulePenalty],['Descuento Plan Cero módulo',c.incentiveDiscount],['Bono neto módulo',c.incentiveNet],['Ventas propias brutas',c.ownGross],['Penalización Plan Cero propias %',c.ownP0Penalty],['Penalización incidencias propias %',c.ownIncPenalty],['Ventas propias netas',c.ownNet],['Bono por dinámica · ventas propias',c.ownDynamicBonus],['Cantidad de folios con dinámica',c.ownDynamicBonusCount],['TOTAL ESTIMADO',c.total],[],['CALIDAD','Alcance %','Calidad %'],...SUP_FACTOR_KEYS.map(k=>[SUP_FACTOR_LABELS[k],c.q.actual[k],c.q.factors[k]]),[],['PAGO POR CONCEPTO','Cantidad','Tarifa','Total'],...c.parts.map(x=>[x.name,x.count,x.rate,x.total])];
       for(const [title,rows] of [['FOLIOS DE EJECUTIVOS',c.src.team],['FOLIOS DE SUPERVISOR',c.src.own]]){
-        lines.push([], [title,'Fecha','Ejecutivo','Folio','Código','P0','Dental','APP','Incidencia']);
-        for(const r of [...rows].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.i-a.i))lines.push(['',r.fecha,r.executive,r.folio,r.code,r.p0,r.dental,appEnabled(r)?'Sí':'No',selectedIncident(r)?'Sí':'No']);
+        lines.push([], [title,'Fecha','Ejecutivo','Folio','Código','P0','Dental','APP','Incidencia','Bono adicional']);
+        for(const r of [...rows].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.i-a.i))lines.push(['',r.fecha,r.executive,r.folio,r.code,r.p0,r.dental,appEnabled(r)?'Sí':'No',selectedIncident(r)?'Sí':'No',getCellText(r,'dynamicBonus')]);
       }
       const csv='\ufeff'+lines.map(row=>row.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
       saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),`supervisor_${supView.week||'sin_semana'}.csv`);return;
@@ -2291,17 +2380,17 @@ el('teamTable').addEventListener('click',e=>{
     }
     if(activePage==='team'&&imported.data){
       const items=filteredTeamEntries();
-      const lines=[['Ejecutivo','Módulo','Semana','Meta','Cumplimiento %','Ventas regulares','Ventas garantizadas','Ventas totales','APP','Programa Cero','Plan Dental','Incidencias','Escalón','Comisión estimada MXN'],...items.map(e=>{const r=e.result;return [e.name,e.module,weekLabel(imported.week),e.goal,r.ok?r.completion:'',r.ok?r.validReg:'',r.ok?r.validGuar:'',r.ok?r.validSales:'',r.ok?r.validApp:'',r.ok?r.validP0:'',r.ok?r.validDental:'',e.inputs.inc,briefTier(r),r.ok?r.net:'Revisar']})];
+      const lines=[['Ejecutivo','Módulo','Semana','Meta','Cumplimiento %','Ventas regulares','Ventas garantizadas','Ventas totales','APP','Programa Cero','Plan Dental','Incidencias','Escalón','Folios dinámica','Bono por dinámica MXN','Comisión estimada MXN'],...items.map(e=>{const r=e.result;return [e.name,e.module,weekLabel(imported.week),e.goal,r.ok?r.completion:'',r.ok?r.validReg:'',r.ok?r.validGuar:'',r.ok?r.validSales:'',r.ok?r.validApp:'',r.ok?r.validP0:'',r.ok?r.validDental:'',e.inputs.inc,briefTier(r),r.ok?r.dynamicBonusCount:'',r.ok?r.dynamicBonus:'',r.ok?r.net:'Revisar']})];
       const csv='\ufeff'+lines.map(row=>row.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
       saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),`comparativo_ejecutivos_${imported.week}.csv`);return;
     }
     const a=calculate(state.base),b=calculate(state.sim);
     if(!a.ok||!b.ok){alert('Corrige los datos antes de exportar.');return;}
     const rows=[['Concepto','Base','Simulación','Diferencia']];
-    const measures=[['Meta semanal','goal'],['Ventas regulares válidas','validReg'],['Ventas garantizadas válidas','validGuar'],['Ventas válidas','validSales'],['Cumplimiento %','completion'],['Programa Cero %','p0rate'],['Comisión por ventas','salePay'],['Comisión dental','dentalPay'],['Comisión APP','appPay'],['Comisión P0','p0Pay'],['Subtotal','gross'],['Bono','bonus'],['Penalización P0 %','p0Penalty'],['Penalización incidencias %','incPenalty'],['Descuento total','discounts'],['Descuento previo','recover'],['NETO','net']];
+    const measures=[['Meta semanal','goal'],['Ventas regulares válidas','validReg'],['Ventas garantizadas válidas','validGuar'],['Ventas válidas','validSales'],['Cumplimiento %','completion'],['Programa Cero %','p0rate'],['Comisión por ventas','salePay'],['Comisión dental','dentalPay'],['Comisión APP','appPay'],['Comisión P0','p0Pay'],['Subtotal','gross'],['Bono','bonus'],['Penalización P0 %','p0Penalty'],['Penalización incidencias %','incPenalty'],['Descuento total','discounts'],['Descuento previo','recover'],['Bono por dinámica','dynamicBonus'],['NETO','net']];
     for(const [label,key] of measures){const x=asNum(a[key]),y=asNum(b[key]);rows.push([label,x===null?'Exento':x,y===null?'Exento':y,x===null||y===null?'':round(y-x)]);}
     rows.push([],['DETALLE DE PAGO','Escenario base','Simulación','Diferencia']);
-    for(const [label,totalKey] of PAYMENT_CONCEPTS){
+    for(const [label,totalKey] of [...PAYMENT_CONCEPTS,['Bono por dinámica','dynamicBonus']]){
       const basePart=paymentConcepts(a).find(p=>p.totalKey===totalKey);
       const simPart=paymentConcepts(b).find(p=>p.totalKey===totalKey);
       const describe=p=>`${mx(p.total)} (${number.format(p.quantity)} x ${mx(p.rate)})`;
@@ -2360,6 +2449,25 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   el('authLogout').addEventListener('click',()=>{void window.APP_CLOUD?.logout?.();});
   el('toggleSettings').addEventListener('click',()=>toggleSettings());
   el('closeSettings').addEventListener('click',()=>toggleSettings(false));
+  function saveDynamicSettings(){
+    const input=el('dynamicBonusAmount'),msg=el('dynamicBonusStatus');
+    const raw=input.value.trim(),value=Number(raw);
+    if(!raw||!validRateAmount(value)){
+      msg.textContent='Monto inválido. Usa pesos MXN de 0 a 1,000,000 y máximo dos decimales.';
+      input.focus();return false;
+    }
+    dynamicBonusConfig={amount:value};
+    try{localStorage.setItem(DYNAMIC_BONUS_KEY,JSON.stringify(dynamicBonusConfig));}catch(err){msg.textContent='No se pudo guardar el importe: '+err.message;return false;}
+    msg.textContent='Bono por dinámica guardado: '+mx(value)+(isAuthorized()?' · sincronización pendiente.':' · solo en este dispositivo.');
+    if(importActive())computeImportedBase();
+    renderTeam();renderSupervisorCalculator();renderRecords();renderAllRecords();renderAchievements();
+    return true;
+  }
+  // Cualquiera de los tres botones Guardar valida ambos editores y cierra al terminar.
+  el('dynamicBonusAmount').value=dynamicBonusAmount();
+  el('dynamicBonusStatus').textContent='Importe configurado: '+mx(dynamicBonusAmount())+' por venta válida marcada.';
+  el('saveDynamicBonus').addEventListener('click',()=>el('supSaveSettings').click());
+  el('saveSettingsAndClose').addEventListener('click',()=>el('supSaveSettings').click());
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'&&settingsDialog.open)toggleSettings(false);
   });
@@ -2451,12 +2559,12 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   const REPORT_TEXT_DEFAULTS={
     individual:{subtitle:'Calculadora individual',description:'Comisiones simuladas: pueden existir variaciones respecto al monto final a pagar.',footer:'Lee los importes del escenario base y de la simulación. El desglose muestra tarifas, bono, incidencias, descuentos y pago neto estimado; los folios no comisionables no generan pago.'},
     team:{subtitle:'Comparativo de ejecutivos',description:'Comisiones simuladas: pueden existir variaciones respecto al monto final a pagar.',footer:'Cada fila corresponde a un ejecutivo. Compara su meta, ventas comisionables, nivel de cumplimiento y comisión estimada. Las incidencias y ajustes pueden modificar el importe final.'},
-    daily:{subtitle:'Comparativa diaria',description:'Actividad operativa del XLS · Totales y variación entre fechas seleccionadas.',footer:'Cada cifra presenta el resultado del día principal y su variación frente al día comparado. Calidad es el promedio ponderado de Cumplimiento, Plan Cero, Plan Dental, APP y Primera compra con objetivos configurables; se puede excluir a supervisores desde el filtro superior.'},
-    accumulated:{subtitle:'Acumulado general',description:'Resultados consolidados del historial XLS guardado.',footer:'Totales sobre todos los XLS históricos deduplicados. La Calidad utiliza las metas semanales configuradas acumuladas por las semanas con registros y los cinco factores y el porcentaje requerido de Calidad. Se puede excluir a supervisores desde el filtro superior.'},
+    daily:{subtitle:'Comparativa diaria',description:'Actividad operativa del XLS · Totales y variación entre fechas seleccionadas.',footer:'Cada cifra presenta el resultado del día principal y su variación frente al día comparado. Calidad Total es el promedio de Cumplimiento, Primera compra, Programa Cero y APP, topado a 100%; Alcance Global es el promedio de esas cuatro calidades más Calidad Total, sin tope. Dental es informativo; el filtro permite incluir o excluir supervisores.'},
+    accumulated:{subtitle:'Acumulado general',description:'Resultados consolidados del historial XLS guardado.',footer:'Totales de los XLS históricos deduplicados. Cumplimiento se calcula con las metas semanales y cada calidad divide el alcance real entre el requerido. Calidad Total promedia cuatro calidades con tope de 100% y Alcance Global promedia cinco valores sin tope. El filtro permite incluir o excluir supervisores.'},
     weekly:{subtitle:'Comparativa semanal',description:'Objetivos, resultados y cumplimiento por semana completa de lunes a domingo.',footer:'OBJETIVOS define metas por semana; CUMPLIMIENTO = resultado / objetivo; CALIDAD DE FACTORES aplica el porcentaje requerido, mínimo y máximo configurados para cada factor; ALCANCE GLOBAL = promedio de las cuatro calidades (Cumplimiento, Primera compra, Programa Cero y Activaciones) más Calidad Total, dividido entre cinco; sin tope. Los supervisores se incluyen según la casilla superior.'},
     allrecords:{subtitle:'Consulta de registros XLS',description:'Vista íntegra de los registros cargados, con filtros operativos combinados.',footer:'Se muestran las filas de los XLS activos que cumplen todos los filtros seleccionados. La columna Incidencia excluye pagos del folio; APP refleja la activación habilitada en el Dashboard. Filtrar no altera los cálculos.'},
     achievements:{subtitle:'Logros semanales',description:'Metas de registros y ventas en cantidades; planes, APP y primera compra en porcentajes requeridos.',footer:'Alcance real (número grande) = obtenido ÷ base u objetivo. Calidad (número pequeño) = alcance ÷ porcentaje requerido, con mínimos y máximos configurados. Todos los filtros de la tabla afectan los indicadores; los folios con incidencia se muestran, pero no cuentan para sus cálculos.'},
-    supervisor:{subtitle:'Calculadora de supervisor',description:'Bono por resultados del módulo y comisiones por ventas propias del supervisor.',footer:'El escalón de ventas propias utiliza las ventas pagables del equipo sin supervisores. Las incidencias excluyen folios completos y afectan la penalización de ventas propias. Los importes de bono base y bonos adicionales deben configurarse expresamente en Ajustes → 12.'}
+    supervisor:{subtitle:'Calculadora de supervisor',description:'Bono por resultados del módulo y comisiones por ventas propias del supervisor.',footer:'Bono del módulo = bono base × Alcance Global × min(1, Cumplimiento del módulo / 100). Las ventas propias se incluyen en Cumplimiento cuando su casilla está activa; el escalón de pago propio usa solo ventas válidas del equipo. El bono adicional de 110/115/120% es único; se aplican penalizaciones configuradas.'}
   };
   const REPORT_TITLE_DEFAULT='Reporte de avances merida';
   const reportTextState={title:REPORT_TITLE_DEFAULT,pages:{}};
@@ -2479,7 +2587,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return `<div class="report-heading"><div><h1>${esc(content.title)}</h1><p class="report-subtitle">${esc(content.subtitle)}</p><p class="report-disclaimer">${esc(content.description)}</p><p class="report-meta">${meta}</p></div><div class="report-brand">${brand}</div></div>`;
   }
   function reportFootMarkup(page){
-    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión 2.4.2</div></footer>`;
+    return `<footer class="report-foot"><div class="report-footnote"><strong>NOTA PARA LEER EL REPORTE</strong><p>${esc(reportTextFor(page).footer)}</p></div><div class="report-foot-version">Versión ${APP_VERSION}</div></footer>`;
   }
   function initReportTextEditor(){
     loadReportTexts();
@@ -2539,11 +2647,11 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     const [,accent,deep]=THEME_COLORS[uiLayout.theme];
     let valid=entries.filter(e=>e.result.ok);
     const sums=valid.reduce((v,e)=>{const r=e.result;v.sales+=r.validSales;v.goal+=r.goal;v.net+=r.net;return v},{sales:0,goal:0,net:0});
-    const tr=entries.map(e=>{const r=e.result;return `<tr><td>${esc(e.name)}</td><td>${esc(e.module)}</td><td>${e.goal}</td><td>${r.ok?pct(r.completion):'—'}</td><td>${r.ok?r.validReg:'—'}</td><td>${r.ok?r.validGuar:'—'}</td><td>${r.ok?r.validSales:'—'}</td><td>${r.ok?r.validApp:'—'}</td><td>${r.ok?r.validP0:'—'}</td><td>${r.ok?r.validDental:'—'}</td><td>${r.inc||0}</td><td>${briefTier(r)}</td><td>${r.ok?mx(r.net):'Revisar'}</td></tr>`}).join('');
-    const headers=['Ejecutivo','Módulo','Meta','Cumpl.','Reg.','Gar.','Ventas','APP','P0','Dental','Inc.','Escalón','Comisión'];
+    const tr=entries.map(e=>{const r=e.result;return `<tr><td>${esc(e.name)}</td><td>${esc(e.module)}</td><td>${e.goal}</td><td>${r.ok?pct(r.completion):'—'}</td><td>${r.ok?r.validReg:'—'}</td><td>${r.ok?r.validGuar:'—'}</td><td>${r.ok?r.validSales:'—'}</td><td>${r.ok?r.validApp:'—'}</td><td>${r.ok?r.validP0:'—'}</td><td>${r.ok?r.validDental:'—'}</td><td>${r.inc||0}</td><td>${briefTier(r)}</td><td>${r.ok?r.dynamicBonusCount:0}</td><td>${r.ok?mx(r.dynamicBonus):'—'}</td><td>${r.ok?mx(r.net):'Revisar'}</td></tr>`}).join('');
+    const headers=['Ejecutivo','Módulo','Meta','Cumpl.','Reg.','Gar.','Ventas','APP','P0','Dental','Inc.','Escalón','Folios din.','Dinámica','Comisión'];
     const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("team",`Semana: ${esc(weekLabel(imported.week))} · Calculo manual desde google forms · ${entries.length} ejecutivos visibles · ${new Date().toLocaleString('es-MX')}`)}
       <section class="report-section report-section-team-summary" data-report-section="team-summary"><h2>Resumen del equipo</h2><div class="report-kpis"><div class="report-kpi"><div class="rlabel">Ejecutivos</div><div class="rval">${entries.length}</div></div><div class="report-kpi"><div class="rlabel">Ventas válidas</div><div class="rval">${sums.sales}</div></div><div class="report-kpi"><div class="rlabel">Comisiones estimadas</div><div class="rval">${mx(round(sums.net))}</div></div></div></section>
-      <section class="report-section report-section-team" data-report-section="team"><h2>Comparativo por ejecutivo</h2><table class="team-export-table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${tr||'<tr><td colspan="13">Sin registros para los filtros seleccionados.</td></tr>'}</tbody></table><p class="report-note">Metas individuales editables. APP considerada por cada venta válida, excepto desactivaciones manuales. Incidencias, estatus no pagables, descuentos y penalización de Programa Cero aplicados por ejecutivo. Los objetivos se presuponen en 10 salvo modificación.</p></section>${reportFootMarkup("team")}</div>`;
+      <section class="report-section report-section-team" data-report-section="team"><h2>Comparativo por ejecutivo</h2><table class="team-export-table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${tr||'<tr><td colspan="15">Sin registros para los filtros seleccionados.</td></tr>'}</tbody></table><p class="report-note">Metas individuales editables. APP considerada por cada venta válida, excepto desactivaciones manuales. Incidencias, estatus no pagables, descuentos y penalización de Programa Cero aplicados por ejecutivo. Los objetivos se presuponen en 10 salvo modificación.</p></section>${reportFootMarkup("team")}</div>`;
     el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}</style>${html}`;
     return el('printPage');
   }
@@ -2664,38 +2772,22 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return el('printPage');
   }
 
+  function supervisorStatementModel(){
+    const c=supervisorCalculator();
+    return createSupervisorStatement(c,{
+      week:supView.week,version:APP_VERSION,settings:supSettings,
+      weekLabel,fmtDay,goalFor:executiveGoal,
+      eligible:r=>candidate(r)&&!excluded(r),
+      fee:supRowFee,guarantee:guaranteeType,hasP0:r=>isYes(r.p0),hasDental:r=>isYes(r.dental),
+      hasApp:appEnabled,incident:selectedIncident,marked:dynamicBonusMarked,dynamicAmount:dynamicBonusAmount(),
+      printed:{overview:supPrintEnabled('overview'),team:supPrintEnabled('team'),bonus:supPrintEnabled('bonus'),
+        own:supPrintEnabled('own'),recordsOwn:supPrintEnabled('recordsOwn'),recordsTeam:supPrintEnabled('recordsTeam'),
+        search:supPrintEnabled('search'),searchText:el('supSearch')?.value||''}
+    });
+  }
   function buildSupervisorReport(){
-    const c=supervisorCalculator(),[,accent,deep]=THEME_COLORS[uiLayout.theme];
-    const tab=(heads,rows)=>`<table class="sup-report-table"><thead><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(v=>`<td>${esc(String(v??'—'))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-    const sections=[];
-    if(c.ready){
-      if(supPrintEnabled('filters'))sections.push(`<section class="report-section" data-report-section="sup-filters"><h2>Parámetros de consulta</h2>${tab(['Campo','Selección'],[['Semana',supView.week?weekLabel(supView.week):'—'],['Supervisor',c.selected.name],['Módulo',c.selected.module]])}</section>`);
-      if(supPrintEnabled('overview'))sections.push(`<section class="report-section" data-report-section="sup-overview"><h2>Resumen de comisiones</h2>${tab(['Concepto','Importe'],[['Comisión total estimada',mx(c.total)],['Bono por módulo',mx(c.incentiveNet)],['Ventas propias',mx(c.ownNet)]])}</section>`);
-      if(supPrintEnabled('search'))sections.push(`<section class="report-section" data-report-section="sup-search"><h2>Búsqueda aplicada</h2>${tab(['Filtro','Valor'],[['Búsqueda de folios',el('supSearch')?.value||'Sin filtro']])}</section>`);
-      const factors=SUP_FACTOR_KEYS.map(k=>[SUP_FACTOR_LABELS[k],supText(c.q.actual[k]),supText(c.q.factors[k])]);
-      factors.push(['Calidad total',supText(c.q.composite),supText(c.q.global)]);
-      if(supPrintEnabled('team'))sections.push(`<section class="report-section" data-report-section="sup-quality"><h2>Calidad del equipo</h2>${tab(['Factor','Alcance','Calidad'],factors)}</section>`);
-      const bonus=[['Objetivo del equipo',`${number.format(c.goal)} ventas`],['Ventas pagables del equipo',c.teamValid.length],['Ventas de supervisores incluidas',c.supervisorValid.length],['Cumplimiento del módulo',supText(c.completion)],['Escalón aplicable',c.tier?pct(c.tier.min)+' o más':'Sin escalón'],['Calidad total',supText(c.q.composite)],['Alcance global',supText(c.q.global)],['Bono base',c.bonusConfigured?mx(supSettings.baseBonus):'Pendiente de configurar'],['Cálculo base',mx(c.base)],...c.additional.map(b=>['Bono por '+pct(b.threshold),b.configured?mx(b.earned):'Pendiente de configurar']),['Subtotal',mx(c.incentiveBefore)],['Plan Cero módulo',supText(c.moduleP0Reach)],['Descuento P0 módulo ('+pct(c.modulePenalty)+')','−'+mx(c.incentiveDiscount)],['Bono neto módulo',mx(c.incentiveNet)]];
-      if(supPrintEnabled('bonus'))sections.push(`<section class="report-section" data-report-section="sup-bonus"><h2>Bono por resultados del módulo</h2>${tab(['Concepto','Resultado'],bonus)}</section>`);
-      const own=[...c.parts.map(x=>[x.name,`${x.count} × ${mx(x.rate)}`,mx(x.total)]),['Subtotal ventas propias','',mx(c.ownGross)],['Incidencias propias',c.ownInc,''],['Base para penalización P0',c.ownP0Basis,''],['Plan Cero evaluado / requerido',supText(c.ownP0ComparedReach)+' / '+pct(c.ownP0ComparedThreshold),''],['Descuento Plan Cero ('+pct(c.ownP0Penalty)+')','','−'+mx(c.ownP0Discount)],['Descuento incidencias ('+pct(c.ownIncPenalty)+')','','−'+mx(c.ownIncDiscount)],['Neto ventas propias','',mx(c.ownNet)],['TOTAL SUPERVISOR','',mx(c.total)]];
-      if(supPrintEnabled('own'))sections.push(`<section class="report-section" data-report-section="sup-own"><h2>Ventas propias del supervisor</h2>${tab(['Concepto','Cantidad × tarifa','Pago'],own)}</section>`);
-      for(const [key,title,rows,kind] of [['sup-team-records','Folios de ejecutivos',c.src.team,'team'],['sup-own-records','Folios del supervisor',c.src.own,'own']]){
-        if(!supPrintEnabled(key==='sup-team-records'?'recordsTeam':'recordsOwn'))continue;
-        sections.push(`<section class="report-section" data-report-section="${key}"><h2>${title} (${rows.length})</h2>${supTableMarkup([...rows].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.i-a.i),c,kind,true)}</section>`);
-      }
-    }
-    const selected=c.selected||supReadSelection();
-    const meta=`${supView.week?weekLabel(supView.week):'Sin semana'} · ${selected?esc(selected.name)+' · '+esc(selected.module):'Sin supervisor'} · Cálculo simulado`;
-    el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}
-.report-page .sup-report-table{width:100%;border-collapse:collapse;font-size:10px;margin:4px 0 12px}
-.report-page .sup-report-table th,.report-page .sup-report-table td{border:1px solid #dce5ef;padding:5px 8px;text-align:left}
-.report-page .sup-report-table th{background:#edf4fc;color:#244663}
-.report-page .sup-report-table td:last-child{font-weight:750}
-.report-page .sup-report-records{width:100%;border-collapse:collapse;font-size:8px}
-.report-page .sup-report-records th,.report-page .sup-report-records td{border:1px solid #dce5ef;padding:3px 5px;overflow-wrap:anywhere}
-.report-page .sup-report-records th{background:#edf4fc}
-.report-page section[data-report-section="sup-team-records"],.report-page section[data-report-section="sup-own-records"]{break-before:page;page-break-before:always}
-</style><div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup('supervisor',meta)}${sections.join('')||'<p>Asigna supervisor e importa XLS.</p>'}${reportFootMarkup('supervisor')}</div>`;
+    const model=supervisorStatementModel();
+    el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}\n${SUPERVISOR_STATEMENT_CSS}</style>${supervisorStatementHtml(model)}`;
     return el('printPage');
   }
 
@@ -2915,7 +3007,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=70;line(margin,y,content);y+=16;
     write('NOTA PARA LEER EL REPORTE',margin,y,10,true,deep);y+=20;
     y=paragraph(reportTexts.footer,margin,y,content,11,17,'#4b5c70')+19;
-    write('Versión 2.4.2',margin+content-84,y,10,false,'#6b7b8e');y+=32;
+    write('Versión '+APP_VERSION,margin+content-84,y,10,false,'#6b7b8e');y+=32;
     return Math.ceil(y);
   }
   function exportPng(){
@@ -2924,14 +3016,18 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     button.disabled=true;button.textContent='Generando imagen…';
     try{
       buildReport();
-      const probe=document.createElement('canvas').getContext('2d');const w=1120,h=paintReportCanvas(probe,false);
+      const supModel=activePage==='supervisor'?supervisorStatementModel():null;
+      const probe=document.createElement('canvas').getContext('2d');
+      const measured=supModel?.ready?paintSupervisorStatement(probe,false,supModel):null;
+      const w=measured?.width||1120,h=measured?.height||paintReportCanvas(probe,false);
       // Escala máxima compatible sin superar límites habituales de tamaño/memoria de Canvas.
       const scale=Math.min(uiLayout.scale,24000/Math.max(w,h),Math.sqrt(90000000/(w*h)));
       if(scale<.75)throw Error('El reporte es demasiado extenso para generar un PNG legible. Reduce la cantidad de filas o utiliza Imprimir / PDF, que conserva el texto vectorial.');
       const canvas=document.createElement('canvas');canvas.width=Math.round(w*scale);canvas.height=Math.round(h*scale);
       const ctx=canvas.getContext('2d');if(!ctx)throw Error('No se pudo iniciar el lienzo PNG.');
       ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.scale(scale,scale);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-      paintReportCanvas(ctx,true);
+      if(supModel?.ready)paintSupervisorStatement(ctx,true,supModel);
+      else paintReportCanvas(ctx,true);
       canvas.toBlob(blob=>{
         button.disabled=false;button.textContent=before;
         if(blob)saveBlob(blob,activePage==='supervisor'?`calculadora_supervisor_${supView.week||'sin_semana'}.png`:activePage==='achievements'?`logros_semanales_${achValue('achWeek')||'sin_semana'}.png`:activePage==='allrecords'?`registros_xls_${dateIso(new Date())}.png`:activePage==='weekly'?`comparativa_semanal_${weeklySelection().primary}_vs_${weeklySelection().previous}.png`:activePage==='accumulated'?`acumulado_general_${el('accumulatedFrom').value||'todo'}_${el('accumulatedTo').value||'todo'}.png`:activePage==='daily'?`comparativa_diaria_${imported.data?dailyDates().latest:'sin_datos'}.png`:activePage==='team'?`comisiones_equipo_${imported.week}.png`:`comisiones_simuladas_${importActive()?imported.week:'manual'}.png`);
@@ -2949,7 +3045,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   window.APP_CLOUD?.registerRefresh(async()=>{
     if(!isAuthorized())return;
     archive.reports=await archiveGetAll();archive.temporaryMode=false;
-    archiveSelectionRestore();loadFolioFlags();loadCommissionRates();
+    archiveSelectionRestore();loadFolioFlags();loadCommissionRates();dynamicBonusConfig=loadDynamicBonus();if(el('dynamicBonusAmount'))el('dynamicBonusAmount').value=dynamicBonusAmount();
     refreshArchiveData(true);refreshAuthorizedPages();render();window.VISITS?.refreshSources();
   });
   // Solo lectura: acuse consulta TODOS los XLS del historial, sin aplicar filtros visuales.

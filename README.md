@@ -1,3 +1,39 @@
+# Dashboard y comisiones Mérida · V2.4.8 (13 de noviembre de 2026)
+
+## Metodología VIGENTE (prevalece sobre el historial de versiones que aparece abajo)
+
+1. **Calidad individual:** `calidad = 100 × (alcance real / requerido)`. Alcances reales: Cumplimiento = ventas pagables / meta de ventas; Primera compra = ventas con Plan Cero **o** Dental / ventas pagables (solo una vez por venta); Programa Cero = P0 de ventas regulares / ventas regulares; APP = activadas / ventas pagables. Las divisiones se expresan como porcentaje antes de calcular la calidad.
+2. **Umbral mínimo:** calidad inferior al **60%** → **0%**; 60% exacto conserva su valor. Es editable en Ajustes 10 y 12. Cumplimiento y Programa Cero **no se topan**; Primera compra y APP tienen **tope 100%**. Dental es un indicador adicional, pero no una quinta calidad para el promedio.
+3. **Calidad Total:** `min(100, (Cumplimiento + Primera compra + Programa Cero + APP) / 4)`.
+4. **Alcance Global:** `(Cumplimiento + Primera compra + Programa Cero + APP + Calidad Total) / 5`, **sin tope**. No se utiliza un requerido adicional ni ponderaciones.
+5. **Bono base del supervisor:** `Bono base × Alcance Global/100 × min(1, Cumplimiento real del módulo/100)`. Si el cumplimiento es ≥100% **no se vuelve a multiplicar por el cumplimiento**. Los bonos extraordinarios por 110/115/120% son **excluyentes**, se paga únicamente el mayor alcanzado, con porcentajes y montos editables. Después se aplica la penalización P0 del módulo si procede.
+6. **Casilla en Ajustes 12 (activada por defecto):** suma las ventas pagables del supervisor seleccionado a las ventas del módulo **para el cálculo de Cumplimiento** y la comisión base. Desactivarla deja solo las ventas pagables de ejecutivos. **No** cambia los otros tres factores del equipo, la penalización P0 del equipo ni el escalón de pago de las ventas propias, el cual siempre utiliza el cumplimiento de ejecutivos sin supervisores. Otros supervisores no se incluyen.
+7. **Ventas propias:** se calculan por separado según tarifas del escalón del equipo y se aplican descuentos P0 e incidencias conforme a Ajustes 12. El total antes de dinámicas es bono neto del módulo + ventas propias netas. Las incidencias excluyen el folio completo del pago.
+8. **Bono por dinámica (nuevo):** en Ajustes 13 se configura un importe fijo por cada venta pagable con la casilla **Bono adicional** marcada en sus registros. La casilla se comparte entre tablas y entre dispositivos cuando hay sesión. No generan bono los folios sin código, con incidencia o no pagables. **Ejecutivo:** Neto final = Neto anterior (después de descuentos/recuperaciones) + nº de folios válidos marcados × monto. **Supervisor:** Total final = Bono módulo neto + ventas propias netas + nº de ventas propias válidas marcadas × monto. No se duplica el bono de los ejecutivos dentro del bono del módulo. El importe es global para los registros marcados y cambios posteriores recalculan el total de acuerdo con el importe actual.
+
+### Compatibilidad con configuraciones anteriores
+
+Las cuentas que guardaron un mínimo `0%` con versiones anteriores lo reciben como `60%` al abrir esta versión (migración de mínimos antiguos sin marca de versión). Los mínimos personalizados **distintos de 0** se conservan. Tras guardar de nuevo la configuración, se puede establecer explícitamente `0%` en cualquier mínimo editable y se respetará. Inicia sesión y guarda los Ajustes 12 para sincronizarlos. No es necesario alterar tablas de PostgreSQL ni volver a importar XLS.
+
+**Etiquetas:** la V2.4.8 se muestra en los pies de página, PDF, PNG y exportaciones. El bono por dinámica de la versión anterior se mantiene sin cambios.
+
+### Comparativa diaria → Copiar para WhatsApp (V2.4.8)
+
+En la página **Comparativa diaria**, después de importar el XLS, selecciona «Automático» (última fecha con registros contra el día anterior) o «Seleccionar fechas». Marca o desmarca la inclusión de supervisores según requieras. El botón flotante inferior derecho **Copiar para WhatsApp** copia un texto con fecha principal y comparada, y los siete indicadores de la tabla **Por módulo** en total: Registros, Ventas, Regulares, Garantizadas, Programa Cero, Plan Dental y Calidad. Para los primeros seis, el paréntesis muestra la diferencia en unidades; para Calidad muestra puntos porcentuales. La Calidad es el mismo Alcance Global que aparece en la columna Calidad de esa tabla. Si no hay datos para calcularla, se indica con «—», sin inventar 0%.
+
+El mensaje incluye marcas de WhatsApp: `*...*` para título, `_..._` para fechas y una tabla entre **tres acentos graves** para mantener las columnas alineadas en un bloque monoespaciado. **Copia todo el mensaje tal cual** y pégalo en WhatsApp: no borres las líneas de acentos graves. Si el navegador niega permiso al portapapeles, se muestra un aviso. El botón no existe en otras páginas ni se incluye en las exportaciones.
+
+### Estado de comisión del supervisor (V2.4.7)
+Al estar en **Calculadora de supervisor**, los botones **Imprimir / PDF** y **Exportar PNG** producen un estado de comisión compacto azul y naranja con cabecera, cinco KPI, indicadores del equipo, desglose de bono, equipo por ejecutivo, ventas propias y sus folios. Usa los importes y las metas realmente calculadas; el equipo se informa en cantidades porque la calculadora no determina su comisión individual en esta vista. La sección de folios del equipo puede activarse con la casilla de impresión de la página (desmarcada inicialmente); los folios propios aparecen marcados para imprimir. Para PDF selecciona guardar como PDF en el diálogo de impresión y activa gráficos de fondo si el navegador lo requiere. Se usa hoja **A4 vertical** en lugar del paisaje del resto del proyecto.
+
+### Guardar y cerrar ajustes (V2.4.7)
+
+Abre **Ajustes**, modifica tarifas/calidades/monto fijo; el botón superior **Guardar ajustes y cerrar** valida y guarda tanto el editor de supervisor como el bono por dinámica y luego cierra Ajustes. El botón **Guardar configuración de supervisor** y el botón **Guardar bono por dinámica** hacen lo mismo para evitar perder cambios de la otra sección. Si hay un dato inválido, no cierra. Los demás ajustes automáticos continúan guardándose cuando cambian. Con sesión, se envían al servidor mediante la cola de sincronización habitual; cerrar el panel **no confirma que la nube haya recibido el cambio**, por lo que debe comprobarse el indicador de sincronización.
+
+---
+
+## Historial de versiones anteriores (la metodología antigua queda sustituida por la indicada arriba)
+
 ## V2.3.5 — Indicadores ligados a filtros y exclusión de incidencias (página 8)
 
 - Logros por porcentaje: cifra grande = alcance real; cifra pequeña = calidad individual después de requerido, mínimo y máximo. PDF, PNG y CSV contienen ambos valores en columnas distintas.
@@ -10,7 +46,7 @@
 
 **Novedad:** octava página «Logros semanales». Permite seleccionar semana y módulo, consultar logros en porcentajes (Registros, Cumplimiento, Dental, Plan Cero, Primera compra, Calidad compuesta y Alcance global), cantidades reales, y los registros detallados con búsqueda y filtros avanzados inicialmente contraídos. La tabla conserva las mismas columnas y casillas de incidencia/APP de la calculadora. PDF, PNG y CSV incluyen los indicadores y todos los registros filtrados.
 
-La página utiliza los porcentajes requeridos, mínimos, máximos y ponderaciones de Ajustes 10. La meta de registros debe configurarse por módulo; de lo contrario el porcentaje aparece como «—». Calidad compuesta es la media ponderada de cinco factores (incluida APP); Alcance global evalúa esa calidad respecto al porcentaje requerido de Calidad.
+La página utiliza porcentajes requeridos y mínimos de Ajustes 10; la meta de registros se configura por módulo. Calidad Total promedia cuatro factores, con tope 100%; Alcance Global promedia esos cuatro más Calidad Total, sin tope.
 
 Cambiar semana, módulo, buscar o filtrar no llama a PostgreSQL. Las ocho páginas son accesibles sin login con XLS temporales; el historial XLS y los ajustes compartidos siguen protegidos por Netlify Identity.
 
@@ -73,13 +109,13 @@ No se modifica el esquema PostgreSQL ni las Netlify Functions. No es necesario v
 
 ## Versión 2.2.1 · Calidad y supervisores
 
-**Página 3 – Comparativa diaria:** calidad calculada por módulo y por ejecutivo con los cinco factores ponderados, evaluados a su vez contra el porcentaje requerido de Calidad. Se mantiene el comparativo frente al día elegido; el objetivo semanal se prorratea a un día para esta vista.
+**Página 3 – Comparativa diaria:** Calidad Total calculada con cuatro factores y Alcance Global con cinco valores, sin ponderaciones adicionales. Se mantiene el comparativo frente al día elegido; el objetivo semanal se prorratea a un día para esta vista.
 
 **Página 4 – Acumulado general:** los dos comparativos incluyen calidad calculada del conjunto de registros visibles. El objetivo semanal corresponde al número de semanas representadas.
 
-**Página 5 – Comparativa semanal:** las dos tablas muestran **Calidad de factores** (nivel respecto a metas para los seis indicadores) y **Alcance global** (calidad operativa de cinco factores evaluada contra el requerido de Calidad). Si defines la meta de ventas en la fila de objetivos de la semana, se usa esa meta para el cálculo global de esa semana.
+**Página 5 – Comparativa semanal:** las dos tablas muestran **Calidad de factores** (nivel respecto a sus metas) y **Alcance Global** (media de cuatro calidades más Calidad Total, sin dividir de nuevo entre un requerido). Si defines la meta de ventas en la fila de objetivos de la semana, se usa esa meta para el cálculo global de esa semana.
 
-**Ajustes:** dos apartados nuevos, Calidad y objetivos (metas, umbrales, pesos y valores por módulo) y Supervisores por módulo (elegibles entre los ejecutivos cargados). Ambos se sincronizan en Netlify con la sesión autenticada. Las casillas para incluir supervisores en páginas 3–5 funcionan de forma local y se pueden ajustar independientemente en cada página.
+**Ajustes:** dos apartados de Calidad y objetivos (metas, umbrales y valores por módulo) y Supervisores por módulo (elegibles entre los ejecutivos cargados). Ambos se sincronizan en Netlify con la sesión autenticada. Las casillas para incluir supervisores en páginas 3–5 funcionan de forma local y se pueden ajustar independientemente en cada página.
 
 **Búsqueda de folios:** el filtro general en páginas 1 y 7 siempre está visible. La página 7 conserva el orden cronológico descendente en pantalla y exportaciones.
 
@@ -89,13 +125,13 @@ No se modifican comisiones, Netlify Identity, las funciones de servidor ni el es
 
 En V2.2, el navegador intentaba sincronizar objetivos y supervisores, pero la Function `settings` rechazaba esas dos claves; el guardado quedaba pendiente. V2.2.1 corrige la lista de claves aceptadas en servidor. Publica **también** `netlify/functions/settings.js`, no solo `src/legacy-app.js`.
 
-Los factores de calidad operativa de módulos y ejecutivos utilizan los mínimos y máximos que configures; de forma predeterminada los mínimos son 0%, sin corte general al 60%. La escala de comisiones y penalizaciones permanece intacta. Si hay cambios pendientes desde V2.2, tras el despliegue pulsa **Sincronizar** y comprueba que el estado deje de indicar cambios pendientes.
+Los mínimos individuales predeterminados ahora son 60%; se conservan como valores editables. La escala de comisiones y penalizaciones permanece intacta. Si hay cambios pendientes desde V2.2, tras el despliegue pulsa **Sincronizar** y comprueba que el estado deje de indicar cambios pendientes.
 
 
 ## V2.2.3 · Porcentajes requeridos y navegación pública
 - Los seis rubros configurables son Cumplimiento, Plan Cero, Plan Dental, Activación APP, Primera compra y Calidad. Para cada uno: porcentaje requerido, mínimo de calidad y máximo opcional; por módulo prevalece la configuración específica.
 - La calidad individual = (alcance real / porcentaje requerido) × 100; si queda por debajo del mínimo, vale 0; por encima del máximo se topa. En blanco el máximo = sin tope.
-- Los primeros cinco factores componen la calidad mediante pesos normalizados. El sexto rubro, Calidad, aplica su porcentaje requerido y sus límites al compuesto, sin añadir una dependencia circular.
+- Calidad Total se obtiene del promedio simple de cuatro calidades (Cumplimiento, Primera compra, Programa Cero y APP), con tope 100%; Alcance Global promedia esas cuatro más Calidad Total, sin tope.
 - Las ocho páginas se pueden abrir sin sesión, con XLS temporales. El historial, la configuración y las visitas de PostgreSQL siguen protegidos por Netlify Identity. Sin sesión no es posible guardar cambios remotos ni acceder a datos de otra cuenta.
 - El acumulado, las comparativas semanales y la visita utilizan los XLS temporales de esta sesión cuando no se ha iniciado sesión. La visita puede exportarse a PDF/PNG, pero guardarla en la nube requiere iniciar sesión.
 - Sin cambios en el esquema PostgreSQL ni en el cálculo de comisiones.
@@ -109,7 +145,7 @@ Los objetivos de **Registros y Ventas** son cantidades enteras. **Plan Cero, Pla
 - APP = activaciones / ventas con código.
 - Primera compra = ventas que tienen P0 o Dental (una vez por venta) / ventas con código.
 
-La calidad individual divide el alcance porcentual real entre el requerido, respetando mínimos y máximos de Ajustes. Para Cumplimiento se usa ventas / objetivo en cantidad. Se mantienen las ponderaciones para Calidad compuesta y el objetivo requerido de Calidad para Alcance global.
+La calidad individual divide el alcance porcentual real entre el requerido, respetando los límites vigentes. Para Cumplimiento se usa ventas / objetivo en cantidad. Calidad Total y Alcance Global siguen el promedio simple especificado en la metodología vigente.
 
 **Migración segura:** las antiguas metas en cantidades de Registros y Ventas se conservan; los antiguos números capturados como metas de P0, Dental, APP y Primera compra se dejan vacíos para no confundir cantidades con porcentajes. Vuelve a capturar porcentajes y pulsa **Guardar objetivos**. Al escribir los objetivos no se llama a Netlify; solo se sincronizan al guardar con sesión. No se requieren tablas ni Functions nuevas.
 
@@ -129,11 +165,11 @@ La novena página permite escoger una semana y un supervisor previamente marcado
 
 **Escalón del supervisor:** cuenta únicamente las ventas con código, tipo de venta válido, sin estatus no pagable ni incidencia, realizadas por los ejecutivos del módulo que **no** sean supervisores. Divide esas ventas entre el objetivo semanal del módulo. Ejemplo: meta de 20, ejecutivos hacen 15, supervisor hace 10: el escalón para pagar las 10 ventas propias es el de **75%**, independientemente de las 10 ventas propias.
 
-**Bono del módulo:** cuatro variables (Cumplimiento, Primera compra, Programa Cero y APP) con porcentaje requerido, mínimo, máximo y ponderación. La calidad compuesta de las cuatro se evalúa frente al porcentaje requerido de Calidad total para producir Alcance global. Fórmula base: Bono base × (Cumplimiento del equipo/100) × (Alcance global/100). Los bonos adicionales de los escalones 110%, 115% y 120% se **suman** al alcanzar cada umbral; luego se aplica el descuento por P0 insuficiente del módulo (30% requerido y -15% por defecto, ambos editables).
+**Bono del módulo (fórmula vigente):** cuatro calidades individuales más Calidad Total dan Alcance Global. Fórmula base: Bono base × (Alcance Global/100) × min(1, Cumplimiento del módulo/100). Solo el bono extraordinario más alto alcanzado es pagable; se aplica descuento por P0 del módulo cuando corresponda. Casilla opcional para incluir ventas pagables del supervisor en Cumplimiento (activada por defecto).
 
 **Ventas propias:** se pagan Venta, APP, Dental y Plan Cero con las tarifas del escalón anterior. Un folio con incidencia queda excluido completamente antes de calcular las comisiones; con una incidencia no se aplica descuento porcentual adicional, con dos se aplica 10%, con tres 20%, con cuatro o más 30% sobre las comisiones de los folios restantes. También se aplica el descuento por Plan Cero insuficiente en ventas regulares propias. La tabla de escalones y todas las penalizaciones se pueden configurar en Ajustes → 12. No se añade un segundo bono semanal de ejecutivos por las ventas propias del supervisor.
 
-**Metas y cantidades:** Los montos `$x` no se conocen; el bono base y las tres cantidades de bono adicionales comienzan **sin configurar**. Para ponerlo en producción, visita Ajustes → 12 e ingresa los montos reales. Si no defines una meta semanal de módulo en Ajustes → 12, se hereda de Ajustes → 10 y, en último término, de la suma de metas individuales de los ejecutivos no supervisores presentes en la semana.
+**Metas y cantidades:** El bono base comienza sin configurar y los tres importes adicionales son editables, con valores iniciales de $1,000, $1,500 y $2,000. Para ponerlo en producción, visita Ajustes → 12 e ingresa los montos reales. Si no defines una meta semanal de módulo en Ajustes → 12, se hereda de Ajustes → 10 y, en último término, de la suma de metas individuales de los ejecutivos no supervisores presentes en la semana.
 
 **Archivos:** la novena página forma parte del `index.html` y `src/legacy-app.js`; el acceso sigue siendo público para pruebas con XLS temporales, pero guardar/importar datos remotos y sincronizar ajustes requiere Netlify Identity. Los XLS históricos y las visitas de coordinación existentes no se alteran. Las exportaciones PDF/PNG/CSV incluyen el desglose y ambas tablas de folios. La búsqueda de folios es visual: no cambia la comisión y no gasta créditos de Netlify.
 
@@ -142,6 +178,3 @@ Esta calculadora es una simulación de los criterios proporcionados, no una conf
 
 ## V2.4.2
 Secciones de calculadora de supervisor plegables con opción de impresión individual, tablas contraídas por defecto, tarjetas compactas de tres columnas y penalización P0 propia detallada.
-
-## Corrección de supervisor V2.4.5
-Bono base = bono configurado × min(cumplimiento,100)/100 × alcance global/100. Alcance global sin tope. La casilla de Ajustes 12, marcada por defecto, incluye las ventas válidas de supervisores del módulo para cumplimiento y su factor de calidad; desmarcada las excluye. El escalón de pago de ventas propias, otros factores y penalizaciones permanecen sin cambios. Bono adicional único y configurable.

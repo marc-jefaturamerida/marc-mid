@@ -7,6 +7,7 @@ const ALLOWED = new Set([
  'wmSamsComisionesRecuperacionesEquipoV1',
  'wmSamsArchivoSeleccionV9',
  'wmSamsFolioFlagsV9',
+ 'wmSamsMeridaBonusDinamicaV245',
  'wmSamsComparativaSemanalObjetivosV13',
  'wmSamsComisionesLayoutV5',
  'wmSamsMeridaReportTextsV17',

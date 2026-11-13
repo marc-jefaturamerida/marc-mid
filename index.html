@@ -123,6 +123,7 @@ body[data-theme] .import-panel{border-top-color:var(--blue)}
 #printRecordsTable tbody tr:nth-child(even) td{background-color:#edf3fa}
 @media print{#printRecordsTable tbody tr:nth-child(even) td{background-color:#edf3fa!important}}
 /* V5: pantalla despejada, panel de ajustes bajo botón y filtros rápidos */
+.dynamic-bonus-cell{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:11px}.dynamic-bonus-cell input{width:16px;height:16px;cursor:pointer}.dynamic-bonus-cell input:disabled{cursor:not-allowed;opacity:.45}.dynamic-bonus-cell span{font-weight:600;color:var(--ink,#243c53)}
 #settingsPanel:not([open]){display:none!important}
 #settingsPanel>.settings-panel-title{display:none!important}
 #settingsPanel[open]{display:block;margin:0 0 16px;padding:0;overflow:visible}
@@ -207,6 +208,15 @@ body[data-page="daily"] #sectionsContainer,body[data-page="daily"] #printContext
 .daily-method{margin:3px 2px 12px;font-size:11px;line-height:1.5;color:var(--sub)}
 @media(max-width:820px){.daily-heading{flex-direction:column;align-items:flex-start}.daily-period{white-space:normal}}
 @media(max-width:530px){.daily-heading h2{font-size:21px}.daily-scroll{margin-right:-10px}.app-tab{font-size:11px!important}}
+/* V2.4.8 · Reporte diario WhatsApp, disponible solamente en la página diaria. */
+.daily-copy-whatsapp{position:fixed;right:max(18px,env(safe-area-inset-right));bottom:max(20px,env(safe-area-inset-bottom));z-index:860;border:1px solid #0b446f;border-radius:999px;background:#075e54;color:#fff;box-shadow:0 10px 26px #10395355;padding:13px 18px;font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:9px;line-height:1.2;max-width:calc(100vw - 36px);transition:transform .15s,background .15s}
+.daily-copy-whatsapp:hover:not(:disabled){background:#064c46;transform:translateY(-2px)}
+.daily-copy-whatsapp:focus-visible{outline:3px solid #ffb15d;outline-offset:3px}
+.daily-copy-whatsapp:disabled{background:#667a8a;border-color:#667a8a;opacity:.65;cursor:not-allowed;box-shadow:none}
+.daily-copy-status{position:fixed;right:18px;bottom:87px;z-index:861;background:#17395a;color:#fff;max-width:min(340px,calc(100vw - 36px));padding:10px 13px;border-radius:9px;box-shadow:0 6px 20px #1836533a;font-size:12px}
+.daily-copy-status[hidden]{display:none!important}
+@media(max-width:530px){.daily-copy-whatsapp{right:12px;bottom:12px;padding:12px 14px;font-size:12px}.daily-copy-status{right:12px;bottom:75px}}
+@media print{.daily-copy-whatsapp,.daily-copy-status{display:none!important}}
 @media print{.daily-page{display:none!important}}
 
 /* V9 · Historial XLS local y bloqueo de Ajustes */
@@ -760,7 +770,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 </nav>
 <details class="settings-panel section-card" id="settingsPanel">
 <summary class="settings-panel-title"><span><span class="settings-icon">⚙</span> Ajustes de la calculadora</span><small>Archivos · Tarifas · Temas · Impresión · Folios</small></summary>
-<div class="settings-panel-content"><div id="guestSettingsNotice" class="settings-help" hidden role="status" style="margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--blue-soft);font-weight:650">Modo sin sesión: puedes abrir y modificar estas opciones para probar el Dashboard en este dispositivo. No se guardan en Netlify y podrían restablecerse al recargar la página. Inicia sesión para sincronizarlas.</div><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="btn small" id="authLogout" type="button">Cerrar sesión</button><button class="btn small close-settings" id="closeSettings" type="button">Cerrar ajustes ✕</button></div><details class="settings-group" id="settingsArchive"><summary class="settings-group-title"><span><span class="settings-number">1</span> Archivos XLS guardados</span></summary><div class="settings-group-body">
+<div class="settings-panel-content"><div id="guestSettingsNotice" class="settings-help" hidden role="status" style="margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--blue-soft);font-weight:650">Modo sin sesión: puedes abrir y modificar estas opciones para probar el Dashboard en este dispositivo. No se guardan en Netlify y podrían restablecerse al recargar la página. Inicia sesión para sincronizarlas.</div><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="btn small" id="authLogout" type="button">Cerrar sesión</button><button class="btn primary small" id="saveSettingsAndClose" type="button">Guardar ajustes y cerrar</button><button class="btn small close-settings" id="closeSettings" type="button">Cerrar ajustes ✕</button></div><details class="settings-group" id="settingsArchive"><summary class="settings-group-title"><span><span class="settings-number">1</span> Archivos XLS guardados</span></summary><div class="settings-group-body">
 <p class="settings-help">Los reportes se almacenan en tu cuenta de Netlify Database cuando inicias sesión. Puedes usar un archivo, varios o el total acumulado sin crear páginas adicionales. Los registros duplicados de diferentes reportes se cuentan una sola vez.</p>
 <div class="file-archive"><div class="archive-controls" role="radiogroup" aria-label="Fuente para los cálculos"><label><input type="radio" name="archiveMode" value="all" checked> Total acumulado</label><label><input type="radio" name="archiveMode" value="selected"> Elegir uno o varios archivos</label></div>
 <div class="archive-list" id="archiveList"><div class="archive-empty">No hay archivos guardados.</div></div>
@@ -830,9 +840,9 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 <div id="visitsSettingsEditor"></div>
 </div></details>
 <details class="settings-group" id="settingsQualityV22"><summary class="settings-group-title"><span><span class="settings-number">10</span> Porcentajes requeridos y límites de calidad</span></summary><div class="settings-group-body">
-  <p class="settings-help">Configura el porcentaje requerido para Cumplimiento, Plan Cero, Plan Dental, Activación APP, Primera compra y Calidad. Cada calidad se calcula como (alcance ÷ requerido) × 100. Mínimo: si la calidad calculada es menor, se convierte a 0%. Máximo: tope opcional, en blanco = sin tope. Por módulo puedes dejar campos vacíos para heredar los globales. No modifica los pagos de comisiones.</p>
+  <p class="settings-help">Configura los porcentajes requeridos y los mínimos de cada calidad individual. Mínimo predeterminado: 60% de la calidad calculada; si queda por debajo, vale 0%. Cumplimiento y Programa Cero nunca se topan en 100%; Primera compra y APP sí. Plan Dental es informativo y no se agrega como quinto factor. Para la comisión del supervisor utiliza Ajustes → 12.</p>
   <div class="settings-quality-grid" id="qualityGlobalInputs"></div>
-  <p class="settings-help">Cinco factores componen la calidad ponderada: Cumplimiento, Plan Cero, Plan Dental, APP y Primera compra. El factor Calidad evalúa ese promedio respecto a su propio porcentaje requerido; no participa en su propio promedio. Cada mínimo y máximo se aplica individualmente. Puedes personalizarlos por módulo.</p>
+  <p class="settings-help">Calidad Total = min(100%, (Cumplimiento + Primera compra + Programa Cero + APP) / 4). Alcance Global = (esas cuatro calidades + Calidad Total) / 5; sin tope. No se utilizan ponderaciones ni se vuelve a dividir Calidad Total entre un requerido. Personaliza los objetivos por módulo más abajo.</p>
   <h4>Objetivos por módulo</h4><div id="qualityModuleInputs"></div>
   <button id="qualityReset" class="btn small" type="button">Restaurar porcentajes y límites predeterminados</button>
   <span id="qualitySaveStatus" class="settings-help">Ajustes por cuenta, sincronizados solo cuando los modificas.</span>
@@ -843,9 +853,14 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="settings-help" id="supervisorSaveStatus">Se guardan las asignaciones solo cuando las modificas.</div>
 </div></details>
 <details class="settings-group" id="settingsSupervisorCommissionV24"><summary class="settings-group-title"><span><span class="settings-number">12</span> Calculadora de supervisor · bonos, calidad y tarifas</span></summary><div class="settings-group-body">
-<p class="settings-help">Ajusta el bono base, metas semanales por módulo, porcentajes requeridos, mínimos, máximos, ponderaciones, bonos adicionales, penalizaciones y tarifas por escalón. Los cambios se aplican a la calculadora de supervisor cuando pulses <strong>Guardar configuración</strong>.</p>
+<p class="settings-help">Ajusta el bono base, metas semanales por módulo, inclusión de ventas del supervisor, porcentajes requeridos, mínimos, máximos aplicables, bonos adicionales, penalizaciones y tarifas por escalón. Los cambios se aplican a la calculadora de supervisor cuando pulses <strong>Guardar configuración</strong>.</p>
 <div id="supSettingsEditor"></div></div></details>
 
+<details class="settings-group" id="settingsDynamicBonus"><summary class="settings-group-title"><span><span class="settings-number">13</span> Bono por dinámica</span></summary><div class="settings-group-body">
+<p class="settings-help">Define un importe fijo por cada venta válida marcada en la columna <strong>Bono adicional</strong>. El total se suma después de comisiones, descuentos, incidencias y recuperaciones. No se aplica a ventas rechazadas, canceladas, incompletas o con incidencia. Para supervisores solo cuenta en sus ventas propias; no en el bono del módulo.</p>
+<div class="settings-inline"><div class="field"><label for="dynamicBonusAmount">Monto fijo por venta marcada (MXN)</label><input type="number" min="0" max="1000000" step="0.01" inputmode="decimal" id="dynamicBonusAmount" value="0" /></div><button type="button" id="saveDynamicBonus" class="btn primary small">Guardar bono por dinámica</button></div>
+<p id="dynamicBonusStatus" role="status" class="settings-help">Importe inicial: $0.00. Activa las casillas por folio para otorgarlo.</p>
+</div></details>
 </div>
 </details><div aria-label="Filtros rápidos de importación" class="quick-filters section-card" id="quickFilters">
 <div class="quick-row">
@@ -874,7 +889,8 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
       <article class="daily-panel"><div class="daily-panel-title"><h3>Por ejecutivo</h3><span id="dailyExecutivesCount">—</span></div><table class="daily-table" id="dailyExecutiveTable"><thead><tr><th>Ejecutivo</th><th title="Total de registros">Registros</th><th title="Ventas totales con código">Ventas</th><th title="Ventas regulares">Regulares</th><th title="Ventas garantizadas">Garant.</th><th title="Programas Cero">P. Cero</th><th title="Planes Dentales">Dental</th><th title="Calidad operativa sobre objetivos configurados">Calidad</th></tr></thead><tbody id="dailyExecutiveRows"><tr><td colspan="8" class="daily-empty">Importa un XLS para mostrar resultados.</td></tr></tbody><tfoot id="dailyExecutiveTotal"></tfoot></table></article>
     </div>
   </div>
-  
+  <button class="daily-copy-whatsapp" id="dailyCopyWhatsApp" type="button" title="Copiar reporte general del día principal contra el día comparado" aria-label="Copiar comparativo diario para WhatsApp" disabled><span aria-hidden="true">▣</span><span>Copiar para WhatsApp</span></button>
+  <div id="dailyWhatsAppStatus" class="daily-copy-status" role="status" aria-live="polite" hidden></div>
 </section>
 <section id="accumulatedPage" class="daily-page accumulated-page" hidden aria-label="Acumulado por módulos y ejecutivos de los XLS guardados">
   <div class="daily-heading">
@@ -917,11 +933,11 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="weekly-comparison-scroll" aria-label="Dos tablas de módulos, una por semana, colocadas lado a lado">
     <div class="weekly-comparison-grid">
       <article class="daily-panel weekly-panel"><div class="daily-panel-title"><h3 id="weeklyPrimaryTitle">Fecha de comparación 1</h3><span id="weeklyPrimaryModules">—</span></div>
-        <table class="weekly-table" id="weeklyPrimaryTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th><th>APP</th><th>1ª compra</th><th title="Calidad operativa global ponderada">Calidad</th></tr></thead>
+        <table class="weekly-table" id="weeklyPrimaryTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th><th>APP</th><th>1ª compra</th><th title="Alcance Global: promedio simple de cinco valores, sin tope">Calidad</th></tr></thead>
         <tbody id="weeklyPrimaryRows"><tr><td colspan="10" class="daily-empty">No hay datos guardados.</td></tr></tbody><tfoot id="weeklyPrimaryFooter"></tfoot></table>
       </article>
       <article class="daily-panel weekly-panel"><div class="daily-panel-title"><h3 id="weeklyPreviousTitle">Fecha de comparación 2</h3><span id="weeklyPreviousModules">—</span></div>
-        <table class="weekly-table" id="weeklyPreviousTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th><th>APP</th><th>1ª compra</th><th title="Calidad operativa global ponderada">Calidad</th></tr></thead>
+        <table class="weekly-table" id="weeklyPreviousTable"><thead><tr><th>Módulo</th><th>Registros</th><th>Ventas</th><th>Regulares</th><th>Garant.</th><th>P. Cero</th><th>Dental</th><th>APP</th><th>1ª compra</th><th title="Alcance Global: promedio simple de cinco valores, sin tope">Calidad</th></tr></thead>
         <tbody id="weeklyPreviousRows"><tr><td colspan="10" class="daily-empty">No hay datos guardados.</td></tr></tbody><tfoot id="weeklyPreviousFooter"></tfoot></table>
       </article>
     </div>
@@ -1087,7 +1103,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="all-records-help">Las columnas se muestran según <strong>Ajustes → Tabla de folios</strong>. Incidencia y APP permanecen a la vista para validarlas. Desliza horizontalmente para ver más columnas.</div>
   <div class="table-wrap all-records-table-wrap"><table id="allRecordsTable" class="record-table all-records-table"><thead id="allRecordsHead"></thead><tbody id="allRecordsBody"><tr><td>Importa un XLS para mostrar registros.</td></tr></tbody></table></div>
   <div class="all-records-pagination"><span id="allRecordsPageStatus">0 registros</span><div class="all-records-page-actions"><label for="allRecordsPageSize">Filas por página</label><select id="allRecordsPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" type="button" id="allRecordsPrev">Anterior</button><button class="btn small" type="button" id="allRecordsNext">Siguiente</button></div></div>
-  <footer class="foot">Consulta de registros XLS · Versión 2.4.2</footer>
+  <footer class="foot">Consulta de registros XLS · Versión 2.4.8</footer>
 </section>
 
 
@@ -1104,16 +1120,16 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <details class="sup-fold sup-search-fold" data-sup-fold="search" open><summary><span class="sup-fold-title">Buscar folios</span><span class="sup-fold-actions"><span class="sup-print-toggle"><input type="checkbox" data-sup-print="search" aria-label="Incluir búsqueda en impresión"> Imprimir</span><span class="sup-fold-chevron" aria-hidden="true">⌄</span></span></summary><div class="sup-fold-body"><div class="sup-filters section-card" style="grid-template-columns:1fr" aria-label="Buscar registros del supervisor"><div class="field"><label for="supSearch">Buscar en los folios del módulo y del supervisor</label><input id="supSearch" type="search" autocomplete="off" placeholder="Buscar fecha, folio, ejecutivo, código o estatus…" style="width:100%;padding:10px;border-radius:9px;border:1px solid var(--line)"></div></div></div></details>
   <div id="supRecordTables" class="sup-records">
     <details class="sup-block sup-fold" data-sup-fold="recordsTeam"><summary><span class="sup-fold-title">Registros de los ejecutivos del módulo</span><span class="sup-fold-actions"><span class="sup-print-toggle"><input type="checkbox" data-sup-print="recordsTeam" checked aria-label="Imprimir registros de los ejecutivos"> Imprimir</span><small id="supTeamCount">0 registros</small><span class="sup-fold-chevron" aria-hidden="true">⌄</span></span></summary><div class="sup-fold-body">
-      <p class="sup-muted">Estos registros definen el escalón de ventas propias. El cumplimiento puede incluir supervisores desde Ajustes → 12.</p>
+      <p class="sup-muted">Estos registros determinan el escalón de las tarifas por ventas propias y la calidad del equipo. Para el cumplimiento del módulo pueden sumarse las ventas válidas del supervisor seleccionado mediante Ajustes → 12.</p>
       <div class="sup-table-scroll" id="supTeamRows"></div>
     </div></details>
     <details class="sup-block sup-fold" data-sup-fold="recordsOwn"><summary><span class="sup-fold-title">Registros del supervisor</span><span class="sup-fold-actions"><span class="sup-print-toggle"><input type="checkbox" data-sup-print="recordsOwn" checked aria-label="Imprimir registros del supervisor"> Imprimir</span><small id="supOwnCount">0 registros</small><span class="sup-fold-chevron" aria-hidden="true">⌄</span></span></summary><div class="sup-fold-body">
-      <p class="sup-muted">Estas ventas se remuneran con el escalón determinado por el equipo. Una incidencia excluye todos los conceptos de ese folio.</p>
+      <p class="sup-muted">Estas ventas se remuneran con el escalón determinado por el equipo. Si se marca la casilla en Ajustes → 12 también cuentan para el cumplimiento del módulo. Una incidencia excluye todos los conceptos de ese folio.</p>
       <div class="sup-table-scroll" id="supOwnRows"></div>
     </div></details>
   </div>
-  <p class="sup-footnote">Cálculo informativo. Los importes de bono base y bonos adicionales permanecen sin configurar hasta que se indiquen en Ajustes → 12. Solo se transmiten cambios a Netlify al guardar ajustes o validaciones de folios; consultar semanas y supervisores es local.</p>
-  <footer class="foot">Calculadora de supervisor · Versión 2.4.2</footer>
+  <p class="sup-footnote">Cálculo informativo. Configura el bono base en Ajustes → 12; los bonos adicionales comienzan en $1,000, $1,500 y $2,000, editables y no acumulables. Guarda los ajustes para sincronizarlos con Netlify; consultar semanas y supervisores no genera escrituras.</p>
+  <footer class="foot">Calculadora de supervisor · Versión 2.4.8</footer>
 </section>
 <section id="achievementsPage" class="achievements-page" hidden aria-label="Logros semanales por módulo">
   <div class="achievements-hero">
@@ -1186,7 +1202,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
       <div class="achievements-pager"><span id="achRecordStatus">0 registros</span><div class="achievements-pager-options"><label for="achPageSize">Filas</label><select id="achPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" id="achPrev" type="button">Anterior</button><button class="btn small" id="achNext" type="button">Siguiente</button></div></div>
     </div>
   </details>
-  <footer class="foot">Logros semanales · Versión 2.4.2</footer>
+  <footer class="foot">Logros semanales · Versión 2.4.8</footer>
 </section>
 
 <section id="visitPage" class="visit-page" hidden aria-label="Acuse de visita de coordinación">
@@ -1194,14 +1210,14 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 2.4.2</footer>
+  <footer class="foot">Acuse de coordinación · Versión 2.4.8</footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 2.4.2</footer>
+<footer class="foot">Final de la presentacion · Versión 2.4.8</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 
