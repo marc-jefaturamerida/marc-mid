@@ -1,4 +1,4 @@
-# V2.4.9 — Sesión recordada durante siete días
+# V2.5.0 — Gestión permanente de incidencias y navegación personalizada
 
 Esta edición recupera automáticamente una sesión de Netlify Identity al reabrir la página o después de que caduque el JWT de acceso (~1 hora), siempre que la cookie de renovación siga válida. **No** guarda contraseñas ni JWT en preferencias: Netlify sigue verificando al usuario en cada llamada a sus Functions. Se registra solo un plazo local de siete días por cuenta/navegador, sin ampliarlo en cada visita. Al cumplirse, cierra Identity y solicita de nuevo las credenciales. Cerrar sesión manualmente lo borra al instante. Se admite una sesión previa válida al instalar esta actualización, iniciando el contador ese día. Un cambio de dispositivo, bloqueo de cookies, modo privado, revocación o vencimiento del refresh token de Netlify pueden exigir ingresar antes; este código no puede prolongar la validez de Identity en el servidor. La cola local de ajustes pendientes se conserva por cuenta si vence la sesión.
 
@@ -6,7 +6,7 @@ La actualización también incorpora en el ZIP los últimos cambios del mensaje 
 
 ---
 
-# Dashboard y comisiones Mérida · V2.4.9 (13 de noviembre de 2026)
+# Dashboard y comisiones Mérida · V2.5.0 (13 de noviembre de 2026)
 
 ## Metodología VIGENTE (prevalece sobre el historial de versiones que aparece abajo)
 
@@ -23,7 +23,7 @@ La actualización también incorpora en el ZIP los últimos cambios del mensaje 
 
 Las cuentas que guardaron un mínimo `0%` con versiones anteriores lo reciben como `60%` al abrir esta versión (migración de mínimos antiguos sin marca de versión). Los mínimos personalizados **distintos de 0** se conservan. Tras guardar de nuevo la configuración, se puede establecer explícitamente `0%` en cualquier mínimo editable y se respetará. Inicia sesión y guarda los Ajustes 12 para sincronizarlos. No es necesario alterar tablas de PostgreSQL ni volver a importar XLS.
 
-**Etiquetas:** la V2.4.9 se muestra en los pies de página, PDF, PNG y exportaciones. El bono por dinámica de la versión anterior se mantiene sin cambios.
+**Etiquetas:** la V2.5.0 se muestra en los pies de página, PDF, PNG y exportaciones. El bono por dinámica de la versión anterior se mantiene sin cambios.
 
 ### Comparativa diaria → Copiar para WhatsApp (V2.4.8)
 
@@ -64,6 +64,18 @@ Cambiar semana, módulo, buscar o filtrar no llama a PostgreSQL. Las ocho págin
 
 - Las tres últimas filas semanales utilizan la tipografía de **Cumplimiento**.
 - **Ajustes** abre sin autenticación para revisar y probar configuraciones locales. Los XLS guardados, visitas históricas y sincronización con Netlify requieren sesión. Los cambios del invitado no se envían a PostgreSQL y podrían restablecerse al actualizar la página.
+
+## Novedades V2.5.0
+
+- **Incidencias permanentes por folio** en PostgreSQL (`dashboard_incidents`), con estado Activa y estado Resuelta independientes, módulo, ejecutivo, comentarios históricos con fecha, búsqueda, filtros, CSV y exportación PDF/PNG. La tabla no tiene dependencia ni borrado en cascada de los XLS. Se guarda por cuenta de Netlify Identity.
+- **Compatibilidad con casillas anteriores:** al encontrar folios de los XLS históricos que fueron marcados como incidencia, se intenta migrarlos a la nueva tabla. Si los XLS ya fueron eliminados antes de actualizar y solo queda un identificador antiguo sin folio disponible, no puede reconstruirse automáticamente ese folio.
+- **Importación y sustitución de XLS:** en cuanto un registro traiga un folio que coincida con una incidencia activa, vuelve a aparecer marcado y sigue excluido del pago. Marcar «Resuelta» no reactiva por sí solo la comisión; hay que desactivar la incidencia cuando se autorice. Los comentarios se añaden al historial, sin sobrescribir los anteriores.
+- **Aviso emergente cada lunes:** una vez por lunes y navegador/cuenta, al abrir o regresar a la aplicación; permite cerrar o abrir la selección de XLS. No es una notificación push si la app está cerrada.
+- **Navegación en línea desplazable** en móviles, configurable en Ajustes → 14 con flechas para ordenar y radio para página inicial. Por defecto, **Comparativa diaria**.
+- **Menú flotante de exportación** con PDF, PNG y CSV. En Comparativa diaria incluye también «Copiar para WhatsApp». En Visitas usa los botones de PDF/PNG propios de esa página.
+- Versión 2.5.0 unificada en encabezados, pies y reportes. Se conserva la sesión recordada de hasta siete días y el esquema de comisiones existente.
+
+**Puesta en producción:** la migración `netlify/database/migrations/20261113180000_create_incidents.sql` se aplica automáticamente en un despliegue de Netlify Database. Verifica en el registro de despliegue que finalice correctamente; si falla, no se publicará esta versión. Al entrar, inicia sesión y prueba la página «Gestión de incidencias» con un folio de ejemplo. No elimines los XLS antiguos antes de verificar que las incidencias previas aparezcan migradas.
 
 ## Versión 2.3.3 · Calidad numérica y tablas adaptativas
 

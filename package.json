@@ -1,14 +1,14 @@
 {
   "name": "dashboard-comisiones-merida-netlify",
   "private": true,
-  "version": "2.4.9",
+  "version": "2.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "node --check src/cloud-boot.js && node --check src/session-lifetime.js && node --check src/legacy-app.js && node --check src/daily-whatsapp-report.js && node --check src/supervisor-statement.js && node --check src/visits.js && node --check netlify/functions/files.js && node --check netlify/functions/settings.js && node --check netlify/functions/visits.js && node --check netlify/functions/sync.js && node --check netlify/functions/health.js && node --check netlify/lib/_shared.js",
-    "test": "node tests/validate-v249.mjs"
+    "check": "node --check src/cloud-boot.js && node --check src/session-lifetime.js && node --check src/legacy-app.js && node --check src/daily-whatsapp-report.js && node --check src/supervisor-statement.js && node --check src/visits.js && node --check netlify/functions/incidents.js && node --check netlify/functions/files.js && node --check netlify/functions/settings.js && node --check netlify/functions/visits.js && node --check netlify/functions/sync.js && node --check netlify/functions/health.js && node --check netlify/lib/_shared.js",
+    "test": "node tests/validate-v250.mjs"
   },
   "dependencies": {
     "@netlify/database": "^2.0.3",

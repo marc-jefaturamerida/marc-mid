@@ -1,4 +1,20 @@
-## Novedad V2.4.9 · No ingresar la contraseña cada visita
+## V2.5.0 · Antes de reemplazar el repositorio
+
+El ZIP incluye una nueva migración de Netlify Database para las incidencias. Debes subir **todos los archivos y carpetas**, incluyendo `netlify/database/migrations/20261113180000_create_incidents.sql` y `netlify/functions/incidents.js`; reemplazar solamente `index.html` no basta.
+
+1. Haz copia de seguridad del repositorio y de los XLS actuales.
+2. Descomprime en la raíz del repositorio; conserva las carpetas `src`, `netlify` y `public`.
+3. Ejecuta `npm run check && npm test` si tienes Node/npm disponibles.
+4. Publica con `git add -A && git commit -m "INVEX V2.5.0 incidencias y navegacion" && git push origin HEAD`.
+5. Comprueba el despliegue Netlify: el nuevo SQL de `netlify/database/migrations` se aplica automáticamente justo antes de publicar.
+6. Entra con tu cuenta y abre **Gestión de incidencias**. Comprueba que puedas registrar un folio, comentar y volver a encontrarlo tras actualizar o reemplazar el XLS.
+7. Ajustes → **14. Orden de páginas y página principal** permite cambiar la pantalla inicial, predeterminada en Comparativa diaria. El nuevo menú flotante concentra exportaciones.
+
+**Precaución de migración:** deja los XLS históricos en el sistema hasta que las incidencias marcadas anteriormente se hayan podido convertir a registros por folio. Si se eliminaron previamente y solo queda la marca ligada al identificador interno antiguo, la migración no puede deducir el folio perdido.
+
+---
+
+## Novedad heredada V2.4.9 · No ingresar la contraseña cada visita
 
 1. Publica el ZIP completo; no es necesaria una migración SQL.
 2. Inicia sesión **una vez** en el navegador donde usas el dashboard. Al volver a abrirlo después de unas horas, la sesión debería restaurarse automáticamente con Netlify Identity.

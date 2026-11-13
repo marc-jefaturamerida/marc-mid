@@ -22,7 +22,8 @@ const KEYS = new Set([
   'wmSamsMeridaQualityConfigV22',
   'wmSamsMeridaSupervisorsV22',
   'wmSamsMeridaAchievementGoalsV232',
-  'wmSamsMeridaSupervisorCommissionV24'
+  'wmSamsMeridaSupervisorCommissionV24',
+  'wmSamsNavOrderV250'
 ]);
 const PENDING_PREFIX = 'wmSamsCloudPendingV19:';
 const SESSION_EXPIRED_FLAG='wmSamsSessionExpiredV249';
@@ -35,7 +36,7 @@ let user=null, suspended=true, afterLogin=null, inviteToken='', passwordReset=fa
 let sessionExpiredOnBoot=false;
 let saveTimer=0, retryTimer=0, flushPromise=null, retryCount=0;
 let checking=false, checkingTimer=0, lastWakeCheck=0, awaySince=null;
-let pending=new Map(), fileSignatures=new Map(), refresher=null;
+let pending=new Map(), fileSignatures=new Map(), refresher=null, incidenceVersions=new Map(), incidentsChecked=false;
 const $=id=>document.getElementById(id);
 const nativeSet=Storage.prototype.setItem;
 const nativeRemove=Storage.prototype.removeItem;
@@ -226,6 +227,8 @@ async function clearFiles(){
   await api('files?all=1',{method:'DELETE'});
   fileSignatures.clear();
 }
+async function listIncidents(){if(!user)return [];const data=await api('incidents');const rows=Array.isArray(data.incidents)?data.incidents:[];incidenceVersions=new Map(rows.map(r=>[r.folio_key,Date.parse(r.updated_at||'')||0]));incidentsChecked=true;return rows;}
+async function putIncident(payload){if(!user)throw Error('Inicia sesión para guardar incidencias.');const data=await api('incidents',{method:'PUT',body:JSON.stringify(payload)});if(data.incident?.folio_key){incidenceVersions.set(data.incident.folio_key,Date.parse(data.incident.updated_at||'')||0);incidentsChecked=true;}return data.incident;}
 async function expireSession(){
   // Los cambios pendientes ya están en la cola local por cuenta; no se borran.
   // Al volver a iniciar sesión, podrán sincronizarse con el mismo usuario.
@@ -282,7 +285,7 @@ function setupModal(){
 }
 window.APP_CLOUD={
   get user(){return user;},
-  openLogin,logout:signOut,listFiles,putFile,deleteFile,clearFiles,
+  openLogin,logout:signOut,listFiles,putFile,deleteFile,clearFiles,listIncidents,putIncident,
   registerRefresh:fn=>{refresher=fn;},flush,
   get pendingCount(){return pending.size;}
 };
@@ -345,7 +348,11 @@ async function checkRemoteOnReturn(){
     const remote=await api('sync');
     const diverged=[...KEYS].some(key=>String(remote.settings?.[key]??'')!==String(nativeGet.call(localStorage,key)??''));
     const remoteFiles=JSON.stringify((remote.reports||[]).map(r=>[r.id,r.fingerprint]).sort(([a],[b])=>a.localeCompare(b)));
-    if(diverged||remoteFiles!==filesSignature()){
+    const incidenceMeta=remote.incidentsMeta||{};
+    const latestLocal=Math.max(0,...incidenceVersions.values());
+    const remoteLatest=Date.parse(incidenceMeta.last_updated||'')||0;
+    const changedIncidents=incidentsChecked&&(Number(incidenceMeta.count||0)!==incidenceVersions.size||remoteLatest!==latestLocal);
+    if(diverged||remoteFiles!==filesSignature()||changedIncidents){
       toast('Se detectaron cambios en la nube. Actualizando…');
       location.reload();return;
     }

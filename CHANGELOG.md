@@ -1,3 +1,14 @@
+## V2.5.0 — Incidencias permanentes, navegación y recordatorio XLS (13 de noviembre de 2026)
+
+- Nueva tabla `dashboard_incidents` segregada por cuenta en PostgreSQL, sin dependencia de `dashboard_reports`.
+- Nueva Function `incidents` con listado y escritura autenticados, validación de folio y comentarios históricos append-only.
+- Página «Gestión de incidencias» con alta y edición, comentarios, activa/inactiva, resuelta/pendiente, filtros y exportación CSV; exportación general PDF/PNG integrada.
+- Casillas en tablas vinculadas a folio estable. Importaciones futuras heredan estados; se intenta migrar las marcas de XLS anteriores cuando sus folios siguen disponibles.
+- Popup los lunes una vez al día por navegador/cuenta, con acceso directo a subir XLS.
+- Navegación de pestañas en una línea horizontal desplazable, orden y página principal configurables por cuenta (comparativa diaria por defecto).
+- Exportaciones trasladadas a menú flotante; copiar WhatsApp se incluye ahí solamente para Comparativa diaria.
+- Se preservan motor de comisiones, cálculo de supervisor, bono por dinámica, exportaciones y sesión recordada hasta 7 días.
+
 ## V2.4.9 — Sesión persistente y plazo de siete días (13 de noviembre de 2026)
 
 - El Dashboard vuelve a consultar el estado de Identity al abrir y renueva el JWT de acceso si está próximo a expirar, utilizando su cookie de renovación, sin almacenar credenciales de usuario.

@@ -354,6 +354,67 @@ body[data-page="weekly"] #quickFilters{display:none!important}
 .weekly-table .weekly-rule-goal{font-size:11px;color:var(--blue-deep);font-weight:850}
 .weekly-quality td.no-goal{background:#eaf6f0;color:#83949b;font-weight:550}
 .weekly-quality td small{font-size:9px}
+
+/* V2.5.0 — navegación horizontal, acciones flotantes e incidencias */
+.app-navigation{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:thin;width:100%!important;max-width:100%;padding:7px 8px;gap:7px;white-space:nowrap;-webkit-overflow-scrolling:touch}
+.app-navigation .app-tab{flex:0 0 auto!important;white-space:nowrap;scroll-snap-align:start;min-height:41px}
+.app-navigation .app-tab.active{box-shadow:0 1px 8px #003b7a24}
+.floating-export{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));z-index:990;display:flex;flex-direction:column;align-items:end;gap:9px}
+.floating-export-main{border:0;border-radius:50px;background:#075398;color:white;padding:13px 19px;font-size:13px;font-weight:850;box-shadow:0 8px 26px #113f6a66;cursor:pointer}
+.floating-export-main:focus-visible,.floating-export-menu button:focus-visible{outline:3px solid #edaa48;outline-offset:2px}
+.floating-export-menu{display:flex;flex-direction:column;gap:4px;background:#fff;padding:9px;border:1px solid #c8d8e8;border-radius:14px;box-shadow:0 12px 35px #152f4f40;min-width:212px;max-width:calc(100vw - 30px)}
+.floating-export-menu[hidden]{display:none!important}
+.floating-export-menu button{border:0;background:transparent;border-radius:8px;text-align:left;padding:10px 13px;font:inherit;font-size:13px;font-weight:750;color:#17416e;cursor:pointer}
+.floating-export-menu button:hover{background:#eef5fc}
+.floating-export-menu button[hidden]{display:none!important}
+#dailyCopyWhatsApp{position:static!important;box-shadow:none!important;border:0!important;max-width:none!important;width:100%;border-radius:8px!important;color:#075e54!important;background:#e6f6ee!important;padding:10px 13px!important;text-align:left;justify-content:flex-start;font-size:13px!important}
+#dailyCopyWhatsApp:disabled{opacity:.5}
+.toolbar>#print,.toolbar>#export,.toolbar>#exportImage{display:none!important}
+#visitPdf,#visitPng{display:none!important}
+.page-order-list{display:grid;gap:7px;margin:12px 0}
+.page-order-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;align-items:center;border:1px solid var(--line);background:var(--white);border-radius:10px;padding:8px 10px}
+.page-order-row b{font-size:12px;color:var(--blue-deep)}
+.page-order-row .page-order-actions{display:flex;gap:5px}
+.page-order-row button{border:1px solid #c3d5e6;border-radius:7px;background:#f5f9fd;padding:5px 9px;min-width:30px;cursor:pointer;color:#104a80}
+.page-order-row label{font-size:11px;white-space:nowrap;font-weight:700;color:var(--sub)}
+.incidence-page[hidden]{display:none!important}
+body[data-page="incidents"] #sectionsContainer,body[data-page="incidents"] #quickFilters,body[data-page="incidents"] #printContext,body[data-page="incidents"] #printRecordsSection{display:none!important}
+.incidence-page{margin:8px 0 24px;display:grid;gap:16px}
+.inc-hero{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.inc-hero h2{margin:3px 0 6px;color:var(--blue-deep);font-size:24px}
+.inc-hero p{margin:0;color:var(--sub);font-size:12px;line-height:1.5;max-width:670px}
+.inc-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.inc-stat{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:13px}
+.inc-stat span{display:block;font-size:11px;color:var(--sub)}.inc-stat b{display:block;font-size:24px;color:var(--blue-deep)}
+.inc-card{background:var(--white);border:1px solid var(--line);border-radius:13px;padding:18px;box-shadow:var(--shadow)}
+.inc-card h3{margin:0 0 12px;font-size:15px;color:var(--blue-deep)}
+.inc-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.inc-fields .field{min-width:0}
+.inc-fields input,.inc-fields textarea,.inc-fields select,.inc-filterbar input,.inc-filterbar select{width:100%;padding:10px;border:1px solid #c5d4e4;border-radius:8px;background:#fff;color:var(--ink);font:inherit;font-size:13px}
+.inc-fields textarea{min-height:90px;resize:vertical}.inc-fields .span-all{grid-column:1/-1}
+.inc-checkboxes{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:12px;font-size:12px;font-weight:750}
+.inc-checkboxes input{width:18px;height:18px;vertical-align:middle;margin-right:5px;accent-color:#0858a0}
+.inc-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:15px}
+.inc-actions .status{font-size:11px;color:var(--sub);overflow-wrap:anywhere}
+.inc-filterbar{display:grid;grid-template-columns:2fr 1fr auto;gap:10px;align-items:end;margin-bottom:12px}
+.inc-table-scroll{overflow-x:auto}.inc-table{border-collapse:collapse;width:100%;min-width:750px;font-size:12px}
+.inc-table th,.inc-table td{padding:11px 8px;border-bottom:1px solid #e9eff6;text-align:left;vertical-align:top}
+.inc-table th{background:#edf4fa;color:#345b82;font-size:11px}
+.inc-table td button{border:1px solid #b5cadb;background:#f3f7fb;border-radius:7px;color:#0c4f8e;padding:6px 8px;font-size:11px;cursor:pointer}
+.inc-tag{font-size:10px;padding:4px 6px;border-radius:6px;font-weight:800;white-space:nowrap;background:#e5f0fc;color:#064e89}
+.inc-tag.good{background:#e1f5e8;color:#206440}.inc-tag.warn{background:#ffede2;color:#a34620}
+.inc-comments{max-width:340px;white-space:pre-wrap;overflow-wrap:anywhere;color:#556980}
+.inc-muted{font-size:11px;color:var(--sub)}
+#incHistory{border-top:1px solid #e7eef6;padding-top:10px;margin-top:10px;max-height:220px;overflow-y:auto}
+#incHistory .inc-history-item{padding:5px 0;border-bottom:1px solid #edf2f7;white-space:pre-wrap;overflow-wrap:anywhere}
+#xlsMondayReminder[hidden]{display:none!important}
+#xlsMondayReminder{position:fixed;inset:0;z-index:1300;background:#0825449c;display:grid;place-items:center;padding:20px}
+.monday-card{background:#fff;border-radius:17px;max-width:440px;width:100%;padding:25px;box-shadow:0 15px 60px #00162980;border-top:5px solid #f09648}
+.monday-card h2{margin:0 0 10px;color:#103d70}.monday-card p{font-size:13px;color:#526982;line-height:1.6}
+.monday-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:17px}
+@media(max-width:700px){.inc-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.inc-fields{grid-template-columns:1fr 1fr}.inc-filterbar{grid-template-columns:1fr 1fr}.inc-filterbar .inc-search{grid-column:1/-1}.page-order-row{grid-template-columns:1fr auto}.page-order-row label{grid-column:1/-1}}
+@media(max-width:440px){.inc-fields{grid-template-columns:1fr}.inc-hero h2{font-size:21px}.inc-card{padding:12px}.floating-export{right:12px;bottom:12px}}
+@media print{.floating-export,#xlsMondayReminder,.incidence-page,.page-order-list{display:none!important}}
 </style>
 
 <style>
@@ -767,6 +828,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="allRecordsPage" data-page-tab="allrecords">Registros XLS</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="achievementsPage" data-page-tab="achievements">Logros semanales</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="supPage" data-page-tab="supervisor">Calculadora supervisor</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="incidencePage" data-page-tab="incidents">Gestión de incidencias</button>
 </nav>
 <details class="settings-panel section-card" id="settingsPanel">
 <summary class="settings-panel-title"><span><span class="settings-icon">⚙</span> Ajustes de la calculadora</span><small>Archivos · Tarifas · Temas · Impresión · Folios</small></summary>
@@ -801,7 +863,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 <p class="settings-help">Personaliza título, subtítulo, descripción y nota final que aparecerán en las exportaciones PDF y PNG. El título es general; los otros tres textos son independientes para cada página. Se guardan automáticamente en este navegador.</p>
 <div class="report-text-editor">
 <div class="field"><label for="reportTextTitle">Título general de los reportes</label><input type="text" id="reportTextTitle" maxlength="140" placeholder="Reporte de avances merida"/></div>
-<div class="field"><label for="reportTextPage">Editar textos de la página</label><select id="reportTextPage"><option value="individual">Calculadora individual</option><option value="team">Comparativo de ejecutivos</option><option value="daily">Comparativa diaria</option><option value="accumulated">Acumulado general</option><option value="weekly">Comparativa semanal</option><option value="allrecords">Registros XLS</option><option value="achievements">Logros semanales</option><option value="supervisor">Calculadora supervisor</option></select></div>
+<div class="field"><label for="reportTextPage">Editar textos de la página</label><select id="reportTextPage"><option value="individual">Calculadora individual</option><option value="team">Comparativo de ejecutivos</option><option value="daily">Comparativa diaria</option><option value="accumulated">Acumulado general</option><option value="weekly">Comparativa semanal</option><option value="allrecords">Registros XLS</option><option value="achievements">Logros semanales</option><option value="supervisor">Calculadora supervisor</option><option value="incidents">Gestión de incidencias</option></select></div>
 <div class="field"><label for="reportTextSubtitle">Subtítulo del reporte</label><input type="text" id="reportTextSubtitle" maxlength="160"/></div>
 <div class="field"><label for="reportTextDescription">Descripción del reporte</label><textarea id="reportTextDescription" rows="3" maxlength="700"></textarea></div>
 <div class="field"><label for="reportTextFootnote">Nota de pie de página — cómo interpretar los resultados</label><textarea id="reportTextFootnote" rows="4" maxlength="1200"></textarea></div>
@@ -861,6 +923,12 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 <div class="settings-inline"><div class="field"><label for="dynamicBonusAmount">Monto fijo por venta marcada (MXN)</label><input type="number" min="0" max="1000000" step="0.01" inputmode="decimal" id="dynamicBonusAmount" value="0" /></div><button type="button" id="saveDynamicBonus" class="btn primary small">Guardar bono por dinámica</button></div>
 <p id="dynamicBonusStatus" role="status" class="settings-help">Importe inicial: $0.00. Activa las casillas por folio para otorgarlo.</p>
 </div></details>
+
+<details class="settings-group" id="settingsPageOrder"><summary class="settings-group-title"><span><span class="settings-number">14</span> Orden de páginas y página principal</span></summary><div class="settings-group-body">
+<p class="settings-help">Usa las flechas para cambiar la posición de cada página. Marca cuál se abrirá primero. Las preferencias se sincronizan por cuenta cuando inicies sesión.</p>
+<div id="pageOrderList" class="page-order-list"></div><div class="settings-row-actions"><button type="button" class="btn primary small" id="savePageOrder">Guardar orden y página principal</button><button type="button" class="btn small" id="resetPageOrder">Restaurar orden predeterminado</button></div>
+<p class="settings-help" id="pageOrderStatus" role="status">Principal predeterminada: Comparativa diaria.</p>
+</div></details>
 </div>
 </details><div aria-label="Filtros rápidos de importación" class="quick-filters section-card" id="quickFilters">
 <div class="quick-row">
@@ -889,7 +957,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
       <article class="daily-panel"><div class="daily-panel-title"><h3>Por ejecutivo</h3><span id="dailyExecutivesCount">—</span></div><table class="daily-table" id="dailyExecutiveTable"><thead><tr><th>Ejecutivo</th><th title="Total de registros">Registros</th><th title="Ventas totales con código">Ventas</th><th title="Ventas regulares">Regulares</th><th title="Ventas garantizadas">Garant.</th><th title="Programas Cero">P. Cero</th><th title="Planes Dentales">Dental</th><th title="Calidad operativa sobre objetivos configurados">Calidad</th></tr></thead><tbody id="dailyExecutiveRows"><tr><td colspan="8" class="daily-empty">Importa un XLS para mostrar resultados.</td></tr></tbody><tfoot id="dailyExecutiveTotal"></tfoot></table></article>
     </div>
   </div>
-  <button class="daily-copy-whatsapp" id="dailyCopyWhatsApp" type="button" title="Copiar reporte general del día principal contra el día comparado" aria-label="Copiar comparativo diario para WhatsApp" disabled><span aria-hidden="true">▣</span><span>Copiar para WhatsApp</span></button>
+
   <div id="dailyWhatsAppStatus" class="daily-copy-status" role="status" aria-live="polite" hidden></div>
 </section>
 <section id="accumulatedPage" class="daily-page accumulated-page" hidden aria-label="Acumulado por módulos y ejecutivos de los XLS guardados">
@@ -1103,7 +1171,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="all-records-help">Las columnas se muestran según <strong>Ajustes → Tabla de folios</strong>. Incidencia y APP permanecen a la vista para validarlas. Desliza horizontalmente para ver más columnas.</div>
   <div class="table-wrap all-records-table-wrap"><table id="allRecordsTable" class="record-table all-records-table"><thead id="allRecordsHead"></thead><tbody id="allRecordsBody"><tr><td>Importa un XLS para mostrar registros.</td></tr></tbody></table></div>
   <div class="all-records-pagination"><span id="allRecordsPageStatus">0 registros</span><div class="all-records-page-actions"><label for="allRecordsPageSize">Filas por página</label><select id="allRecordsPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" type="button" id="allRecordsPrev">Anterior</button><button class="btn small" type="button" id="allRecordsNext">Siguiente</button></div></div>
-  <footer class="foot">Consulta de registros XLS · Versión 2.4.9</footer>
+  <footer class="foot">Consulta de registros XLS · Versión 2.5.0</footer>
 </section>
 
 
@@ -1129,7 +1197,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
     </div></details>
   </div>
   <p class="sup-footnote">Cálculo informativo. Configura el bono base en Ajustes → 12; los bonos adicionales comienzan en $1,000, $1,500 y $2,000, editables y no acumulables. Guarda los ajustes para sincronizarlos con Netlify; consultar semanas y supervisores no genera escrituras.</p>
-  <footer class="foot">Calculadora de supervisor · Versión 2.4.9</footer>
+  <footer class="foot">Calculadora de supervisor · Versión 2.5.0</footer>
 </section>
 <section id="achievementsPage" class="achievements-page" hidden aria-label="Logros semanales por módulo">
   <div class="achievements-hero">
@@ -1202,25 +1270,52 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
       <div class="achievements-pager"><span id="achRecordStatus">0 registros</span><div class="achievements-pager-options"><label for="achPageSize">Filas</label><select id="achPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" id="achPrev" type="button">Anterior</button><button class="btn small" id="achNext" type="button">Siguiente</button></div></div>
     </div>
   </details>
-  <footer class="foot">Logros semanales · Versión 2.4.9</footer>
+  <footer class="foot">Logros semanales · Versión 2.5.0</footer>
 </section>
 
+
+<section id="incidencePage" class="incidence-page" hidden aria-label="Gestión permanente de incidencias por folio">
+  <div class="inc-hero"><div><div class="eyebrow">BASE DE DATOS INDEPENDIENTE</div><h2>Gestión de incidencias</h2><p>Registro permanente por folio, aun cuando se eliminen o sustituyan archivos XLS. Guarda comentarios y resolución por separado; una incidencia activa continúa excluyendo ese folio de las comisiones.</p></div><button type="button" class="btn" id="incRefresh">↻ Actualizar incidencias</button></div>
+  <div class="inc-stats" id="incStats"><div class="inc-stat"><span>Incidencias</span><b>—</b></div></div>
+  <section class="inc-card"><h3 id="incFormTitle">Registrar o actualizar incidencia</h3>
+    <div class="inc-fields">
+      <div class="field"><label for="incFolio">Folio del trámite *</label><input id="incFolio" type="text" maxlength="100" autocomplete="off" placeholder="Folio único" required /></div>
+      <div class="field"><label for="incModule">Módulo</label><input id="incModule" type="text" maxlength="160" placeholder="Módulo de origen" /></div>
+      <div class="field"><label for="incExecutive">Ejecutivo</label><input id="incExecutive" type="text" maxlength="160" placeholder="Nombre del ejecutivo" /></div>
+      <div class="field span-all"><label for="incComment">Agregar comentario (se conserva en el historial)</label><textarea id="incComment" maxlength="2000" placeholder="Describe la incidencia, evidencias, acciones realizadas o conclusión..."></textarea></div>
+    </div>
+    <div class="inc-checkboxes"><label><input id="incActive" type="checkbox" checked/> Incidencia activa (excluye comisión)</label><label><input id="incResolved" type="checkbox"/> Resuelta</label></div>
+    <div id="incHistory" class="inc-muted" aria-live="polite"></div>
+    <div class="inc-actions"><button id="incSave" class="btn primary" type="button">Guardar incidencia</button><button id="incClear" class="btn" type="button">Nueva / Limpiar</button><span id="incFormStatus" class="status" role="status">Necesitas iniciar sesión para guardar en PostgreSQL.</span></div>
+  </section>
+  <section class="inc-card"><h3>Historial y seguimiento</h3><div class="inc-filterbar"><div class="inc-search field"><label for="incSearch">Buscar folio, módulo, ejecutivo o comentario</label><input id="incSearch" type="search" placeholder="Buscar en incidencias guardadas" /></div><div class="field"><label for="incFilter">Estado</label><select id="incFilter"><option value="all">Todas</option><option value="active">Activas</option><option value="pending">Activas no resueltas</option><option value="resolved">Resueltas</option><option value="inactive">Desactivadas</option></select></div><button class="btn small" type="button" id="incExportCsv">Exportar historial CSV</button></div>
+    <div id="incListStatus" class="inc-muted" role="status">Cargando incidencias…</div><div class="inc-table-scroll"><table class="inc-table"><thead><tr><th>Folio</th><th>Módulo / Ejecutivo</th><th>Incidencia</th><th>Resolución</th><th>Comentarios</th><th>Último cambio</th><th>Acción</th></tr></thead><tbody id="incRows"><tr><td colspan="7">Sin registros cargados</td></tr></tbody></table></div>
+    <div class="inc-actions" style="justify-content:flex-end;margin:8px 0 4px"><button type="button" class="btn small" id="incPrev">Anterior</button><span id="incPageText" class="inc-muted">Página 1 de 1</span><button type="button" class="btn small" id="incNext">Siguiente</button></div>
+    <p class="inc-muted">Desactivar no borra la historia. Marcar «Resuelta» registra el seguimiento, pero no reactiva el pago de forma automática. Los datos se mantienen por cuenta de Netlify Identity.</p>
+  </section>
+</section>
 <section id="visitPage" class="visit-page" hidden aria-label="Acuse de visita de coordinación">
   <div class="visit-hero"><div><div class="eyebrow">AUDITORÍA OPERATIVA</div><h2>Visitas de coordinación</h2><p>Acuse de visita · Captura móvil · Semana en curso</p></div><span id="visitCloudInfo" class="visit-state">Captura local · Guarda en la nube con sesión</span></div>
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 2.4.9</footer>
+  <footer class="foot">Acuse de coordinación · Versión 2.5.0</footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 2.4.9</footer>
+<footer class="foot">Final de la presentacion · Versión 2.5.0</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 
+
+<div class="floating-export" id="floatingExport"><div class="floating-export-menu" id="floatingExportMenu" hidden aria-label="Exportar página actual">
+  <button type="button" id="floatPdf">Imprimir / PDF</button><button type="button" id="floatPng">Exportar PNG</button><button type="button" id="floatCsv">Exportar CSV</button>
+  <button class="daily-copy-whatsapp" id="dailyCopyWhatsApp" type="button" title="Copiar comparación diaria para WhatsApp" aria-label="Copiar comparativo diario para WhatsApp" hidden disabled>Copiar para WhatsApp</button>
+</div><button class="floating-export-main" id="floatingExportToggle" type="button" aria-expanded="false" aria-controls="floatingExportMenu">Exportar ▴</button></div>
+<div id="xlsMondayReminder" role="dialog" aria-modal="true" aria-labelledby="mondayHeading" hidden><div class="monday-card"><div class="eyebrow">RECORDATORIO SEMANAL</div><h2 id="mondayHeading">Hoy es lunes: actualiza los XLS</h2><p>Revisa y carga los archivos XLS de todos los módulos para mantener actualizados los reportes y comisiones. Las incidencias se conservan en su base independiente, aunque reemplaces archivos.</p><div class="monday-actions"><button type="button" class="btn" id="mondayDismiss">Entendido</button><button type="button" class="btn primary" id="mondayUpload">Cargar XLS ahora</button></div></div></div>
 <div class="auth-modal" id="cloudModal" hidden role="dialog" aria-modal="true" aria-labelledby="cloudModalTitle">
   <div class="auth-card cloud-auth-card">
     <h2 id="cloudModalTitle">Acceso por correo</h2>

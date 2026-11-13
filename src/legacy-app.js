@@ -37,7 +37,7 @@ import {buildDailyWhatsAppReport} from './daily-whatsapp-report.js';
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='2.4.9';
+  const APP_VERSION='2.5.0';
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -86,7 +86,23 @@ const TABLE_FILTER_CONTROL_IDS=['tableScope','tableFilter','tablePaymentFilter',
 const TEAM_GOALS_STORAGE='wmSamsComisionesMetasEquipoV1';
 const TEAM_RECOVERY_STORAGE='wmSamsComisionesRecuperacionesEquipoV1';
 const teamGoals=loadTeamStore(TEAM_GOALS_STORAGE),teamRecoveries=loadTeamStore(TEAM_RECOVERY_STORAGE);
-let activePage='individual';
+// Las preferencias de navegación se sincronizan mediante dashboard_settings.
+const PAGE_NAV_KEY='wmSamsNavOrderV250';
+const DEFAULT_PAGE_ORDER=['daily','individual','team','supervisor','incidents','allrecords','achievements','accumulated','weekly','visits'];
+const PAGE_LABELS={daily:'Comparativa diaria',individual:'Calculadora individual',team:'Comparativo de ejecutivos',supervisor:'Calculadora supervisor',incidents:'Gestión de incidencias',allrecords:'Registros XLS',achievements:'Logros semanales',accumulated:'Acumulado general',weekly:'Comparativa semanal',visits:'Visitas de coordinación'};
+function validNavSettings(value){
+  const arr=Array.isArray(value?.order)?value.order:[],unique=[...new Set(arr.filter(k=>DEFAULT_PAGE_ORDER.includes(k)))];
+  const order=[...unique,...DEFAULT_PAGE_ORDER.filter(k=>!unique.includes(k))];
+  return {order,home:DEFAULT_PAGE_ORDER.includes(value?.home)?value.home:'daily'};
+}
+function loadNavSettings(){try{return validNavSettings(JSON.parse(localStorage.getItem(PAGE_NAV_KEY)||'null'));}catch(_){return validNavSettings(null);}}
+let pageNavigation=loadNavSettings();
+let activePage=pageNavigation.home;
+const incidentRecords=new Map();
+const normalizeIncidentFolio=value=>String(value??'').trim().normalize('NFKC').toUpperCase().replace(/[\s\-]+/g,'');
+const incidentFolioKey=row=>normalizeIncidentFolio(row?.folio);
+let incidentLoaded=false, incidentLoading=false, incidentPageIndex=1;
+
 function loadTeamStore(key){try{const v=JSON.parse(localStorage.getItem(key)||'{}');return v&&typeof v==='object'&&!Array.isArray(v)?v:{}}catch(_){return {}}}
 function teamKey(week,name){return `${week}::${name}`;}
 function executiveGoal(week,name){const n=teamGoals[teamKey(week,name)];return Number.isInteger(n)&&n>0?n:qualityConfig.execWeeklyGoal;}
@@ -268,7 +284,7 @@ const hasCode=r=>!!r.code.trim();
 const guaranteeType=r=>isYes(r.guaranteed)?'guar':isNo(r.guaranteed)?'reg':null;
 const candidate=r=>hasCode(r)&&!!guaranteeType(r);
 const autoSkipped=r=>isNonPayableStatus(r.status);
-const selectedIncident=r=>imported.flags.has(r.uid||String(r.i));
+const selectedIncident=r=>{const key=incidentFolioKey(r);const permanent=key&&incidentRecords.get(key);return permanent?permanent.active===true:imported.flags.has(r.uid||String(r.i));};
 const appEnabled=r=>hasCode(r)&&!imported.appDisabled.has(r.uid||String(r.i));
 const dynamicBonusMarked=r=>imported.dynamicBonuses.has(r.uid||String(r.i));
 const dynamicBonusPayable=r=>payable(r)&&dynamicBonusMarked(r);
@@ -365,6 +381,132 @@ function loadFolioFlags(){try{const o=JSON.parse(localStorage.getItem(FOLIO_FLAG
   imported.dynamicBonuses=new Set(Array.isArray(o.dynamicBonuses)?o.dynamicBonuses:[]);
   }catch(_){imported.flags=new Set();imported.appDisabled=new Set();imported.dynamicBonuses=new Set();}}
 function saveFolioFlags(){if(archive.temporaryMode||!isAuthorized())return;try{localStorage.setItem(FOLIO_FLAGS_KEY,JSON.stringify({incidents:[...imported.flags],appsOff:[...imported.appDisabled],dynamicBonuses:[...imported.dynamicBonuses]}));}catch(_){}}
+
+function incidentLocalDate(value){if(!value)return '—';const date=new Date(value);return Number.isNaN(date.getTime())?'—':date.toLocaleString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function incidentArray(){return [...incidentRecords.values()].sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));}
+function incidentStatus(message,error=false){const node=el('incListStatus');if(node){node.textContent=message;node.style.color=error?'#b33939':'';}}
+function updateIncidentMap(record){if(record?.folio_key)incidentRecords.set(record.folio_key,record);}
+function incidentSaveData(row,active,comment='',resolved=false){return {folio:row.folio,module:row.module||'',executive:row.executive||'',active,resolved,comment};}
+function syncIncidentDisplays(){
+  if(importActive()){computeImportedBase();renderRecords();}
+  renderTeam();renderDaily();renderAccumulated();renderWeekly();renderAllRecords();renderAchievements();renderSupervisorCalculator();
+  renderIncidencePage();
+}
+// Migración conservadora de casillas previas. No borra marcas sin folio y nunca
+// revive una incidencia desactivada explícitamente en la nueva base.
+async function migrateLegacyIncidents(){
+  if(!isAuthorized()||!imported.flags.size||!archive.reports.length)return;
+  const historic=combinedArchiveData(archive.reports);
+  if(!historic)return;
+  const candidates=new Map();
+  for(const row of historic.rows){
+    if(!imported.flags.has(row.uid||String(row.i)))continue;
+    const key=incidentFolioKey(row);if(!key)continue;
+    if(!candidates.has(key))candidates.set(key,row);
+  }
+  let migrated=0;
+  for(const [key,row] of candidates){
+    try{
+      if(!incidentRecords.has(key)){
+        const record=await window.APP_CLOUD.putIncident(incidentSaveData(row,true,'Migrada desde las casillas de la versión anterior.'));
+        updateIncidentMap(record);migrated++;
+      }
+      // Al quedar vinculada por folio, el indicador antiguo ya no es necesario.
+      for(const entry of historic.rows)if(incidentFolioKey(entry)===key)imported.flags.delete(entry.uid||String(entry.i));
+    }catch(error){console.warn('No se pudo migrar la incidencia '+key,error);}
+  }
+  if(migrated||candidates.size)saveFolioFlags();
+}
+async function refreshIncidents(migrate=false){
+  if(!isAuthorized()){
+    incidentLoaded=false;incidentRecords.clear();renderIncidencePage();return;
+  }
+  if(incidentLoading)return;
+  incidentLoading=true;incidentStatus('Consultando incidencias permanentes…');
+  try{
+    const rows=await window.APP_CLOUD.listIncidents();
+    incidentRecords.clear();rows.forEach(updateIncidentMap);incidentLoaded=true;
+    if(migrate)await migrateLegacyIncidents();
+    syncIncidentDisplays();
+    incidentStatus(`${incidentRecords.size} folio(s) conservados en la base independiente de Netlify.`);
+  }catch(error){incidentStatus('No se pudo consultar PostgreSQL: '+(error.message||error),true);}
+  finally{incidentLoading=false;}
+}
+async function saveIncidentFromRow(uid,active){
+  const row=imported.data?.rows.find(r=>(r.uid||String(r.i))===uid);
+  if(!row)throw Error('No se encontró el registro en el XLS activo.');
+  if(!incidentFolioKey(row))throw Error('Este registro no tiene folio. No puede guardarse en la base permanente.');
+  if(!isAuthorized())throw Error('Inicia sesión para conservar incidencias aunque cambien los XLS.');
+  const current=incidentRecords.get(incidentFolioKey(row));
+  const result=await window.APP_CLOUD.putIncident(incidentSaveData(row,active,'',current?.resolved===true));
+  updateIncidentMap(result);
+  imported.flags.delete(uid);saveFolioFlags();syncIncidentDisplays();
+  incidentStatus('Folio '+row.folio+' guardado en PostgreSQL.');
+}
+function renderIncidencePage(){
+  const stats=el('incStats'),list=el('incRows');if(!stats||!list)return;
+  const rows=incidentArray(),active=rows.filter(r=>r.active),pending=active.filter(r=>!r.resolved),resolved=rows.filter(r=>r.resolved);
+  stats.innerHTML=[['Total histórico',rows.length],['Activas',active.length],['Activas sin resolver',pending.length],['Resueltas',resolved.length]].map(([name,count])=>`<div class="inc-stat"><span>${esc(name)}</span><b>${number.format(count)}</b></div>`).join('');
+  const search=normalize(el('incSearch').value),filter=el('incFilter').value;
+  const found=rows.filter(r=>{
+    const matches=!search||normalize([r.folio,r.module,r.executive,...(Array.isArray(r.comments)?r.comments.map(c=>c.text):[])].join(' ')).includes(search);
+    const status=filter==='all'||(filter==='active'&&r.active)||(filter==='pending'&&r.active&&!r.resolved)||(filter==='resolved'&&r.resolved)||(filter==='inactive'&&!r.active);
+    return matches&&status;
+  });
+  const locked=!isAuthorized();el('incSave').disabled=locked;el('incRefresh').disabled=locked;
+  const pages=Math.max(1,Math.ceil(found.length/50));incidentPageIndex=Math.min(Math.max(1,incidentPageIndex),pages);
+  el('incPrev').disabled=incidentPageIndex===1;el('incNext').disabled=incidentPageIndex===pages;el('incPageText').textContent=`Página ${incidentPageIndex} de ${pages}`;
+  const visible=found.slice((incidentPageIndex-1)*50,incidentPageIndex*50);
+  list.innerHTML=visible.map(r=>{
+    const comments=Array.isArray(r.comments)?r.comments:[];
+    const commentsText=comments.slice(-2).map(c=>`<div>${esc(c.text||'')}<small class="inc-muted"> · ${esc(incidentLocalDate(c.createdAt))}</small></div>`).join('')||'<span class="inc-muted">Sin comentarios</span>';
+    return `<tr><td><b>${esc(r.folio)}</b></td><td>${esc(r.module||'—')}<div class="inc-muted">${esc(r.executive||'—')}</div></td><td><span class="inc-tag ${r.active?'warn':'good'}">${r.active?'Activa':'Inactiva'}</span></td><td><span class="inc-tag ${r.resolved?'good':'warn'}">${r.resolved?'Resuelta':'Pendiente'}</span></td><td><div class="inc-comments">${commentsText}</div>${comments.length>2?`<small class="inc-muted">${comments.length} comentarios en total</small>`:''}</td><td>${esc(incidentLocalDate(r.updated_at))}</td><td><button type="button" data-edit-incident="${esc(r.folio_key)}">Ver / editar</button></td></tr>`;
+  }).join('')||`<tr><td colspan="7">${locked?'Inicia sesión para consultar incidencias permanentes.':'No hay incidencias para estos filtros.'}</td></tr>`;
+  if(!incidentLoading)incidentStatus(locked?'Inicia sesión para guardar y consultar incidencias en PostgreSQL.':`${found.length} de ${rows.length} registros mostrados. Los folios existen aunque no estén en ningún XLS.`);
+}
+function resetIncidentForm(){
+  for(const id of ['incFolio','incModule','incExecutive','incComment'])el(id).value='';
+  el('incFolio').readOnly=false;el('incActive').checked=true;el('incResolved').checked=false;el('incHistory').innerHTML='';
+  el('incFormTitle').textContent='Registrar o actualizar incidencia';el('incFormStatus').textContent='Nueva incidencia por folio.';
+}
+function editIncident(key){
+  const record=incidentRecords.get(key);if(!record)return;
+  el('incFolio').value=record.folio;el('incFolio').readOnly=true;
+  el('incModule').value=record.module||'';el('incExecutive').value=record.executive||'';
+  el('incComment').value='';el('incActive').checked=record.active;el('incResolved').checked=record.resolved;
+  el('incFormTitle').textContent='Editar folio '+record.folio;
+  el('incFormStatus').textContent=`${(record.comments||[]).length} comentario(s) conservados · alta: ${incidentLocalDate(record.created_at)} · resuelta: ${incidentLocalDate(record.resolved_at)}. Escribe uno nuevo para agregarlo al historial.`;
+  el('incHistory').innerHTML='<strong>Historial de comentarios</strong>'+((record.comments||[]).map(c=>`<div class="inc-history-item">${esc(incidentLocalDate(c.createdAt))}: ${esc(c.text||'')}</div>`).join('')||'<p>Sin comentarios anteriores.</p>');
+  el('incFolio').scrollIntoView({behavior:'smooth',block:'center'});
+}
+async function saveIncidentForm(){
+  const data={folio:el('incFolio').value.trim(),module:el('incModule').value.trim(),executive:el('incExecutive').value.trim(),comment:el('incComment').value.trim(),active:el('incActive').checked,resolved:el('incResolved').checked,replaceMetadata:true};
+  const status=el('incFormStatus');
+  if(!isAuthorized()){status.textContent='Inicia sesión para guardar incidencias en la nube.';return;}
+  if(!data.folio){status.textContent='El folio es obligatorio.';return;}
+  const btn=el('incSave');btn.disabled=true;status.textContent='Guardando en PostgreSQL…';
+  try{updateIncidentMap(await window.APP_CLOUD.putIncident(data));status.textContent='Incidencia guardada y sincronizada. Reaparecerá si vuelves a importar este folio.';el('incComment').value='';syncIncidentDisplays();}
+  catch(error){status.textContent='No se pudo guardar: '+(error.message||error);}
+  finally{btn.disabled=false;}
+}
+function exportIncidentCsv(){
+  const csv=[['Folio','Módulo','Ejecutivo','Incidencia activa','Resuelta','Fecha alta','Fecha resolución','Último cambio','Comentarios'],...incidentArray().map(r=>[r.folio,r.module,r.executive,r.active?'Sí':'No',r.resolved?'Sí':'No',r.created_at,r.resolved_at||'',r.updated_at,(r.comments||[]).map(c=>`${incidentLocalDate(c.createdAt)}: ${c.text}`).join(' | ')])];
+  const val=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const blob=new Blob(['\ufeff'+csv.map(row=>row.map(val).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='incidencias_permanentes_'+dateIso(new Date())+'.csv';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function initIncidences(){
+  el('incSave').addEventListener('click',()=>{void saveIncidentForm();});
+  el('incClear').addEventListener('click',resetIncidentForm);
+  el('incRefresh').addEventListener('click',()=>{void refreshIncidents(false);});
+  el('incSearch').addEventListener('input',()=>{incidentPageIndex=1;renderIncidencePage();});
+  el('incFilter').addEventListener('change',()=>{incidentPageIndex=1;renderIncidencePage();});
+  el('incPrev').addEventListener('click',()=>{incidentPageIndex--;renderIncidencePage();});
+  el('incNext').addEventListener('click',()=>{incidentPageIndex++;renderIncidencePage();});
+  el('incRows').addEventListener('click',event=>{const btn=event.target.closest('[data-edit-incident]');if(btn)editIncident(btn.dataset.editIncident);});
+  el('incExportCsv').addEventListener('click',exportIncidentCsv);
+  renderIncidencePage();
+}
 function openArchiveDB(){return new Promise((resolve,reject)=>{
   if(!window.indexedDB){reject(Error('El navegador no permite IndexedDB. Abre la página en un navegador moderno.'));return;}
   const req=indexedDB.open(ARCHIVE_DB,1);
@@ -478,6 +620,7 @@ async function importXlsFiles(files){
     // Mantener las marcas de los folios de histórico, pero no persistir cambios temporales.
     loadFolioFlags();
     refreshArchiveData(true);window.VISITS?.refreshSources();
+    if(persistent)await refreshIncidents(true);
   }
   const stateText=persistent?
     `${added} archivo(s) guardado(s) en el historial · ${duplicated} duplicado(s) omitido(s).`:
@@ -492,7 +635,9 @@ async function initArchive(){
   try{
     archive.reports=await archiveGetAll();archive.reports.sort((a,b)=>a.addedAt-b.addedAt||a.id.localeCompare(b.id));archive.ready=isAuthorized();
     refreshArchiveData(true);window.VISITS?.refreshSources();
+    await refreshIncidents(true);
   }catch(err){archive.ready=false;renderArchiveList();statusBox('No se pudo conectar al historial en línea: '+esc(err.message||String(err))+'. Comprueba la conexión, la sesión y Netlify Database.','error');}
+  finally{if(!incidentLoaded)await refreshIncidents(true);}
 }
 // Columnas configurables y filtros visuales (no alteran las métricas por sí mismos).
 function columnLabel(c){return c.key==='dynamicBonus'?'Bono adicional':c.key==='incident'?'Incidencia':c.key==='app'?'APP':c.key==='payment'?'Validación de pago':c.name;}
@@ -706,7 +851,7 @@ function resetAllRecordsAdvanced(){
 }
 function applyFolioValidationChange(target){
   const id=target.dataset.incidentId??target.dataset.appId??target.dataset.dynamicBonusId;if(id===undefined)return false;
-  if(target.matches('input[data-incident-id]')){if(target.checked)imported.flags.add(id);else imported.flags.delete(id);}
+  if(target.matches('input[data-incident-id]')){target.disabled=true;void saveIncidentFromRow(id,target.checked).catch(error=>{alert(error.message||error);syncIncidentDisplays();});return true;}
   else if(target.matches('input[data-app-id]')){if(target.checked)imported.appDisabled.delete(id);else imported.appDisabled.add(id);}
   else if(target.matches('input[data-dynamic-bonus-id]')){if(target.checked)imported.dynamicBonuses.add(id);else imported.dynamicBonuses.delete(id);}
   else return false;
@@ -1995,7 +2140,7 @@ function initSupervisorCalculator(){
   el('supRecordTables').addEventListener('change',event=>{
     const target=event.target;const id=target.dataset.supIncidentId??target.dataset.supAppId??target.dataset.supDynamicBonusId;
     if(id===undefined)return;
-    if(target.matches('[data-sup-incident-id]')){if(target.checked)imported.flags.add(id);else imported.flags.delete(id);}
+    if(target.matches('[data-sup-incident-id]')){target.disabled=true;void saveIncidentFromRow(id,target.checked).catch(error=>{alert(error.message||error);syncIncidentDisplays();});return;}
     else if(target.matches('[data-sup-app-id]')){if(!target.checked)imported.appDisabled.add(id);else imported.appDisabled.delete(id);}
     else if(target.matches('[data-sup-dynamic-bonus-id]')){if(target.checked)imported.dynamicBonuses.add(id);else imported.dynamicBonuses.delete(id);}
     saveFolioFlags();renderSupervisorCalculator();
@@ -2036,7 +2181,7 @@ function initSupervisorCalculator(){
 }
 
 function refreshAuthorizedPages(){
-  // Las siete páginas son visibles sin sesión. Datos y guardado remoto requieren Identity.
+  // Todas las páginas son visibles; datos e incidencias persistentes requieren Identity.
   for(const tab of document.querySelectorAll('[data-page-tab]'))tab.hidden=false;
   if(activePage==='accumulated')renderAccumulated();
   if(activePage==='weekly')renderWeekly();
@@ -2045,8 +2190,76 @@ function refreshAuthorizedPages(){
   if(activePage==='supervisor'){populateSupervisorCalculatorFilters();renderSupervisorCalculator();}
 }
 
+
+function applyNavOrder(){
+  const nav=document.querySelector('.app-navigation');if(!nav)return;
+  for(const page of pageNavigation.order){const tab=nav.querySelector(`[data-page-tab="${page}"]`);if(tab)nav.appendChild(tab);}
+}
+function renderNavOrderEditor(){
+  const host=el('pageOrderList');if(!host)return;
+  host.innerHTML=pageNavigation.order.map((page,index)=>`<div class="page-order-row">
+    <b>${index+1}. ${esc(PAGE_LABELS[page])}</b>
+    <div class="page-order-actions"><button type="button" data-order-move="${esc(page)}" data-order-dir="-1" title="Subir ${esc(PAGE_LABELS[page])}" ${index===0?'disabled':''}>↑</button><button type="button" data-order-move="${esc(page)}" data-order-dir="1" title="Bajar ${esc(PAGE_LABELS[page])}" ${index===pageNavigation.order.length-1?'disabled':''}>↓</button></div>
+    <label><input type="radio" name="navMainPage" value="${esc(page)}" ${page===pageNavigation.home?'checked':''}> Principal</label>
+  </div>`).join('');
+}
+function saveNavSettings(){
+  try{localStorage.setItem(PAGE_NAV_KEY,JSON.stringify(pageNavigation));}catch(error){el('pageOrderStatus').textContent='No se pudo guardar: '+error.message;return;}
+  applyNavOrder();el('pageOrderStatus').textContent='Orden y página principal guardados'+(isAuthorized()?' · sincronización en cola.':'. Inicia sesión para sincronizar.');
+}
+function initNavOrder(){
+  pageNavigation=loadNavSettings();applyNavOrder();renderNavOrderEditor();
+  el('pageOrderList').addEventListener('click',event=>{
+    const btn=event.target.closest('[data-order-move]');if(!btn)return;
+    const index=pageNavigation.order.indexOf(btn.dataset.orderMove),next=index+Number(btn.dataset.orderDir);
+    if(index<0||next<0||next>=pageNavigation.order.length)return;
+    [pageNavigation.order[index],pageNavigation.order[next]]=[pageNavigation.order[next],pageNavigation.order[index]];
+    renderNavOrderEditor();el('pageOrderStatus').textContent='Orden modificado. Pulsa Guardar para conservarlo.';
+  });
+  el('pageOrderList').addEventListener('change',event=>{if(event.target.name==='navMainPage'){pageNavigation.home=event.target.value;el('pageOrderStatus').textContent='Página principal seleccionada. Pulsa Guardar.';}});
+  el('savePageOrder').addEventListener('click',saveNavSettings);
+  el('resetPageOrder').addEventListener('click',()=>{pageNavigation=validNavSettings(null);renderNavOrderEditor();saveNavSettings();});
+}
+function updateFloatingExport(){
+  const isDaily=activePage==='daily',isVisit=activePage==='visits',isIncident=activePage==='incidents';
+  el('dailyCopyWhatsApp').hidden=!isDaily;
+  el('floatCsv').hidden=isVisit;
+  el('floatPdf').hidden=false;el('floatPng').hidden=false;
+  el('floatingExportMenu').hidden=true;el('floatingExportToggle').setAttribute('aria-expanded','false');
+  el('floatCsv').textContent=isIncident?'Exportar incidencias CSV':'Exportar CSV';
+}
+function initFloatingExport(){
+  const menu=el('floatingExportMenu'),toggle=el('floatingExportToggle');
+  toggle.addEventListener('click',()=>{menu.hidden=!menu.hidden;toggle.setAttribute('aria-expanded',String(!menu.hidden));});
+  const action=(id,fn)=>el(id).addEventListener('click',()=>{menu.hidden=true;toggle.setAttribute('aria-expanded','false');fn();});
+  action('floatPdf',()=>el(activePage==='visits'?'visitPdf':'print').click());
+  action('floatPng',()=>el(activePage==='visits'?'visitPng':'exportImage').click());
+  action('floatCsv',()=>activePage==='incidents'?exportIncidentCsv():el('export').click());
+  el('dailyCopyWhatsApp').addEventListener('click',()=>{menu.hidden=true;toggle.setAttribute('aria-expanded','false');});
+  document.addEventListener('click',event=>{if(!el('floatingExport').contains(event.target)){menu.hidden=true;toggle.setAttribute('aria-expanded','false');}});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'){menu.hidden=true;toggle.setAttribute('aria-expanded','false');}});
+  updateFloatingExport();
+}
+function mondayReminderKey(){return 'wmSamsMondayXlsV250:'+String(window.APP_CLOUD?.user?.id||'guest');}
+function initMondayReminder(){
+  const modal=el('xlsMondayReminder'),dismiss=el('mondayDismiss');
+  function hide(){modal.hidden=true;}
+  function acknowledge(){try{localStorage.setItem(mondayReminderKey(),dateIso(new Date()));}catch(_){}hide();}
+  dismiss.addEventListener('click',acknowledge);
+  el('mondayUpload').addEventListener('click',()=>{acknowledge();el('xlsInput').click();});
+  modal.addEventListener('click',event=>{if(event.target===modal)acknowledge();});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!modal.hidden)acknowledge();});
+  function maybeShow(){
+    const now=new Date();if(now.getDay()!==1||!modal.hidden)return;
+    if(localStorage.getItem(mondayReminderKey())!==dateIso(now))modal.hidden=false;
+  }
+  // Al abrir la aplicación y al volver a ella un lunes (sin recordatorios repetitivos).
+  setTimeout(maybeShow,250);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)maybeShow();});
+  window.addEventListener('focus',maybeShow);
+}
 function switchPage(page){
-  activePage=['individual','team','daily','accumulated','weekly','visits','allrecords','achievements','supervisor'].includes(page)?page:'individual';
+  activePage=DEFAULT_PAGE_ORDER.includes(page)?page:pageNavigation.home;
   document.body.dataset.page=activePage;
   el('teamPage').hidden=activePage!=='team';
   el('dailyPage').hidden=activePage!=='daily';
@@ -2056,6 +2269,7 @@ function switchPage(page){
   el('allRecordsPage').hidden=activePage!=='allrecords';
   el('achievementsPage').hidden=activePage!=='achievements';
   el('supPage').hidden=activePage!=='supervisor';
+  el('incidencePage').hidden=activePage!=='incidents';
   for(const b of document.querySelectorAll('[data-page-tab]')){const yes=b.dataset.pageTab===activePage;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));}
   if(activePage==='team')renderTeam();
   if(activePage==='daily')renderDaily();
@@ -2065,6 +2279,8 @@ function switchPage(page){
   if(activePage==='allrecords')renderAllRecords();
   if(activePage==='achievements'){populateAchFilters();renderAchievements();}
   if(activePage==='supervisor'){populateSupervisorCalculatorFilters();renderSupervisorCalculator();}
+  if(activePage==='incidents')renderIncidencePage();
+  updateFloatingExport();
   if(el('settingsPanel').open){el('settingsPanel').open=false;el('toggleSettings').setAttribute('aria-expanded','false');}
 }
 for(const b of document.querySelectorAll('[data-page-tab]'))b.addEventListener('click',()=>switchPage(b.dataset.pageTab));
@@ -2305,6 +2521,7 @@ el('teamTable').addEventListener('click',e=>{
   el('nextTier').addEventListener('click',()=>{simDirty=true;const r=calculate(state.sim);if(!r.ok||!r.nextTarget)return;state.sim.reg+=r.needed;state.sim.app+=r.needed;update('sim');});
   el('print').addEventListener('click',()=>{refreshAuthorizedPages();buildReport();window.print();});
   el('export').addEventListener('click',()=>{
+    if(activePage==='incidents'){exportIncidentCsv();return;}
     if(activePage==='supervisor'){
       const c=supervisorCalculator();if(!c.ready){alert(c.reason);return;}
       const lines=[['CALCULADORA DE SUPERVISOR','Valor'],['Supervisor',c.selected.name],['Módulo',c.selected.module],['Semana',weekLabel(supView.week)],['Objetivo de ventas',c.goal],['Ventas válidas del equipo',c.teamValid.length],['Incluir ventas del supervisor',c.includeSupervisorSales?'Sí':'No'],['Ventas propias incluidas en cumplimiento',c.includeSupervisorSales?c.ownValid.length:0],['Ventas válidas del módulo para cumplimiento',c.completionSales],['Cumplimiento para escalón propio %',c.teamCompletion],['Cumplimiento %',c.completion],['Calidad total %',c.q.composite],['Alcance global %',c.q.global],['Bono base',supSettings.baseBonus??'Sin configurar'],['Cálculo base',c.base],...c.additional.map(b=>['Bono '+b.threshold+'%',b.configured?b.earned:'Sin configurar']),['Penalización Plan Cero módulo %',c.modulePenalty],['Descuento Plan Cero módulo',c.incentiveDiscount],['Bono neto módulo',c.incentiveNet],['Ventas propias brutas',c.ownGross],['Penalización Plan Cero propias %',c.ownP0Penalty],['Penalización incidencias propias %',c.ownIncPenalty],['Ventas propias netas',c.ownNet],['Bono por dinámica · ventas propias',c.ownDynamicBonus],['Cantidad de folios con dinámica',c.ownDynamicBonusCount],['TOTAL ESTIMADO',c.total],[],['CALIDAD','Alcance %','Calidad %'],...SUP_FACTOR_KEYS.map(k=>[SUP_FACTOR_LABELS[k],c.q.actual[k],c.q.factors[k]]),[],['PAGO POR CONCEPTO','Cantidad','Tarifa','Total'],...c.parts.map(x=>[x.name,x.count,x.rate,x.total])];
@@ -2564,6 +2781,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     weekly:{subtitle:'Comparativa semanal',description:'Objetivos, resultados y cumplimiento por semana completa de lunes a domingo.',footer:'OBJETIVOS define metas por semana; CUMPLIMIENTO = resultado / objetivo; CALIDAD DE FACTORES aplica el porcentaje requerido, mínimo y máximo configurados para cada factor; ALCANCE GLOBAL = promedio de las cuatro calidades (Cumplimiento, Primera compra, Programa Cero y Activaciones) más Calidad Total, dividido entre cinco; sin tope. Los supervisores se incluyen según la casilla superior.'},
     allrecords:{subtitle:'Consulta de registros XLS',description:'Vista íntegra de los registros cargados, con filtros operativos combinados.',footer:'Se muestran las filas de los XLS activos que cumplen todos los filtros seleccionados. La columna Incidencia excluye pagos del folio; APP refleja la activación habilitada en el Dashboard. Filtrar no altera los cálculos.'},
     achievements:{subtitle:'Logros semanales',description:'Metas de registros y ventas en cantidades; planes, APP y primera compra en porcentajes requeridos.',footer:'Alcance real (número grande) = obtenido ÷ base u objetivo. Calidad (número pequeño) = alcance ÷ porcentaje requerido, con mínimos y máximos configurados. Todos los filtros de la tabla afectan los indicadores; los folios con incidencia se muestran, pero no cuentan para sus cálculos.'},
+    incidents:{subtitle:'Gestión de incidencias',description:'Historial permanente de incidencias independiente de los archivos XLS.',footer:'Los folios con incidencia activa se excluyen de las comisiones. El estado Resuelta no elimina automáticamente la exclusión; desactiva la incidencia por separado cuando corresponda.'},
     supervisor:{subtitle:'Calculadora de supervisor',description:'Bono por resultados del módulo y comisiones por ventas propias del supervisor.',footer:'Bono del módulo = bono base × Alcance Global × min(1, Cumplimiento del módulo / 100). Las ventas propias se incluyen en Cumplimiento cuando su casilla está activa; el escalón de pago propio usa solo ventas válidas del equipo. El bono adicional de 110/115/120% es único; se aplican penalizaciones configuradas.'}
   };
   const REPORT_TITLE_DEFAULT='Reporte de avances merida';
@@ -2791,7 +3009,14 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return el('printPage');
   }
 
+  function buildIncidenceReport(){
+    const entries=incidentArray(),cols=['Folio','Módulo','Ejecutivo','Activa','Resuelta','Comentarios'];
+    const body=entries.map(r=>`<tr><td>${esc(r.folio)}</td><td>${esc(r.module||'—')}</td><td>${esc(r.executive||'—')}</td><td>${r.active?'Sí':'No'}</td><td>${r.resolved?'Sí':'No'}</td><td>${esc((r.comments||[]).map(c=>c.text).join(' / '))}</td></tr>`).join('');
+    el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}</style><div id="printPage" class="report-page" style="--raccent:#005daa;--rdeep:#003b7a;--rpale:#eef5fb">${reportHeaderMarkup('incidents',`${entries.length} incidencias permanentes · ${new Date().toLocaleString('es-MX')}`)}<section class="report-section" data-report-section="incidents"><h2>Historial independiente de XLS</h2><table class="record-export-table"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${body||'<tr><td colspan="6">Sin incidencias registradas.</td></tr>'}</tbody></table></section>${reportFootMarkup('incidents')}</div>`;
+    return el('printPage');
+  }
   function buildReport(){
+    if(activePage==='incidents')return buildIncidenceReport();
     if(activePage==='visits')return window.VISITS?.buildReport();
     if(activePage==='supervisor')return buildSupervisorReport();
     if(activePage==='allrecords')return buildAllRecordsReport();
@@ -2896,7 +3121,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=8;
     y=paragraph(reportTexts.subtitle,margin,y,content,16,21,accent)+6;
     y=paragraph(reportTexts.description,margin,y,content,12,18,deep)+8;
-    const selection=activePage==='supervisor'?`${supView.week?weekLabel(supView.week):'Sin semana'} · ${supReadSelection()?.name||'Sin supervisor'} · ${supReadSelection()?.module||''}`:activePage==='achievements'?`${achValue('achWeek')?weekLabel(achValue('achWeek')):'Sin semana'} · ${achValue('achModule')||'Todos los módulos'} · ${achFilteredRecords().length} folios filtrados`:activePage==='allrecords'?`${getAllRecordsFiltered().length} registros · Módulo ${allRecordsFilterValue('allRecordsModule')||'Todos'} · Ejecutivo ${allRecordsFilterValue('allRecordsExecutive')||'Todos'}`:activePage==='weekly'?`${weekLabel(weeklySelection().primary)} vs. ${weekLabel(weeklySelection().previous)} · Calculo manual desde google forms`:activePage==='accumulated'?`${accumulatedPeriodText()} · ${isAuthorized()?archive.reports.length:archive.tempReports.length} XLS ${isAuthorized()?'guardados':'temporales'} · Calculo manual desde google forms`:activePage==='daily'&&imported.data?`Día principal ${fmtDay(dailyDates().latest)} · Día comparado ${fmtDay(dailyDates().previous)} · Calculo manual desde google forms`:activePage==='team'&&imported.data?`Semana ${weekLabel(imported.week)} · ${filteredTeamEntries().length} ejecutivos · Calculo manual desde google forms`:importActive()?`Semana ${weekLabel(imported.week)} · ${imported.executive} · Objetivo ${state.base.goal}`:`Modo manual · Objetivo ${state.base.goal}`;
+    const selection=activePage==='incidents'?`${incidentRecords.size} incidencias permanentes · ${new Date().toLocaleString('es-MX')}`:activePage==='supervisor'?`${supView.week?weekLabel(supView.week):'Sin semana'} · ${supReadSelection()?.name||'Sin supervisor'} · ${supReadSelection()?.module||''}`:activePage==='achievements'?`${achValue('achWeek')?weekLabel(achValue('achWeek')):'Sin semana'} · ${achValue('achModule')||'Todos los módulos'} · ${achFilteredRecords().length} folios filtrados`:activePage==='allrecords'?`${getAllRecordsFiltered().length} registros · Módulo ${allRecordsFilterValue('allRecordsModule')||'Todos'} · Ejecutivo ${allRecordsFilterValue('allRecordsExecutive')||'Todos'}`:activePage==='weekly'?`${weekLabel(weeklySelection().primary)} vs. ${weekLabel(weeklySelection().previous)} · Calculo manual desde google forms`:activePage==='accumulated'?`${accumulatedPeriodText()} · ${isAuthorized()?archive.reports.length:archive.tempReports.length} XLS ${isAuthorized()?'guardados':'temporales'} · Calculo manual desde google forms`:activePage==='daily'&&imported.data?`Día principal ${fmtDay(dailyDates().latest)} · Día comparado ${fmtDay(dailyDates().previous)} · Calculo manual desde google forms`:activePage==='team'&&imported.data?`Semana ${weekLabel(imported.week)} · ${filteredTeamEntries().length} ejecutivos · Calculo manual desde google forms`:importActive()?`Semana ${weekLabel(imported.week)} · ${imported.executive} · Objetivo ${state.base.goal}`:`Modo manual · Objetivo ${state.base.goal}`;
     y=paragraph(selection,margin,y,content,10,15)+6;
     line(margin,y,content,accent);y+=9;
     for(const section of sections){
@@ -2994,7 +3219,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
         y=tableAt(table,margin,y,content,{fontSize:11,rowMin:28,widths:[2.25,1,1,1]});
         const note=section.querySelector('.report-note');if(note){y+=8;y=paragraph(note.textContent,margin,y,content,10,14)+5;}
       }
-      else if(key==='records'||key==='allrecords'||key==='ach-records'){
+      else if(['records','allrecords','ach-records','incidents'].includes(key)){
         const note=section.querySelector('.report-note');if(note){y=paragraph(note.textContent,margin,y,content,10,15)+8;}
         const table=section.querySelector('.record-export-table');
         if(table){const heads=[...table.querySelectorAll('thead th')].map(z=>normalize(z.textContent));const weights=heads.map(h=>h==='INCIDENCIA'?8:h==='APP'?6:h==='CODIGO'?18:h==='VALIDACION DE PAGO'?14:h==='PRODUCTO'?13:h==='FECHA'?11:h==='ESTATUS'?11:h==='GARANTIZADA'?12:12);
@@ -3030,7 +3255,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
       else paintReportCanvas(ctx,true);
       canvas.toBlob(blob=>{
         button.disabled=false;button.textContent=before;
-        if(blob)saveBlob(blob,activePage==='supervisor'?`calculadora_supervisor_${supView.week||'sin_semana'}.png`:activePage==='achievements'?`logros_semanales_${achValue('achWeek')||'sin_semana'}.png`:activePage==='allrecords'?`registros_xls_${dateIso(new Date())}.png`:activePage==='weekly'?`comparativa_semanal_${weeklySelection().primary}_vs_${weeklySelection().previous}.png`:activePage==='accumulated'?`acumulado_general_${el('accumulatedFrom').value||'todo'}_${el('accumulatedTo').value||'todo'}.png`:activePage==='daily'?`comparativa_diaria_${imported.data?dailyDates().latest:'sin_datos'}.png`:activePage==='team'?`comisiones_equipo_${imported.week}.png`:`comisiones_simuladas_${importActive()?imported.week:'manual'}.png`);
+        if(blob)saveBlob(blob,activePage==='supervisor'?`calculadora_supervisor_${supView.week||'sin_semana'}.png`:activePage==='achievements'?`logros_semanales_${achValue('achWeek')||'sin_semana'}.png`:activePage==='incidents'?`historial_incidencias_${dateIso(new Date())}.png`:activePage==='allrecords'?`registros_xls_${dateIso(new Date())}.png`:activePage==='weekly'?`comparativa_semanal_${weeklySelection().primary}_vs_${weeklySelection().previous}.png`:activePage==='accumulated'?`acumulado_general_${el('accumulatedFrom').value||'todo'}_${el('accumulatedTo').value||'todo'}.png`:activePage==='daily'?`comparativa_diaria_${imported.data?dailyDates().latest:'sin_datos'}.png`:activePage==='team'?`comisiones_equipo_${imported.week}.png`:`comisiones_simuladas_${importActive()?imported.week:'manual'}.png`);
         else alert('No se pudo guardar la imagen PNG. Prueba un periodo con menos folios.');
       },'image/png');
     }catch(err){button.disabled=false;button.textContent=before;alert('No se pudo generar el PNG: '+err.message);}
@@ -3040,13 +3265,13 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   window.addEventListener('beforeprint',buildReport);
   window.CALC_REPORT={buildReport,layout:uiLayout};
 
-  initAllRecordsPage();initAchievements();initQualitySettings();initSupervisorCalculator();
-  restore();setForm('base');setForm('sim');render();initializeWeeklyDates();refreshAuthorizedPages();initArchive();
+  initAllRecordsPage();initAchievements();initQualitySettings();initSupervisorCalculator();initIncidences();initNavOrder();initFloatingExport();initMondayReminder();
+  restore();setForm('base');setForm('sim');render();initializeWeeklyDates();refreshAuthorizedPages();switchPage(pageNavigation.home);initArchive();
   window.APP_CLOUD?.registerRefresh(async()=>{
     if(!isAuthorized())return;
     archive.reports=await archiveGetAll();archive.temporaryMode=false;
     archiveSelectionRestore();loadFolioFlags();loadCommissionRates();dynamicBonusConfig=loadDynamicBonus();if(el('dynamicBonusAmount'))el('dynamicBonusAmount').value=dynamicBonusAmount();
-    refreshArchiveData(true);refreshAuthorizedPages();render();window.VISITS?.refreshSources();
+    refreshArchiveData(true);await refreshIncidents(true);refreshAuthorizedPages();render();window.VISITS?.refreshSources();
   });
   // Solo lectura: acuse consulta TODOS los XLS del historial, sin aplicar filtros visuales.
   window.VISIT_SOURCE={
@@ -3060,7 +3285,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
         return key?String(row.raw[indexes[normalize(key)]]??'').trim():'';
       };
       return data.rows.map(r=>({...r,
-        incidentFlag:imported.flags.has(r.uid||String(r.i)),
+        incidentFlag:selectedIncident(r),
         appOff:imported.appDisabled.has(r.uid||String(r.i)),
         incidentValue:find(r,['Incidencia','Incidencias']),
         appValue:find(r,['Act APP','Activacion App','App Invex','Activacion','APP']),
