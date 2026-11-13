@@ -1,4 +1,5 @@
 import {createSupervisorStatement,supervisorStatementHtml,SUPERVISOR_STATEMENT_CSS,paintSupervisorStatement} from './supervisor-statement.js';
+import {preloadWeeklyAdminAssets,getCachedWeeklyAdminAssets,renderWeeklyAdminSheets,weeklyAdminPageMarkup,weeklyAdminPrintCss} from './weekly-admin-report.js';
 import {buildDailyWhatsAppReport} from './daily-whatsapp-report.js';
 
 (() => {
@@ -37,7 +38,7 @@ import {buildDailyWhatsAppReport} from './daily-whatsapp-report.js';
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='2.5.0';
+  const APP_VERSION='2.5.1';
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -2225,6 +2226,8 @@ function updateFloatingExport(){
   el('dailyCopyWhatsApp').hidden=!isDaily;
   el('floatCsv').hidden=isVisit;
   el('floatPdf').hidden=false;el('floatPng').hidden=false;
+  el('floatPdf').textContent=activePage==='supervisor'?'Seguimiento administrativo · PDF':'Imprimir / PDF';
+  el('floatPng').textContent=activePage==='supervisor'?'Seguimiento administrativo · PNG':'Exportar PNG';
   el('floatingExportMenu').hidden=true;el('floatingExportToggle').setAttribute('aria-expanded','false');
   el('floatCsv').textContent=isIncident?'Exportar incidencias CSV':'Exportar CSV';
 }
@@ -2519,7 +2522,14 @@ el('teamTable').addEventListener('click',e=>{
   el('plusDental').addEventListener('click',()=>{simDirty=true;const r=calculate(state.sim);if(!r.ok||r.validDental>=r.validSales)return;state.sim.dental+=1;update('sim');});
   el('plusP0').addEventListener('click',()=>{simDirty=true;const r=calculate(state.sim);if(!r.ok||r.validP0>=r.validReg)return;state.sim.p0+=1;update('sim');});
   el('nextTier').addEventListener('click',()=>{simDirty=true;const r=calculate(state.sim);if(!r.ok||!r.nextTarget)return;state.sim.reg+=r.needed;state.sim.app+=r.needed;update('sim');});
-  el('print').addEventListener('click',()=>{refreshAuthorizedPages();buildReport();window.print();});
+  el('print').addEventListener('click',async()=>{
+  refreshAuthorizedPages();
+  try{if(activePage==='supervisor')await preloadWeeklyAdminAssets();
+    buildReport();
+    if(activePage==='supervisor')await Promise.all([...document.querySelectorAll('#printPage .weekly-admin-paper')].map(img=>img.decode?.().catch(()=>{})||Promise.resolve()));
+    window.print();
+  }catch(error){alert('No se pudo preparar el reporte administrativo: '+error.message);}
+});
   el('export').addEventListener('click',()=>{
     if(activePage==='incidents'){exportIncidentCsv();return;}
     if(activePage==='supervisor'){
@@ -3003,9 +3013,53 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
         search:supPrintEnabled('search'),searchText:el('supSearch')?.value||''}
     });
   }
+  // Reporte administrativo semanal en hoja carta (hasta 50 folios por hoja).
+  // Usa folios completados del supervisor y su equipo, incluyendo los que tengan
+  // una incidencia activa para revisión; no contabiliza esos folios para calidad.
+  function weeklyAdminData(){
+    const c=supervisorCalculator();
+    if(!c.ready)return {ready:false,reason:c.reason};
+    const q=c.q, counters=q.base, opts=supSettings.required;
+    const metric=(label,base,objective,reach,quality)=>({
+      label,base,objective:percentageForReport(objective),
+      reach:percentageForReport(reach),quality:percentageForReport(quality),
+      below:Number.isFinite(reach)&&reach<objective, status:Number.isFinite(reach)?reach<objective?'Bajo objetivo':'Alcanzado':'Sin base'
+    });
+    const validOwn=c.includeSupervisorSales?c.ownValid.length:0;
+    const metrics=[
+      metric('Cumplimiento ventas',`${c.completionSales} / ${c.goal||0}`,opts.completion,q.actual.completion,q.factors.completion),
+      metric('Primera compra',`${counters.purchase} / ${counters.sales}`,opts.purchase,q.actual.purchase,q.factors.purchase),
+      metric('Programa Cero',`${counters.p0} / ${counters.regular}`,opts.p0,q.actual.p0,q.factors.p0),
+      metric('Activación APP',`${counters.apps} / ${counters.sales}`,opts.app,q.actual.app,q.factors.app)
+    ];
+    const rows=[...c.src.team,...c.src.own].filter(r=>candidate(r)&&!autoSkipped(r));
+    const unique=new Map();
+    rows.forEach(r=>{const folio=String(r.folio||'').trim();const key=folio||r.uid||String(r.i);if(!unique.has(key))unique.set(key,r);});
+    const records=[...unique.values()].sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||''))||String(a.folio||'').localeCompare(String(b.folio||''))).map(r=>({
+      date:r.fecha?String(fmtDay(r.fecha)).slice(0,5):'—',folio:String(r.folio||'—'),
+      dental:isYes(r.dental),p0:guaranteeType(r)==='reg'&&isYes(r.p0),app:appEnabled(r),
+      incident:selectedIncident(r),dynamic:dynamicBonusMarked(r)&&payable(r)
+    }));
+    return {ready:true,weekLabel:weekLabel(supView.week),week:supView.week,
+      supervisor:c.selected.name,module:c.selected.module,goal:c.goal,
+      validSales:c.completionSales,teamSales:c.teamValid.length,ownSales:validOwn,
+      regular:c.teamReg.length,guaranteed:c.teamValid.length-c.teamReg.length,
+      dental:c.teamValid.filter(r=>isYes(r.dental)).length,p0:c.teamP0.length,
+      apps:c.teamValid.filter(appEnabled).length,
+      incidents:rows.filter(selectedIncident).length,dynamic:records.filter(r=>r.dynamic).length,
+      metrics,qualityTotal:q.composite,qualityObjective:opts.quality,global:q.global,records};
+  }
+  function percentageForReport(value){return Number.isFinite(value)?`${number.format(value)}%`:'—';}
   function buildSupervisorReport(){
-    const model=supervisorStatementModel();
-    el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}\n${SUPERVISOR_STATEMENT_CSS}</style>${supervisorStatementHtml(model)}`;
+    const model=weeklyAdminData();
+    const assets=getCachedWeeklyAdminAssets();
+    if(!model.ready||!assets){
+      const message=model.ready?'Cargando logotipos y firma. Intenta exportar de nuevo.':model.reason;
+      el('reportHost').innerHTML=`<style>${weeklyAdminPrintCss}</style><div id="printPage" class="report-page"><p>${esc(message)}</p></div>`;
+      return el('printPage');
+    }
+    const pages=renderWeeklyAdminSheets(model,assets,{scale:3});
+    el('reportHost').innerHTML=`<style>${weeklyAdminPrintCss}</style>${weeklyAdminPageMarkup(pages)}`;
     return el('printPage');
   }
 
@@ -3237,6 +3291,21 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   }
   function exportPng(){
     if(activePage==='visits')return window.VISITS?.exportPng();
+    if(activePage==='supervisor'){
+      const btn=el('exportImage'),before=btn.textContent;
+      btn.disabled=true;btn.textContent='Generando seguimiento administrativo…';
+      (async()=>{
+        const assets=await preloadWeeklyAdminAssets();
+        const data=weeklyAdminData();
+        const pages=renderWeeklyAdminSheets(data,assets,{scale:3});
+        for(let i=0;i<pages.length;i++){
+          const blob=await new Promise(resolve=>pages[i].toBlob(resolve,'image/png'));
+          if(!blob)throw Error('No se pudo crear la imagen PNG.');
+          saveBlob(blob,`seguimiento_administrativo_${supView.week||'sin_semana'}_${i+1}_de_${pages.length}.png`);
+        }
+      })().catch(e=>alert('No se pudo exportar el reporte: '+e.message)).finally(()=>{btn.disabled=false;btn.textContent=before;});
+      return;
+    }
     const button=el('exportImage'),before=button.textContent;
     button.disabled=true;button.textContent='Generando imagen…';
     try{
@@ -3261,6 +3330,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     }catch(err){button.disabled=false;button.textContent=before;alert('No se pudo generar el PNG: '+err.message);}
   }
   setUpLayout();
+  preloadWeeklyAdminAssets().catch(()=>{});
   el('exportImage').addEventListener('click',exportPng);
   window.addEventListener('beforeprint',buildReport);
   window.CALC_REPORT={buildReport,layout:uiLayout};

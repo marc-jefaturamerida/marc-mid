@@ -1,3 +1,10 @@
+## V2.5.1 — 13 de noviembre de 2026
+- Nueva exportación Seguimiento administrativo semanal en la página Supervisor para PDF y PNG en formato carta.
+- Logo INVEX/MARC y firma original de Visitas de coordinador.
+- Apartados sin numeración, comentarios y plan de trabajo ampliados, firmas al final sin notas inferiores.
+- Hasta 50 folios por hoja en dos tablas; sin recortes para semanas de más de 50.
+- No se alteran las fórmulas ni los datos guardados en PostgreSQL.
+
 ## V2.5.0 — Incidencias permanentes, navegación y recordatorio XLS (13 de noviembre de 2026)
 
 - Nueva tabla `dashboard_incidents` segregada por cuenta en PostgreSQL, sin dependencia de `dashboard_reports`.

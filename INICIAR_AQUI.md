@@ -73,3 +73,7 @@ Selecciona Calculadora de supervisor, semana y supervisor. Usa **Imprimir / PDF*
 3. Toca el botón flotante verde **Copiar para WhatsApp** en la esquina inferior derecha.
 4. Pega directamente en WhatsApp el mensaje completo. Conservar las tres comillas invertidas de apertura y cierre permite que los valores se vean como una tabla monoespaciada.
 5. Comprueba que los primeros seis valores coincidan con la fila TOTAL de «Por módulo»; Calidad usa el mismo porcentaje de esa fila y calcula diferencia en puntos porcentuales.
+
+
+### Exportación administrativa (V2.5.1)
+En la página **Calculadora de supervisor**, el menú flotante **Imprimir / PDF** o **Exportar PNG** genera Seguimiento administrativo semanal. Para PDF, elige **Guardar como PDF**, papel **Carta** y márgenes **Ninguno**, sin encabezados ni pies del navegador. Cada hoja muestra hasta 50 folios.

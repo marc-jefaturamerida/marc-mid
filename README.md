@@ -198,3 +198,10 @@ Esta calculadora es una simulación de los criterios proporcionados, no una conf
 
 ## V2.4.2
 Secciones de calculadora de supervisor plegables con opción de impresión individual, tablas contraídas por defecto, tarjetas compactas de tres columnas y penalización P0 propia detallada.
+
+
+## V2.5.1 · Seguimiento administrativo semanal (supervisores)
+
+Las opciones **Imprimir/PDF** y **PNG** de la página de supervisor generan el Seguimiento administrativo semanal en **carta vertical**, a partir de los datos reales de la semana seleccionada. Contiene los logos INVEX/MARC y la firma original conservada en `public/assets/visit-header.png` y `public/assets/visit-signature.png`, objetivos y calidades, dos tablas compactas de hasta 25 folios por lado, áreas de oportunidad, comentarios y plan de trabajo manuscritos, y firmas. Las secciones no están numeradas y no existe texto debajo de las firmas.
+
+El registro de ventas completadas incluye los folios con código de barras y clasificación regular/garantizada, omitiendo estatus no pagables. La casilla Inc. mantiene visibles los folios con incidencia aunque estén excluidos de las métricas de pago. Se muestra **Din.** solo para ventas válidas marcadas. Las metas, mínimo y topes siguen la configuración de la calculadora del supervisor. **Hasta 50 folios entran en una hoja carta**; si hay más, se generan hojas adicionales con bloques de 50 para no perder información. El PDF se obtiene con la impresión del navegador (Guardar como PDF, tamaño carta y márgenes Ninguno). Los PNG se descargan por hoja.
