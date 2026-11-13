@@ -1,3 +1,12 @@
+## V2.4.9 — Sesión persistente y plazo de siete días (13 de noviembre de 2026)
+
+- El Dashboard vuelve a consultar el estado de Identity al abrir y renueva el JWT de acceso si está próximo a expirar, utilizando su cookie de renovación, sin almacenar credenciales de usuario.
+- Las Functions verifican y renuevan la sesión antes de autorizar el acceso a PostgreSQL. No se quita ninguna comprobación de identidad ni separación por cuenta.
+- Política local de máximo siete días por usuario y navegador desde el último inicio de sesión con credenciales (no se reinicia al recargar). Cierre de sesión manual y vencimiento eliminan esa marca. El backend de Identity puede expirar/revocar antes.
+- Los ajustes pendientes conservan su cola local vinculada al usuario; no se transfieren datos entre cuentas.
+- También se incorporan las correcciones del formato WhatsApp aprobadas después de V2.4.8: no repetir fechas y nombres de hasta ocho caracteres.
+- Actualización de números de versión de pies de página, exportaciones y package.json. Sin migraciones SQL.
+
 ## V2.4.8 — Reporte diario listo para WhatsApp (13 de noviembre de 2026)
 
 - Botón flotante **Copiar para WhatsApp** visible solo en la página **Comparativa diaria**. Se desactiva cuando no hay registros o se seleccionan dos fechas idénticas.

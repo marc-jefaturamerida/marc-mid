@@ -1,4 +1,12 @@
-# Dashboard y comisiones Mérida · V2.4.8 (13 de noviembre de 2026)
+# V2.4.9 — Sesión recordada durante siete días
+
+Esta edición recupera automáticamente una sesión de Netlify Identity al reabrir la página o después de que caduque el JWT de acceso (~1 hora), siempre que la cookie de renovación siga válida. **No** guarda contraseñas ni JWT en preferencias: Netlify sigue verificando al usuario en cada llamada a sus Functions. Se registra solo un plazo local de siete días por cuenta/navegador, sin ampliarlo en cada visita. Al cumplirse, cierra Identity y solicita de nuevo las credenciales. Cerrar sesión manualmente lo borra al instante. Se admite una sesión previa válida al instalar esta actualización, iniciando el contador ese día. Un cambio de dispositivo, bloqueo de cookies, modo privado, revocación o vencimiento del refresh token de Netlify pueden exigir ingresar antes; este código no puede prolongar la validez de Identity en el servidor. La cola local de ajustes pendientes se conserva por cuenta si vence la sesión.
+
+La actualización también incorpora en el ZIP los últimos cambios del mensaje WhatsApp: se eliminó la segunda línea de fechas y las etiquetas tienen como máximo ocho caracteres, separadas de la cantidad por dos espacios.
+
+---
+
+# Dashboard y comisiones Mérida · V2.4.9 (13 de noviembre de 2026)
 
 ## Metodología VIGENTE (prevalece sobre el historial de versiones que aparece abajo)
 
@@ -15,13 +23,13 @@
 
 Las cuentas que guardaron un mínimo `0%` con versiones anteriores lo reciben como `60%` al abrir esta versión (migración de mínimos antiguos sin marca de versión). Los mínimos personalizados **distintos de 0** se conservan. Tras guardar de nuevo la configuración, se puede establecer explícitamente `0%` en cualquier mínimo editable y se respetará. Inicia sesión y guarda los Ajustes 12 para sincronizarlos. No es necesario alterar tablas de PostgreSQL ni volver a importar XLS.
 
-**Etiquetas:** la V2.4.8 se muestra en los pies de página, PDF, PNG y exportaciones. El bono por dinámica de la versión anterior se mantiene sin cambios.
+**Etiquetas:** la V2.4.9 se muestra en los pies de página, PDF, PNG y exportaciones. El bono por dinámica de la versión anterior se mantiene sin cambios.
 
 ### Comparativa diaria → Copiar para WhatsApp (V2.4.8)
 
 En la página **Comparativa diaria**, después de importar el XLS, selecciona «Automático» (última fecha con registros contra el día anterior) o «Seleccionar fechas». Marca o desmarca la inclusión de supervisores según requieras. El botón flotante inferior derecho **Copiar para WhatsApp** copia un texto con fecha principal y comparada, y los siete indicadores de la tabla **Por módulo** en total: Registros, Ventas, Regulares, Garantizadas, Programa Cero, Plan Dental y Calidad. Para los primeros seis, el paréntesis muestra la diferencia en unidades; para Calidad muestra puntos porcentuales. La Calidad es el mismo Alcance Global que aparece en la columna Calidad de esa tabla. Si no hay datos para calcularla, se indica con «—», sin inventar 0%.
 
-El mensaje incluye marcas de WhatsApp: `*...*` para título, `_..._` para fechas y una tabla entre **tres acentos graves** para mantener las columnas alineadas en un bloque monoespaciado. **Copia todo el mensaje tal cual** y pégalo en WhatsApp: no borres las líneas de acentos graves. Si el navegador niega permiso al portapapeles, se muestra un aviso. El botón no existe en otras páginas ni se incluye en las exportaciones.
+El mensaje incluye marcas de WhatsApp: `*...*` para título (con las fechas cuando no es hoy/ayer) y una tabla entre **tres acentos graves** para mantener las columnas alineadas en un bloque monoespaciado. **Copia todo el mensaje tal cual** y pégalo en WhatsApp: no borres las líneas de acentos graves. Si el navegador niega permiso al portapapeles, se muestra un aviso. El botón no existe en otras páginas ni se incluye en las exportaciones.
 
 ### Estado de comisión del supervisor (V2.4.7)
 Al estar en **Calculadora de supervisor**, los botones **Imprimir / PDF** y **Exportar PNG** producen un estado de comisión compacto azul y naranja con cabecera, cinco KPI, indicadores del equipo, desglose de bono, equipo por ejecutivo, ventas propias y sus folios. Usa los importes y las metas realmente calculadas; el equipo se informa en cantidades porque la calculadora no determina su comisión individual en esta vista. La sección de folios del equipo puede activarse con la casilla de impresión de la página (desmarcada inicialmente); los folios propios aparecen marcados para imprimir. Para PDF selecciona guardar como PDF en el diálogo de impresión y activa gráficos de fondo si el navegador lo requiere. Se usa hoja **A4 vertical** en lugar del paisaje del resto del proyecto.

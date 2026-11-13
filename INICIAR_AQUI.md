@@ -1,17 +1,25 @@
-# Dashboard Mérida V2.4.8 — instalación
+## Novedad V2.4.9 · No ingresar la contraseña cada visita
+
+1. Publica el ZIP completo; no es necesaria una migración SQL.
+2. Inicia sesión **una vez** en el navegador donde usas el dashboard. Al volver a abrirlo después de unas horas, la sesión debería restaurarse automáticamente con Netlify Identity.
+3. La aplicación recuerda el acceso **hasta 7 días desde ese ingreso**, no siete días renovables por visita. Tras ese plazo vuelve a pedir autenticación. Al pulsar **Cerrar sesión**, el acceso termina inmediatamente.
+4. Prueba cerrando la pestaña y volviendo a abrirla sin usar incógnito ni eliminar cookies. El navegador debe permitir cookies del sitio. Si la configuración de Netlify Identity da una vigencia menor al token de renovación, podrá pedir login antes; el frontend no modifica ese límite del servidor.
+5. Se conservaron los cambios recientes de WhatsApp: sin fecha duplicada y etiquetas de ocho caracteres.
+
+# Dashboard Mérida V2.4.9 — instalación
 
 Esta entrega contiene el proyecto completo: `index.html`, `src/`, `netlify/`, `public/`, `package.json` y documentación. No requiere migraciones SQL adicionales ni reimportar los XLS.
 
 ## Publicar en GitHub y Netlify
 
 1. Extrae el ZIP. Sustituye en la **raíz** del repositorio todos los archivos y carpetas del proyecto, **sin** crear una carpeta adicional por encima de `index.html`.
-2. Desde Termux, dentro de tu repositorio: `git add -A && git commit -m "INVEX v2.4.8 reporte diario whatsapp" && git push origin HEAD`.
+2. Desde Termux, dentro de tu repositorio: `git add -A && git commit -m "INVEX v2.4.9 sesion 7 dias" && git push origin HEAD`.
 3. Netlify construye el sitio conectado a GitHub con comando `npm run build` y directorio `dist`. Verifica que el despliegue termine correctamente.
 4. Para probar desde un computador con Node instalado: `npm install`, `npm run check`, `npm run dev`. Abre la URL que indique Vite. El despliegue cloud seguirá requiriendo Identity y sus Functions.
 
 ## Revisar después de publicar
 
-1. Confirma que todos los pies de página de la web y exportaciones muestren **Versión 2.4.8**.
+1. Confirma que todos los pies de página de la web y exportaciones muestren **Versión 2.4.9**.
 2. Abre **Ajustes → 10**: mínimo predeterminado **60%** para las calidades individuales. En **Ajustes → 12**, comprueba los cuatro mínimos de 60% y la nueva casilla **Incluir las ventas propias del supervisor en el cumplimiento del módulo**, marcada por defecto.
 3. En Ajustes 12, configura el **bono base** del supervisor y revisa los bonos adicionales, 110%/115%/120%, con importes iniciales **$1,000/$1,500/$2,000** y monto más alto **único** (no acumulativo).
 4. Guarda la configuración del supervisor para sincronizarla a tu cuenta. Los mínimos antiguos de 0 se migran a 60 al cargar; puedes escribir 0 de nuevo si lo deseas después de guardar esta versión.

@@ -1,7 +1,8 @@
 import {
   login, logout, getUser, handleAuthCallback, acceptInvite,
-  requestPasswordRecovery, updateUser
+  requestPasswordRecovery, updateUser, refreshSession
 } from '@netlify/identity';
+import { rememberSession, readRememberedSession, isRememberedSessionExpired, clearRememberedSession } from './session-lifetime.js';
 
 // 1.9: sin sondeo continuo. Datos remotos por cuenta; cálculos y UI locales.
 // Las ediciones se agrupan y se conservan como pendientes si falla la conexión.
@@ -24,12 +25,14 @@ const KEYS = new Set([
   'wmSamsMeridaSupervisorCommissionV24'
 ]);
 const PENDING_PREFIX = 'wmSamsCloudPendingV19:';
+const SESSION_EXPIRED_FLAG='wmSamsSessionExpiredV249';
 const WRITE_DEBOUNCE_MS = 3000;
 const MIN_AWAY_MS = 10 * 60 * 1000;
 const RETRY_DELAYS_MS = [30000, 120000]; // Dos intentos; después solo manual / regreso / reconexión.
 const MAX_BATCH_KEYS = 12;
 const MAX_BATCH_BYTES = 1700000;
 let user=null, suspended=true, afterLogin=null, inviteToken='', passwordReset=false;
+let sessionExpiredOnBoot=false;
 let saveTimer=0, retryTimer=0, flushPromise=null, retryCount=0;
 let checking=false, checkingTimer=0, lastWakeCheck=0, awaySince=null;
 let pending=new Map(), fileSignatures=new Map(), refresher=null;
@@ -67,11 +70,22 @@ function openLogin(callback){
   modal(true);
 }
 async function api(endpoint,options={}){
-  const res=await fetch('/api/'+endpoint,{
+  const request=()=>fetch('/api/'+endpoint,{
     credentials:'same-origin',cache:'no-store',
     headers:{Accept:'application/json',...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})},
     ...options
   });
+  if(user && isRememberedSessionExpired(localStorage,user.id)){
+    await expireSession();
+    throw Error('Se cumplieron 7 días. Inicia sesión de nuevo.');
+  }
+  let res=await request();
+  // Una sesión con JWT de una hora puede recuperarse mediante nf_refresh.
+  // El servidor también intenta renovarla antes de verificar la identidad.
+  if(res.status===401 && user){
+    try{await refreshSession();}catch(_){ /* La respuesta del servidor confirmará si continúa válida. */ }
+    res=await request();
+  }
   let data;
   try{data=await res.json();}catch(_){throw Error(`El servidor devolvió un resultado inválido (${res.status}). Comprueba Functions y Database.`);}
   if(!res.ok)throw Error(data?.error||`Solicitud rechazada (${res.status})`);
@@ -212,6 +226,16 @@ async function clearFiles(){
   await api('files?all=1',{method:'DELETE'});
   fileSignatures.clear();
 }
+async function expireSession(){
+  // Los cambios pendientes ya están en la cola local por cuenta; no se borran.
+  // Al volver a iniciar sesión, podrán sincronizarse con el mismo usuario.
+  clearRememberedSession(localStorage);
+  try{await logout();}catch(_){ /* Identity limpia sus cookies incluso si falla el endpoint. */ }
+  try{sessionStorage.setItem(SESSION_EXPIRED_FLAG,'1');}catch(_){}
+  user=null;
+  clearDashboardCache();
+  location.reload();
+}
 async function signOut(){
   await flush();
   if(pending.size){
@@ -219,6 +243,7 @@ async function signOut(){
     pending.clear();persistPending();
   }
   try{await logout();}catch(err){toast('No se pudo cerrar sesión: '+escapeMsg(err));return;}
+  clearRememberedSession(localStorage);
   clearDashboardCache();location.reload();
 }
 function setupModal(){
@@ -244,9 +269,12 @@ function setupModal(){
     const email=$('cloudEmail').value.trim(),password=$('cloudPassword').value;
     $('cloudSubmit').disabled=true;$('cloudAuthError').textContent='';
     try{
-      if(inviteToken)await acceptInvite(inviteToken,password);
-      else if(passwordReset)await updateUser({password});
-      else await login(email,password);
+      let loggedIn;
+      if(inviteToken)loggedIn=await acceptInvite(inviteToken,password);
+      else if(passwordReset)loggedIn=await updateUser({password});
+      else loggedIn=await login(email,password);
+      // Se inicia el plazo SOLO al acceder con credenciales, nunca por recargar.
+      if(loggedIn?.id)rememberSession(localStorage,String(loggedIn.id),Date.now(),true);
       modal(false);location.reload();
     }catch(err){$('cloudAuthError').textContent=escapeMsg(err);}
     finally{$('cloudSubmit').disabled=false;}
@@ -263,8 +291,27 @@ try{
   const callback=await handleAuthCallback();
   if(callback?.type==='invite'&&callback.token)inviteToken=callback.token;
   if(callback?.type==='recovery')passwordReset=true;
+  // Si el JWT de una hora caducó durante la noche, intenta renovarlo con
+  // la cookie de sesión válida de Identity antes de declarar al usuario invitado.
+  try{await refreshSession();}catch(_){ /* getUser decide la autenticación real. */ }
   user=await getUser();
-  if(user)restorePending();
+  if(user){
+    if(isRememberedSessionExpired(localStorage,user.id)){
+      sessionExpiredOnBoot=true;
+      clearRememberedSession(localStorage);
+      try{await logout();}catch(_){}
+      user=null;
+    }else{
+      if(!readRememberedSession(localStorage)?.userId ||
+         readRememberedSession(localStorage)?.userId!==String(user.id))
+        rememberSession(localStorage,String(user.id)); // Migración de una sesión previa ya válida.
+      restorePending();
+    }
+  }else{
+    // Conservar solamente la FECHA local si Identity no responde o cerró
+    // temporalmente la sesión. Nunca otorga acceso a la nube por sí sola.
+    // Así un fallo de red no reinicia indebidamente el plazo de siete días.
+  }
 }catch(err){toast('No se pudo validar la sesión: '+escapeMsg(err));user=null;}
 try{await hydrate();}
 catch(err){
@@ -280,7 +327,12 @@ if(user){
   sessionMessage('Sin sesión · XLS temporales');
 }
 await import('./legacy-app.js');
-if(inviteToken||passwordReset)openLogin();
+let expiredFromAnotherVisit=false;
+try{expiredFromAnotherVisit=sessionStorage.getItem(SESSION_EXPIRED_FLAG)==='1';sessionStorage.removeItem(SESSION_EXPIRED_FLAG);}catch(_){}
+if(inviteToken||passwordReset||sessionExpiredOnBoot||expiredFromAnotherVisit){
+  openLogin();
+  if(sessionExpiredOnBoot||expiredFromAnotherVisit)$('cloudAuthError').textContent='Pasaron 7 días desde el último ingreso. Inicia sesión nuevamente.';
+}
 if(user&&pending.size)scheduleSave(1500);
 
 // Sin intervalos: solo una lectura tras ausentarse >= 10 minutos, o sincronización manual.
@@ -302,6 +354,7 @@ async function checkRemoteOnReturn(){
   finally{checking=false;}
 }
 function returnFromAway(){
+  if(user && isRememberedSessionExpired(localStorage,user.id)){void expireSession();return;}
   if(awaySince===null)return;
   const duration=Date.now()-awaySince;
   awaySince=null;

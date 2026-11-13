@@ -1103,7 +1103,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="all-records-help">Las columnas se muestran según <strong>Ajustes → Tabla de folios</strong>. Incidencia y APP permanecen a la vista para validarlas. Desliza horizontalmente para ver más columnas.</div>
   <div class="table-wrap all-records-table-wrap"><table id="allRecordsTable" class="record-table all-records-table"><thead id="allRecordsHead"></thead><tbody id="allRecordsBody"><tr><td>Importa un XLS para mostrar registros.</td></tr></tbody></table></div>
   <div class="all-records-pagination"><span id="allRecordsPageStatus">0 registros</span><div class="all-records-page-actions"><label for="allRecordsPageSize">Filas por página</label><select id="allRecordsPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" type="button" id="allRecordsPrev">Anterior</button><button class="btn small" type="button" id="allRecordsNext">Siguiente</button></div></div>
-  <footer class="foot">Consulta de registros XLS · Versión 2.4.8</footer>
+  <footer class="foot">Consulta de registros XLS · Versión 2.4.9</footer>
 </section>
 
 
@@ -1129,7 +1129,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
     </div></details>
   </div>
   <p class="sup-footnote">Cálculo informativo. Configura el bono base en Ajustes → 12; los bonos adicionales comienzan en $1,000, $1,500 y $2,000, editables y no acumulables. Guarda los ajustes para sincronizarlos con Netlify; consultar semanas y supervisores no genera escrituras.</p>
-  <footer class="foot">Calculadora de supervisor · Versión 2.4.8</footer>
+  <footer class="foot">Calculadora de supervisor · Versión 2.4.9</footer>
 </section>
 <section id="achievementsPage" class="achievements-page" hidden aria-label="Logros semanales por módulo">
   <div class="achievements-hero">
@@ -1202,7 +1202,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
       <div class="achievements-pager"><span id="achRecordStatus">0 registros</span><div class="achievements-pager-options"><label for="achPageSize">Filas</label><select id="achPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" id="achPrev" type="button">Anterior</button><button class="btn small" id="achNext" type="button">Siguiente</button></div></div>
     </div>
   </details>
-  <footer class="foot">Logros semanales · Versión 2.4.8</footer>
+  <footer class="foot">Logros semanales · Versión 2.4.9</footer>
 </section>
 
 <section id="visitPage" class="visit-page" hidden aria-label="Acuse de visita de coordinación">
@@ -1210,21 +1210,21 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 2.4.8</footer>
+  <footer class="foot">Acuse de coordinación · Versión 2.4.9</footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 2.4.8</footer>
+<footer class="foot">Final de la presentacion · Versión 2.4.9</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 
 <div class="auth-modal" id="cloudModal" hidden role="dialog" aria-modal="true" aria-labelledby="cloudModalTitle">
   <div class="auth-card cloud-auth-card">
     <h2 id="cloudModalTitle">Acceso por correo</h2>
-    <p id="cloudModalHelp">Inicia sesión con la cuenta que tengas registrada en Netlify Identity. Los datos se vincularán a esa cuenta.</p>
+    <p id="cloudModalHelp">Inicia sesión con la cuenta que tengas registrada en Netlify Identity. Los datos se vincularán a esa cuenta. En este navegador se intentará recordar tu acceso hasta por 7 días, siempre que Netlify Identity mantenga vigente la sesión.</p>
     <form id="cloudAuthForm">
       <label class="field" for="cloudEmail">Correo electrónico</label>
       <input type="email" id="cloudEmail" autocomplete="email" placeholder="correo@ejemplo.com" required>

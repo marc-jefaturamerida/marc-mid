@@ -1,8 +1,11 @@
-import { getUser } from '@netlify/identity';
+import { getUser, refreshSession } from '@netlify/identity';
 import { getDatabase } from '@netlify/database';
 
 export async function authorize(request) {
-  // Netlify Identity valida el JWT / cookie en el servidor.
+  // El access token de Identity expira normalmente cada hora. Renovarlo
+  // aquí permite seguir usando las Functions tras cerrar el navegador,
+  // siempre que Netlify conserve una cookie refresh aún válida.
+  try { await refreshSession(); } catch (_) { /* getUser valida el token actual. */ }
   const user = await getUser();
   if (!user?.id) return { response: send({ error: 'Inicia sesión por correo para acceder a la nube.' }, 401) };
   if (request.method !== 'GET' && request.method !== 'HEAD') {
