@@ -1,6 +1,6 @@
 import {createSupervisorStatement,supervisorStatementHtml,SUPERVISOR_STATEMENT_CSS,paintSupervisorStatement} from './supervisor-statement.js';
-import {preloadWeeklyAdminAssets,getCachedWeeklyAdminAssets,renderWeeklyAdminSheets,weeklyAdminPageMarkup,weeklyAdminPrintCss} from './weekly-admin-report.js';
 import {buildDailyWhatsAppReport} from './daily-whatsapp-report.js';
+import {WEEKLY_ADMIN_DEFAULTS,WEEKLY_ADMIN_STORAGE,cleanWeeklyAdminSettings,preloadWeeklyAdminAssets,cachedWeeklyAdminAssets,renderWeeklyAdminSheets,weeklyAdminPageMarkup,weeklyAdminPrintCss} from './weekly-admin-report.js';
 
 (() => {
   'use strict';
@@ -38,7 +38,7 @@ import {buildDailyWhatsAppReport} from './daily-whatsapp-report.js';
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='2.5.1';
+  const APP_VERSION='2.5.2';
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -88,6 +88,9 @@ const TEAM_GOALS_STORAGE='wmSamsComisionesMetasEquipoV1';
 const TEAM_RECOVERY_STORAGE='wmSamsComisionesRecuperacionesEquipoV1';
 const teamGoals=loadTeamStore(TEAM_GOALS_STORAGE),teamRecoveries=loadTeamStore(TEAM_RECOVERY_STORAGE);
 // Las preferencias de navegación se sincronizan mediante dashboard_settings.
+// Plantilla exclusiva de Logros semanales. Se sincroniza por cuenta, independiente de otros reportes.
+function readWeeklyAdminPrefs(){try{return cleanWeeklyAdminSettings(JSON.parse(localStorage.getItem(WEEKLY_ADMIN_STORAGE)||'null'));}catch(_){return cleanWeeklyAdminSettings(null);}}
+let weeklyAdminPrefs=readWeeklyAdminPrefs();
 const PAGE_NAV_KEY='wmSamsNavOrderV250';
 const DEFAULT_PAGE_ORDER=['daily','individual','team','supervisor','incidents','allrecords','achievements','accumulated','weekly','visits'];
 const PAGE_LABELS={daily:'Comparativa diaria',individual:'Calculadora individual',team:'Comparativo de ejecutivos',supervisor:'Calculadora supervisor',incidents:'Gestión de incidencias',allrecords:'Registros XLS',achievements:'Logros semanales',accumulated:'Acumulado general',weekly:'Comparativa semanal',visits:'Visitas de coordinación'};
@@ -2226,8 +2229,6 @@ function updateFloatingExport(){
   el('dailyCopyWhatsApp').hidden=!isDaily;
   el('floatCsv').hidden=isVisit;
   el('floatPdf').hidden=false;el('floatPng').hidden=false;
-  el('floatPdf').textContent=activePage==='supervisor'?'Seguimiento administrativo · PDF':'Imprimir / PDF';
-  el('floatPng').textContent=activePage==='supervisor'?'Seguimiento administrativo · PNG':'Exportar PNG';
   el('floatingExportMenu').hidden=true;el('floatingExportToggle').setAttribute('aria-expanded','false');
   el('floatCsv').textContent=isIncident?'Exportar incidencias CSV':'Exportar CSV';
 }
@@ -2523,13 +2524,11 @@ el('teamTable').addEventListener('click',e=>{
   el('plusP0').addEventListener('click',()=>{simDirty=true;const r=calculate(state.sim);if(!r.ok||r.validP0>=r.validReg)return;state.sim.p0+=1;update('sim');});
   el('nextTier').addEventListener('click',()=>{simDirty=true;const r=calculate(state.sim);if(!r.ok||!r.nextTarget)return;state.sim.reg+=r.needed;state.sim.app+=r.needed;update('sim');});
   el('print').addEventListener('click',async()=>{
-  refreshAuthorizedPages();
-  try{if(activePage==='supervisor')await preloadWeeklyAdminAssets();
-    buildReport();
-    if(activePage==='supervisor')await Promise.all([...document.querySelectorAll('#printPage .weekly-admin-paper')].map(img=>img.decode?.().catch(()=>{})||Promise.resolve()));
-    window.print();
-  }catch(error){alert('No se pudo preparar el reporte administrativo: '+error.message);}
-});
+    try{
+      if(activePage==='achievements')await preloadWeeklyAdminAssets();
+      refreshAuthorizedPages();buildReport();window.print();
+    }catch(error){alert('No se pudo preparar el PDF: '+error.message);}
+  });
   el('export').addEventListener('click',()=>{
     if(activePage==='incidents'){exportIncidentCsv();return;}
     if(activePage==='supervisor'){
@@ -2664,6 +2663,61 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   function isAuthorized(){return Boolean(window.APP_CLOUD?.user?.id);}
   // Los Ajustes se pueden explorar y editar sin cuenta. La sincronización de
   // preferencias y el historial privado permanecen protegidos por Identity.
+  function refreshWeeklyAdminSettingsEditor(){
+    const scope=el('weeklyAdminSettingsEditor');if(!scope)return;
+    for(const field of scope.querySelectorAll('[data-weekly-admin-setting]')){
+      const name=field.dataset.weeklyAdminSetting,value=weeklyAdminPrefs[name];
+      if(field.type==='checkbox')field.checked=Boolean(value);
+      else field.value=String(value??'');
+    }
+    el('weeklyAdminSettingsStatus').textContent='Plantilla preparada. Las modificaciones se aplican a Logros semanales.';
+  }
+  function commitWeeklyAdminSettings(){
+    const scope=el('weeklyAdminSettingsEditor');if(!scope)return true;
+    const next={...weeklyAdminPrefs};
+    for(const field of scope.querySelectorAll('[data-weekly-admin-setting]')){
+      const key=field.dataset.weeklyAdminSetting;
+      next[key]=field.type==='checkbox'?field.checked:field.type==='number'?Number(field.value):field.value;
+    }
+    for(const key of ['commentsLines','planLines']){
+      if(!Number.isInteger(next[key])||next[key]<2||next[key]>8){
+        el('weeklyAdminSettingsStatus').textContent='Selecciona entre 2 y 8 líneas por recuadro.';
+        scope.querySelector(`[data-weekly-admin-setting="${key}"]`).focus();return false;
+      }
+    }
+    weeklyAdminPrefs=cleanWeeklyAdminSettings(next);
+    try{localStorage.setItem(WEEKLY_ADMIN_STORAGE,JSON.stringify(weeklyAdminPrefs));}
+    catch(e){el('weeklyAdminSettingsStatus').textContent='No se pudieron guardar los ajustes: '+e.message;return false;}
+    el('weeklyAdminSettingsStatus').textContent='Guardado. '+(isAuthorized()?'Sincronización en cola con Netlify.':'Se conservará localmente en este navegador.');
+    return true;
+  }
+  function initWeeklyAdminSettings(){
+    refreshWeeklyAdminSettingsEditor();
+    el('weeklyAdminSave').addEventListener('click',commitWeeklyAdminSettings);
+    el('weeklyAdminReset').addEventListener('click',()=>{
+      weeklyAdminPrefs=cleanWeeklyAdminSettings(WEEKLY_ADMIN_DEFAULTS);
+      refreshWeeklyAdminSettingsEditor();commitWeeklyAdminSettings();
+    });
+    // Menú de Ajustes mediante botones. Solo se ve el apartado elegido.
+    const details=[...el('settingsPanel').querySelectorAll('.settings-panel-content > details.settings-group')];
+    const nav=el('settingsSectionsNav');
+    nav.innerHTML=details.map((node,i)=>{
+      const label=(node.querySelector(':scope > summary')?.textContent||node.id).replace(/^\s*\d+\s*[·.]?\s*/,'').trim();
+      return `<button class="settings-section-button" type="button" data-settings-group="${node.id}" aria-expanded="false">${i+1}. ${esc(label)}</button>`;
+    }).join('');
+    nav.addEventListener('click',e=>{
+      const btn=e.target.closest('[data-settings-group]');if(!btn)return;
+      const target=el(btn.dataset.settingsGroup),willOpen=!target.open;
+      details.forEach(node=>node.open=willOpen&&node===target);
+      nav.querySelectorAll('[data-settings-group]').forEach(button=>button.setAttribute('aria-expanded',String(button.dataset.settingsGroup===btn.dataset.settingsGroup&&willOpen)));
+      if(willOpen)target.scrollIntoView({behavior:'smooth',block:'nearest'});
+    });
+    for(const detail of details)detail.addEventListener('toggle',()=>{
+      const btn=nav.querySelector(`[data-settings-group="${detail.id}"]`);
+      if(btn)btn.setAttribute('aria-expanded',String(detail.open));
+    });
+    el('settingsPanel').classList.add('settings-chooser-ready');
+  }
   const settingsDialog=el('settingsPanel');
   function toggleSettings(force){
     settingsDialog.open=typeof force==='boolean'?force:!settingsDialog.open;
@@ -2694,7 +2748,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   el('dynamicBonusAmount').value=dynamicBonusAmount();
   el('dynamicBonusStatus').textContent='Importe configurado: '+mx(dynamicBonusAmount())+' por venta válida marcada.';
   el('saveDynamicBonus').addEventListener('click',()=>el('supSaveSettings').click());
-  el('saveSettingsAndClose').addEventListener('click',()=>el('supSaveSettings').click());
+  el('saveSettingsAndClose').addEventListener('click',()=>{if(commitWeeklyAdminSettings())el('supSaveSettings').click();});
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'&&settingsDialog.open)toggleSettings(false);
   });
@@ -2968,35 +3022,58 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   }
 
 
+  /** El informe de Logros semanales usa exclusivamente los objetivos y filtros de esa página. */
+  function weeklyAchievementReportModel(){
+    const week=achValue('achWeek');
+    if(!week||!imported.data)return {ready:false,reason:'Selecciona la semana operativa e importa un XLS antes de exportar.'};
+    const {filteredRows,rows,q,goals,alcances,counters,incidents}=achData();
+    const module=achValue('achModule')||'Todos los módulos';
+    const salesRows=filteredRows.filter(r=>candidate(r)&&!autoSkipped(r));
+    const records=salesRows.map(r=>({
+      date:fmtDay(r.fecha||'').slice(0,5),folio:String(r.folio||'—'),
+      dental:isYes(r.dental),p0:isYes(r.p0),app:appEnabled(r),
+      incident:selectedIncident(r),dynamic:dynamicBonusPayable(r)
+    }));
+    // El reporte conserva los folios incidentados para revisión, aunque NO los cuente en los objetivos.
+    const below=(reach,target)=>Number.isFinite(reach)&&Number.isFinite(target)&&target>0?reach+1e-8<target:null;
+    const make=(label,actual,denominator,required,reach,quality,opportunityLabel)=>{
+      const target=required===null||!Number.isFinite(required)?null:required;
+      const isBelow=below(reach,target===null?null:(label==='Registros'||label==='Cumplimiento ventas'?100:target));
+      return {label,base:`${actual} / ${denominator>0?denominator:'—'}`,objective:target===null?'Sin definir':label==='Registros'||label==='Cumplimiento ventas'?String(target):`${number.format(target)}%`,reach,quality,below:isBelow,status:isBelow===null?'Sin meta':isBelow?'Bajo meta':'Cumple',opportunityLabel};
+    };
+    const c=q.counters;
+    const metrics=[];
+    if(weeklyAdminPrefs.showRecordsGoal)metrics.push(make('Registros',rows.length,goals.records,goals.records,alcances.records,alcances.records,'REGIST.'));
+    metrics.push(make('Cumplimiento ventas',c.sales,goals.sales,goals.sales,alcances.completion,q.factors.completion,'VENTAS'));
+    metrics.push(make('Plan Dental',c.dental,c.sales,goals.dental,alcances.dental,q.factors.dental,'DENTAL'));
+    metrics.push(make('Primera compra',c.purchase,c.sales,goals.purchase,alcances.purchase,q.factors.purchase,'1A COMPRA'));
+    metrics.push(make('Programa Cero',c.p0,c.regular,goals.p0,alcances.p0,q.factors.p0,'P. CERO'));
+    metrics.push(make('Activación APP',c.apps,c.sales,goals.app,alcances.app,q.factors.app,'APP'));
+    const selectedSupervisorNames=achValue('achModule')?(supervisorConfig[achValue('achModule')]||[]):[];
+    const supervisor=selectedSupervisorNames.length===1?selectedSupervisorNames[0]:selectedSupervisorNames.length>1?selectedSupervisorNames.join(' / '):'SUPERVISOR(A)';
+    const qualityThreshold=qualityRule('quality',achValue('achModule'),'module').required;
+    const opportunities=[
+      {label:'REGIST.',below:metrics.find(m=>m.opportunityLabel==='REGIST.')?.below??null},
+      {label:'VENTAS',below:metrics.find(m=>m.opportunityLabel==='VENTAS')?.below??null},
+      {label:'DENTAL',below:metrics.find(m=>m.opportunityLabel==='DENTAL')?.below??null},
+      {label:'P. CERO',below:metrics.find(m=>m.opportunityLabel==='P. CERO')?.below??null},
+      {label:'1A COMPRA',below:metrics.find(m=>m.opportunityLabel==='1A COMPRA')?.below??null},
+      {label:'APP',below:metrics.find(m=>m.opportunityLabel==='APP')?.below??null},
+      {label:'CALIDAD',below:below(q.composite,qualityThreshold)}
+    ];
+    return {ready:true,week,weekLabel:weekLabel(week),module,supervisor,
+      records,metrics,opportunities,settings:weeklyAdminPrefs,goals,
+      validSales:c.sales,regular:c.regular,guaranteed:rows.filter(r=>candidate(r)&&isYes(r.guaranteed)).length,
+      dental:c.dental,p0:c.p0,apps:c.apps,incidents:salesRows.filter(selectedIncident).length,
+      dynamic:records.filter(r=>r.dynamic).length,qualityTotal:q.composite,global:q.global};
+  }
   function buildAchievementReport(){
-    renderAchievements();
-    const {rows,filteredRows:records,incidents,metricList,counts,goals}=achData(),cols=allRecordsColumns();
-    const [,accent,deep]=THEME_COLORS[uiLayout.theme];
-    const m=achValue('achModule')||'Todos los módulos',week=achValue('achWeek');
-    const details=`${week?weekLabel(week):'Sin semana'} · ${esc(m)} · ${rows.length} válidos de ${records.length} filtrados · ${incidents.length} incidencias excluidas · Calculo manual desde google forms · ${new Date().toLocaleString('es-MX')}`;
-    const tableFrom=(headers,items)=>`<table class="ach-report-table"><thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${items.map(row=>`<tr>${row.map(value=>`<td>${esc(String(value??'—'))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-    const goalLabels=ACH_GOAL_LABELS;
-    const parts=[];
-    if(achPrintEnabled('filters'))parts.push(`<section class="report-section" data-report-section="ach-filters"><h2>Filtros aplicados</h2>${tableFrom(['Filtro','Selección'],achPrintFilters())}</section>`);
-    if(achPrintEnabled('goals'))parts.push(`<section class="report-section" data-report-section="ach-goals"><h2>Objetivos semanales: cantidades y porcentajes</h2>${tableFrom(['Factor','Objetivo'],Object.keys(ACH_GOAL_INPUTS).map(k=>[goalLabels[k],achGoalText(k,goals[k])]))}</section>`);
-    if(achPrintEnabled('percentages'))parts.push(`<section class="report-section" data-report-section="ach-percents"><h2>Logros por porcentaje</h2>${tableFrom(['Factor','Alcance real','Calidad del factor'],metricList.map(x=>[x.name,qualityPercentText(x.reach),qualityPercentText(x.quality)]))}</section>`);
-    if(achPrintEnabled('quantities')){
-      const targets={'Registros':'records','Ventas con código':'sales','Plan Dental':'dental','Plan Cero':'p0','Primera compra':'purchase','APP activadas':'app'};
-      parts.push(`<section class="report-section" data-report-section="ach-quantities"><h2>Logros en cantidades</h2>${tableFrom(['Indicador','Real','Meta / % requerido'],counts.map(([k,v])=>[k,number.format(v),targets[k]?achGoalText(targets[k],goals[targets[k]]):'—']))}</section>`);
-    }
-    if(achPrintEnabled('records')){
-      const table=`<table class="record-export-table"><thead><tr>${cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')}</tr></thead><tbody>${records.map(r=>`<tr>${cols.map(c=>`<td>${tableCellMarkup(r,c,true)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${Math.max(1,cols.length)}">Sin registros para la búsqueda y filtros seleccionados.</td></tr>`}</tbody></table>`;
-      parts.push(`<section class="report-section report-section-allrecords" data-report-section="ach-records"><h2>Registros filtrados · ${records.length}</h2><p class="report-note">Los indicadores se calculan sobre todos los folios filtrados (en todas las páginas de la tabla), excepto los que tengan incidencia. Los folios con incidencia siguen visibles para revisión, pero no suman a los resultados.</p>${table}</section>`);
-    }
-    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup('achievements',details)}${parts.join('')||'<p>No hay apartados seleccionados para imprimir.</p>'}${reportFootMarkup('achievements')}</div>`;
-    el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}
-.report-page .ach-report-table{border-collapse:collapse;width:100%;font-size:10px;margin:5px 0 12px}
-.report-page .ach-report-table th,.report-page .ach-report-table td{border:1px solid #dbe6ef;padding:6px;text-align:left;overflow-wrap:anywhere}
-.report-page .ach-report-table th{background:#edf4fc}
-.report-page .ach-report-table td:nth-child(2){font-weight:800;color:#164f7d}
-.report-page .report-section[data-report-section="ach-records"]{break-before:page;page-break-before:always}
-.report-page .report-section[data-report-section="ach-records"]:first-of-type{break-before:auto;page-break-before:auto}
-</style>${html}`;
+    const model=weeklyAchievementReportModel();
+    if(!model.ready)throw Error(model.reason);
+    const assets=cachedWeeklyAdminAssets();
+    if(!assets)throw Error('Los recursos del informe aún no están cargados. Vuelve a seleccionar Exportar.');
+    const sheets=renderWeeklyAdminSheets(model,assets,{scale:3});
+    el('reportHost').innerHTML=`<style id="reportCss">${weeklyAdminPrintCss}</style>${weeklyAdminPageMarkup(sheets)}`;
     return el('printPage');
   }
 
@@ -3013,53 +3090,9 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
         search:supPrintEnabled('search'),searchText:el('supSearch')?.value||''}
     });
   }
-  // Reporte administrativo semanal en hoja carta (hasta 50 folios por hoja).
-  // Usa folios completados del supervisor y su equipo, incluyendo los que tengan
-  // una incidencia activa para revisión; no contabiliza esos folios para calidad.
-  function weeklyAdminData(){
-    const c=supervisorCalculator();
-    if(!c.ready)return {ready:false,reason:c.reason};
-    const q=c.q, counters=q.base, opts=supSettings.required;
-    const metric=(label,base,objective,reach,quality)=>({
-      label,base,objective:percentageForReport(objective),
-      reach:percentageForReport(reach),quality:percentageForReport(quality),
-      below:Number.isFinite(reach)&&reach<objective, status:Number.isFinite(reach)?reach<objective?'Bajo objetivo':'Alcanzado':'Sin base'
-    });
-    const validOwn=c.includeSupervisorSales?c.ownValid.length:0;
-    const metrics=[
-      metric('Cumplimiento ventas',`${c.completionSales} / ${c.goal||0}`,opts.completion,q.actual.completion,q.factors.completion),
-      metric('Primera compra',`${counters.purchase} / ${counters.sales}`,opts.purchase,q.actual.purchase,q.factors.purchase),
-      metric('Programa Cero',`${counters.p0} / ${counters.regular}`,opts.p0,q.actual.p0,q.factors.p0),
-      metric('Activación APP',`${counters.apps} / ${counters.sales}`,opts.app,q.actual.app,q.factors.app)
-    ];
-    const rows=[...c.src.team,...c.src.own].filter(r=>candidate(r)&&!autoSkipped(r));
-    const unique=new Map();
-    rows.forEach(r=>{const folio=String(r.folio||'').trim();const key=folio||r.uid||String(r.i);if(!unique.has(key))unique.set(key,r);});
-    const records=[...unique.values()].sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||''))||String(a.folio||'').localeCompare(String(b.folio||''))).map(r=>({
-      date:r.fecha?String(fmtDay(r.fecha)).slice(0,5):'—',folio:String(r.folio||'—'),
-      dental:isYes(r.dental),p0:guaranteeType(r)==='reg'&&isYes(r.p0),app:appEnabled(r),
-      incident:selectedIncident(r),dynamic:dynamicBonusMarked(r)&&payable(r)
-    }));
-    return {ready:true,weekLabel:weekLabel(supView.week),week:supView.week,
-      supervisor:c.selected.name,module:c.selected.module,goal:c.goal,
-      validSales:c.completionSales,teamSales:c.teamValid.length,ownSales:validOwn,
-      regular:c.teamReg.length,guaranteed:c.teamValid.length-c.teamReg.length,
-      dental:c.teamValid.filter(r=>isYes(r.dental)).length,p0:c.teamP0.length,
-      apps:c.teamValid.filter(appEnabled).length,
-      incidents:rows.filter(selectedIncident).length,dynamic:records.filter(r=>r.dynamic).length,
-      metrics,qualityTotal:q.composite,qualityObjective:opts.quality,global:q.global,records};
-  }
-  function percentageForReport(value){return Number.isFinite(value)?`${number.format(value)}%`:'—';}
   function buildSupervisorReport(){
-    const model=weeklyAdminData();
-    const assets=getCachedWeeklyAdminAssets();
-    if(!model.ready||!assets){
-      const message=model.ready?'Cargando logotipos y firma. Intenta exportar de nuevo.':model.reason;
-      el('reportHost').innerHTML=`<style>${weeklyAdminPrintCss}</style><div id="printPage" class="report-page"><p>${esc(message)}</p></div>`;
-      return el('printPage');
-    }
-    const pages=renderWeeklyAdminSheets(model,assets,{scale:3});
-    el('reportHost').innerHTML=`<style>${weeklyAdminPrintCss}</style>${weeklyAdminPageMarkup(pages)}`;
+    const model=supervisorStatementModel();
+    el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}\n${SUPERVISOR_STATEMENT_CSS}</style>${supervisorStatementHtml(model)}`;
     return el('printPage');
   }
 
@@ -3289,21 +3322,20 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     write('Versión '+APP_VERSION,margin+content-84,y,10,false,'#6b7b8e');y+=32;
     return Math.ceil(y);
   }
-  function exportPng(){
+  async function exportPng(){
     if(activePage==='visits')return window.VISITS?.exportPng();
-    if(activePage==='supervisor'){
-      const btn=el('exportImage'),before=btn.textContent;
-      btn.disabled=true;btn.textContent='Generando seguimiento administrativo…';
-      (async()=>{
-        const assets=await preloadWeeklyAdminAssets();
-        const data=weeklyAdminData();
-        const pages=renderWeeklyAdminSheets(data,assets,{scale:3});
+    if(activePage==='achievements'){
+      const button=el('exportImage'),oldText=button.textContent;button.disabled=true;button.textContent='Preparando PNG carta…';
+      try{
+        const assets=await preloadWeeklyAdminAssets(),model=weeklyAchievementReportModel();
+        const pages=renderWeeklyAdminSheets(model,assets,{scale:Math.max(2,Math.min(uiLayout.scale,4))});
         for(let i=0;i<pages.length;i++){
           const blob=await new Promise(resolve=>pages[i].toBlob(resolve,'image/png'));
-          if(!blob)throw Error('No se pudo crear la imagen PNG.');
-          saveBlob(blob,`seguimiento_administrativo_${supView.week||'sin_semana'}_${i+1}_de_${pages.length}.png`);
+          if(!blob)throw Error('No se pudo generar la hoja '+(i+1));
+          saveBlob(blob,`seguimiento_administrativo_${achValue('achWeek')}_${i+1}_de_${pages.length}.png`);
         }
-      })().catch(e=>alert('No se pudo exportar el reporte: '+e.message)).finally(()=>{btn.disabled=false;btn.textContent=before;});
+      }catch(error){alert('No se pudo generar PNG: '+error.message);}
+      finally{button.disabled=false;button.textContent=oldText;}
       return;
     }
     const button=el('exportImage'),before=button.textContent;
@@ -3330,19 +3362,20 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     }catch(err){button.disabled=false;button.textContent=before;alert('No se pudo generar el PNG: '+err.message);}
   }
   setUpLayout();
-  preloadWeeklyAdminAssets().catch(()=>{});
   el('exportImage').addEventListener('click',exportPng);
-  window.addEventListener('beforeprint',buildReport);
+  window.addEventListener('beforeprint',()=>{try{if(activePage!=='achievements'||cachedWeeklyAdminAssets())buildReport();}catch(error){console.warn('Reporte de impresión:',error);}});
   window.CALC_REPORT={buildReport,layout:uiLayout};
 
-  initAllRecordsPage();initAchievements();initQualitySettings();initSupervisorCalculator();initIncidences();initNavOrder();initFloatingExport();initMondayReminder();
+  initAllRecordsPage();initAchievements();initWeeklyAdminSettings();initQualitySettings();initSupervisorCalculator();initIncidences();initNavOrder();initFloatingExport();initMondayReminder();
   restore();setForm('base');setForm('sim');render();initializeWeeklyDates();refreshAuthorizedPages();switchPage(pageNavigation.home);initArchive();
   window.APP_CLOUD?.registerRefresh(async()=>{
     if(!isAuthorized())return;
     archive.reports=await archiveGetAll();archive.temporaryMode=false;
-    archiveSelectionRestore();loadFolioFlags();loadCommissionRates();dynamicBonusConfig=loadDynamicBonus();if(el('dynamicBonusAmount'))el('dynamicBonusAmount').value=dynamicBonusAmount();
+    archiveSelectionRestore();loadFolioFlags();loadCommissionRates();weeklyAdminPrefs=readWeeklyAdminPrefs();refreshWeeklyAdminSettingsEditor();dynamicBonusConfig=loadDynamicBonus();if(el('dynamicBonusAmount'))el('dynamicBonusAmount').value=dynamicBonusAmount();
     refreshArchiveData(true);await refreshIncidents(true);refreshAuthorizedPages();render();window.VISITS?.refreshSources();
   });
+  // Carga anticipada de logotipos y firma para evitar esperas al exportar.
+  preloadWeeklyAdminAssets().catch(err=>console.warn('Recursos semanales:',err));
   // Solo lectura: acuse consulta TODOS los XLS del historial, sin aplicar filtros visuales.
   window.VISIT_SOURCE={
     isAuthorized,

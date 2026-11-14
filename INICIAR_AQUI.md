@@ -1,3 +1,18 @@
+## Publicar V2.5.2 — Exportación administrativa desde Logros semanales
+
+La base es **V2.5.0**; NO se utilizó el código de exportación de supervisor de V2.5.1. El nuevo reporte PDF/PNG pertenece exclusivamente a **Logros semanales**. Incluye 15 botones de Ajustes y la plantilla administrativa personalizable (Ajustes → 15).
+
+1. Descarga y descomprime el ZIP en la **raíz** de tu repositorio, reemplazando `index.html`, `src/`, `netlify/`, etc.
+2. Ejecuta `npm run check` y `npm test` si tienes Node.js. Para compilar: `npm install && npm run build`.
+3. Sube los cambios con `git add -A && git commit -m "INVEX V2.5.2 reporte Logros semanales" && git push origin HEAD`.
+4. Después de un despliegue exitoso, entra a **Logros semanales**, selecciona **semana y módulo**, define o carga tus objetivos semanales, revisa filtros y abre el menú flotante **Exportar → PDF** o **PNG**.
+5. El informe se genera en **Carta vertical**, dos tablas dinámicas de folios y un bloque amplio para escribir comentarios/plan de trabajo a mano. Si son más de 50 ventas completadas se reparte en hojas adicionales. Para PDF desactiva los encabezados y pies automáticos del navegador.
+6. En **Ajustes → 15** modifica nombres, títulos, etiquetas, líneas, color y elementos visibles; guarda la plantilla. La cuenta sincroniza los ajustes a través de Netlify Identity y Functions.
+
+No se requiere otra migración SQL ni reimportar archivos. La V2.5.2 conserva la tabla de incidencias creada en V2.5.0. **Verifica el resultado PDF/PNG en Netlify**, porque la compilación real y la navegación automatizada no pudieron finalizarse en este entorno.
+
+---
+
 ## V2.5.0 · Antes de reemplazar el repositorio
 
 El ZIP incluye una nueva migración de Netlify Database para las incidencias. Debes subir **todos los archivos y carpetas**, incluyendo `netlify/database/migrations/20261113180000_create_incidents.sql` y `netlify/functions/incidents.js`; reemplazar solamente `index.html` no basta.
@@ -73,7 +88,3 @@ Selecciona Calculadora de supervisor, semana y supervisor. Usa **Imprimir / PDF*
 3. Toca el botón flotante verde **Copiar para WhatsApp** en la esquina inferior derecha.
 4. Pega directamente en WhatsApp el mensaje completo. Conservar las tres comillas invertidas de apertura y cierre permite que los valores se vean como una tabla monoespaciada.
 5. Comprueba que los primeros seis valores coincidan con la fila TOTAL de «Por módulo»; Calidad usa el mismo porcentaje de esa fila y calcula diferencia en puntos porcentuales.
-
-
-### Exportación administrativa (V2.5.1)
-En la página **Calculadora de supervisor**, el menú flotante **Imprimir / PDF** o **Exportar PNG** genera Seguimiento administrativo semanal. Para PDF, elige **Guardar como PDF**, papel **Carta** y márgenes **Ninguno**, sin encabezados ni pies del navegador. Cada hoja muestra hasta 50 folios.

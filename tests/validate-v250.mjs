@@ -120,8 +120,8 @@ assert.equal(capped.net,Math.round((capped.afterPenalty-capped.recover+capped.dy
 // Version stamped uniformly in UI and generated reports.
 const html=fs.readFileSync('index.html','utf8');
 assert(!html.includes('Versión 2.4.2</footer>'));
-assert.equal((html.match(/Versión 2\.5\.1<\/footer>/g)||[]).length,5);
-assert(source.includes("APP_VERSION='2.5.1'"));
+assert.equal((html.match(/Versión 2\.5\.2<\/footer>/g)||[]).length,5);
+assert(source.includes("APP_VERSION='2.5.2'"));
 assert(source.includes('write(\'Versión \'+APP_VERSION'));
 assert(source.includes('data-sup-include-sales'));
 assert(source.includes('data-dynamic-bonus-id'));
@@ -138,10 +138,10 @@ console.log('OK: cálculos, versiones, mínimos, dinámica en folios, supervisor
 // Diseño de estado de comisión: mismo modelo de datos para PNG y PDF.
 const statement=fs.readFileSync('src/supervisor-statement.js','utf8');
 assert(source.includes("from './supervisor-statement.js'"));
-assert(source.includes('weeklyAdminPageMarkup(pages)'));
-assert(source.includes('renderWeeklyAdminSheets(data,assets,{scale:3})'));
+assert(source.includes('supervisorStatementHtml(model)'));
+assert(source.includes('paintSupervisorStatement(ctx,true,supModel)'));
 for(const term of ['Estado de comisión · Supervisor','Nómina semanal','ALCANCE GLOBAL','Bono por dinámica','Folios propios','ss-pay','@page{size:A4 portrait'])assert(statement.includes(term),`No aparece elemento de diseño: ${term}`);
-assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'2.5.1');
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'2.5.2');
 console.log('OK: plantilla de supervisor y motores de exportación vinculados a los mismos cálculos.');
 
 // Contrato real de la exportación: una sola fuente de cifras para PDF y PNG.

@@ -23,7 +23,8 @@ const KEYS = new Set([
   'wmSamsMeridaSupervisorsV22',
   'wmSamsMeridaAchievementGoalsV232',
   'wmSamsMeridaSupervisorCommissionV24',
-  'wmSamsNavOrderV250'
+  'wmSamsNavOrderV250',
+  'wmSamsWeeklyAdminReportV252'
 ]);
 const PENDING_PREFIX = 'wmSamsCloudPendingV19:';
 const SESSION_EXPIRED_FLAG='wmSamsSessionExpiredV249';

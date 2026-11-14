@@ -1,9 +1,10 @@
-## V2.5.1 — 13 de noviembre de 2026
-- Nueva exportación Seguimiento administrativo semanal en la página Supervisor para PDF y PNG en formato carta.
-- Logo INVEX/MARC y firma original de Visitas de coordinador.
-- Apartados sin numeración, comentarios y plan de trabajo ampliados, firmas al final sin notas inferiores.
-- Hasta 50 folios por hoja en dos tablas; sin recortes para semanas de más de 50.
-- No se alteran las fórmulas ni los datos guardados en PostgreSQL.
+## V2.5.2 — Seguimiento administrativo semanal en Logros semanales (13 de noviembre de 2026)
+
+- Rehecha la integración desde V2.5.0; restauradas y preservadas las exportaciones existentes de Calculadora supervisor. Nuevo informe exclusivamente para PDF/PNG de **Logros semanales**.
+- Plantilla carta vertical de 612×792 puntos con logotipos INVEX/MARC, firma de visitas, datos de la selección, indicadores, dos tablas dinámicas por un máximo de 50 folios por hoja, oportunidades y áreas manuscritas ajustables. No se escribe nada después de las firmas.
+- El modelo toma las metas, filtros e incidencias de Logros semanales sin inventar datos ausentes. A los folios con incidencia se les conserva la marca de revisión, aunque se excluyan del cálculo de objetivos.
+- Ajustes → 15 para textos, etiquetas, personas, color, visibilidad y espacio de escritura. Persistencia local y Netlify Settings permitida mediante la nueva clave `wmSamsWeeklyAdminReportV252`.
+- Navegación dentro de Ajustes mediante botones por sección. Se mantienen todas las funciones de V2.5.0; tests de regresión y nuevo generador aprobados, sin cambio SQL.
 
 ## V2.5.0 — Incidencias permanentes, navegación y recordatorio XLS (13 de noviembre de 2026)
 

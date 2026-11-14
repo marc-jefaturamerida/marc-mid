@@ -415,6 +415,23 @@ body[data-page="incidents"] #sectionsContainer,body[data-page="incidents"] #quic
 @media(max-width:700px){.inc-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.inc-fields{grid-template-columns:1fr 1fr}.inc-filterbar{grid-template-columns:1fr 1fr}.inc-filterbar .inc-search{grid-column:1/-1}.page-order-row{grid-template-columns:1fr auto}.page-order-row label{grid-column:1/-1}}
 @media(max-width:440px){.inc-fields{grid-template-columns:1fr}.inc-hero h2{font-size:21px}.inc-card{padding:12px}.floating-export{right:12px;bottom:12px}}
 @media print{.floating-export,#xlsMondayReminder,.incidence-page,.page-order-list{display:none!important}}
+
+/* V2.5.2 · menú de apartados en Ajustes */
+.settings-section-nav{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:8px;margin:16px 0 18px;padding:13px;border:1px solid #d8e3ef;border-radius:12px;background:#f4f8fd}
+.settings-section-button{font:inherit;text-align:left;font-size:12px;font-weight:750;line-height:1.35;color:#184574;background:#fff;border:1px solid #d1deeb;border-radius:9px;padding:11px 12px;min-height:44px;cursor:pointer}
+.settings-section-button:hover,.settings-section-button[aria-expanded="true"]{background:#0a4d87;color:#fff;border-color:#0a4d87}
+#settingsPanel.settings-chooser-ready .settings-panel-content > .settings-group:not([open]){display:none!important}
+#settingsPanel.settings-chooser-ready .settings-panel-content > .settings-group[open]{margin-top:0}
+.weekly-admin-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin:15px 0}
+.weekly-admin-settings-grid .field{min-width:0}
+.weekly-admin-settings-grid label:not(.checkrow){display:block;font-size:11px;font-weight:800;color:#314f6a;margin:0 0 4px}
+.weekly-admin-settings-grid input:not([type="checkbox"]){display:block;width:100%;height:39px;padding:7px 10px;border:1px solid #cbd9e6;border-radius:8px;color:#193450;background:#fff;font:inherit;font-size:12px}
+.weekly-admin-toggle-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.weekly-admin-toggle-grid label{display:flex;align-items:center;gap:7px;padding:9px;border:1px solid #e1e8f0;border-radius:8px;background:#f8fbff;font-size:12px;color:#24466d;cursor:pointer}
+.weekly-admin-toggle-grid input{accent-color:#07559e;width:17px;height:17px;flex:none}
+@media(max-width:600px){.settings-section-nav{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px;gap:6px}.settings-section-button{font-size:11px;padding:9px}.weekly-admin-settings-grid,.weekly-admin-toggle-grid{grid-template-columns:1fr}}
+@media print{.settings-section-nav{display:none!important}.achievements-page .ach-print-toggle{display:none!important}}
+.achievements-page .ach-print-toggle{display:none!important}
 </style>
 
 <style>
@@ -831,8 +848,8 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="incidencePage" data-page-tab="incidents">Gestión de incidencias</button>
 </nav>
 <details class="settings-panel section-card" id="settingsPanel">
-<summary class="settings-panel-title"><span><span class="settings-icon">⚙</span> Ajustes de la calculadora</span><small>Archivos · Tarifas · Temas · Impresión · Folios</small></summary>
-<div class="settings-panel-content"><div id="guestSettingsNotice" class="settings-help" hidden role="status" style="margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--blue-soft);font-weight:650">Modo sin sesión: puedes abrir y modificar estas opciones para probar el Dashboard en este dispositivo. No se guardan en Netlify y podrían restablecerse al recargar la página. Inicia sesión para sincronizarlas.</div><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="btn small" id="authLogout" type="button">Cerrar sesión</button><button class="btn primary small" id="saveSettingsAndClose" type="button">Guardar ajustes y cerrar</button><button class="btn small close-settings" id="closeSettings" type="button">Cerrar ajustes ✕</button></div><details class="settings-group" id="settingsArchive"><summary class="settings-group-title"><span><span class="settings-number">1</span> Archivos XLS guardados</span></summary><div class="settings-group-body">
+<summary class="settings-panel-title"><span><span class="settings-icon">⚙</span> Ajustes del proyecto</span><small>Elige un apartado para configurar</small></summary>
+<div class="settings-panel-content"><div id="guestSettingsNotice" class="settings-help" hidden role="status" style="margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--blue-soft);font-weight:650">Modo sin sesión: puedes abrir y modificar estas opciones para probar el Dashboard en este dispositivo. No se guardan en Netlify y podrían restablecerse al recargar la página. Inicia sesión para sincronizarlas.</div><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="btn small" id="authLogout" type="button">Cerrar sesión</button><button class="btn primary small" id="saveSettingsAndClose" type="button">Guardar ajustes y cerrar</button><button class="btn small close-settings" id="closeSettings" type="button">Cerrar ajustes ✕</button></div><nav class="settings-section-nav" id="settingsSectionsNav" aria-label="Elegir apartado de Ajustes"></nav><details class="settings-group" id="settingsArchive"><summary class="settings-group-title"><span><span class="settings-number">1</span> Archivos XLS guardados</span></summary><div class="settings-group-body">
 <p class="settings-help">Los reportes se almacenan en tu cuenta de Netlify Database cuando inicias sesión. Puedes usar un archivo, varios o el total acumulado sin crear páginas adicionales. Los registros duplicados de diferentes reportes se cuentan una sola vez.</p>
 <div class="file-archive"><div class="archive-controls" role="radiogroup" aria-label="Fuente para los cálculos"><label><input type="radio" name="archiveMode" value="all" checked> Total acumulado</label><label><input type="radio" name="archiveMode" value="selected"> Elegir uno o varios archivos</label></div>
 <div class="archive-list" id="archiveList"><div class="archive-empty">No hay archivos guardados.</div></div>
@@ -929,6 +946,11 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 <div id="pageOrderList" class="page-order-list"></div><div class="settings-row-actions"><button type="button" class="btn primary small" id="savePageOrder">Guardar orden y página principal</button><button type="button" class="btn small" id="resetPageOrder">Restaurar orden predeterminado</button></div>
 <p class="settings-help" id="pageOrderStatus" role="status">Principal predeterminada: Comparativa diaria.</p>
 </div></details>
+<details class="settings-group" id="settingsWeeklyAdminV252"><summary class="settings-group-title"><span><span class="settings-number">15</span> Seguimiento administrativo semanal · Logros semanales</span></summary><div class="settings-group-body">
+<p class="settings-help">Personaliza únicamente el informe PDF/PNG de <strong>Logros semanales</strong>. Las cantidades, objetivos y folios se obtienen de la semana, módulo y filtros seleccionados en esa página. El PDF siempre utiliza carta vertical y 50 folios como máximo por hoja; el espacio manuscrito crece cuando hay menos folios. Los nombres vacíos se obtienen automáticamente.</p>
+<div class="weekly-admin-settings-grid" id="weeklyAdminSettingsEditor"><div class="field"><label for="wa_title">Título principal</label><input type="text" maxlength="150" id="wa_title" data-weekly-admin-setting="title" /></div><div class="field"><label for="wa_subtitlePrefix">Texto antes de la semana</label><input type="text" maxlength="150" id="wa_subtitlePrefix" data-weekly-admin-setting="subtitlePrefix" /></div><div class="field"><label for="wa_coordinator">Nombre del coordinador</label><input type="text" maxlength="150" id="wa_coordinator" data-weekly-admin-setting="coordinator" /></div><div class="field"><label for="wa_supervisorOverride">Nombre del supervisor (vacío = automático)</label><input type="text" maxlength="150" id="wa_supervisorOverride" data-weekly-admin-setting="supervisorOverride" /></div><div class="field"><label for="wa_moduleOverride">Módulo del reporte (vacío = automático)</label><input type="text" maxlength="150" id="wa_moduleOverride" data-weekly-admin-setting="moduleOverride" /></div><div class="field"><label for="wa_city">Jefatura / ciudad</label><input type="text" maxlength="150" id="wa_city" data-weekly-admin-setting="city" /></div><div class="field"><label for="wa_identificationTitle">Título · Identificación</label><input type="text" maxlength="150" id="wa_identificationTitle" data-weekly-admin-setting="identificationTitle" /></div><div class="field"><label for="wa_goalsTitle">Título · Objetivos y resultados</label><input type="text" maxlength="150" id="wa_goalsTitle" data-weekly-admin-setting="goalsTitle" /></div><div class="field"><label for="wa_recordsTitle">Título · Ventas completadas</label><input type="text" maxlength="150" id="wa_recordsTitle" data-weekly-admin-setting="recordsTitle" /></div><div class="field"><label for="wa_opportunitiesTitle">Título · Áreas de oportunidad</label><input type="text" maxlength="150" id="wa_opportunitiesTitle" data-weekly-admin-setting="opportunitiesTitle" /></div><div class="field"><label for="wa_handwrittenTitle">Título · Comentarios y firmas</label><input type="text" maxlength="150" id="wa_handwrittenTitle" data-weekly-admin-setting="handwrittenTitle" /></div><div class="field"><label for="wa_commentsTitle">Título · Comentarios semanales</label><input type="text" maxlength="150" id="wa_commentsTitle" data-weekly-admin-setting="commentsTitle" /></div><div class="field"><label for="wa_planTitle">Título · Plan de trabajo</label><input type="text" maxlength="150" id="wa_planTitle" data-weekly-admin-setting="planTitle" /></div><div class="field"><label for="wa_coordinatorRole">Cargo del coordinador</label><input type="text" maxlength="150" id="wa_coordinatorRole" data-weekly-admin-setting="coordinatorRole" /></div><div class="field"><label for="wa_supervisorRole">Leyenda de firma del supervisor</label><input type="text" maxlength="150" id="wa_supervisorRole" data-weekly-admin-setting="supervisorRole" /></div><div class="field"><label for="wa_commentsLines">Líneas para comentarios</label><input type="number" min="2" max="8" step="1" id="wa_commentsLines" data-weekly-admin-setting="commentsLines" /></div><div class="field"><label for="wa_planLines">Líneas para plan semanal</label><input type="number" min="2" max="8" step="1" id="wa_planLines" data-weekly-admin-setting="planLines" /></div><div class="field"><label for="wa_mainColor">Color principal</label><input type="color" id="wa_mainColor" data-weekly-admin-setting="mainColor" /></div><div class="field full" style="grid-column:1/-1"><strong style="font-size:12px">Elementos visibles en la hoja</strong><div class="weekly-admin-toggle-grid"><label><input type="checkbox" data-weekly-admin-setting="showLogos" /> Mostrar logotipos INVEX / MARC</label><label><input type="checkbox" data-weekly-admin-setting="showSignature" /> Insertar firma de coordinación</label><label><input type="checkbox" data-weekly-admin-setting="showTotals" /> Totales debajo de ambas tablas</label><label><input type="checkbox" data-weekly-admin-setting="showSummary" /> Mostrar conteos de detalles</label><label><input type="checkbox" data-weekly-admin-setting="showRecordsGoal" /> Incluir objetivo de Registros</label><label><input type="checkbox" data-weekly-admin-setting="showIncidentRows" /> Mostrar marcas de incidencias</label><label><input type="checkbox" data-weekly-admin-setting="showDynamicRows" /> Mostrar marcas de Bono por dinámica</label><label><input type="checkbox" data-weekly-admin-setting="showQuality" /> Incluir Calidad Total y Alcance Global</label></div></div></div>
+<div class="settings-row-actions"><button class="btn primary small" id="weeklyAdminSave" type="button">Guardar plantilla administrativa</button><button class="btn small" id="weeklyAdminReset" type="button">Restaurar plantilla</button></div>
+<p class="settings-help" id="weeklyAdminSettingsStatus" role="status">Cambios pendientes de guardar.</p></div></details>
 </div>
 </details><div aria-label="Filtros rápidos de importación" class="quick-filters section-card" id="quickFilters">
 <div class="quick-row">
@@ -1171,7 +1193,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="all-records-help">Las columnas se muestran según <strong>Ajustes → Tabla de folios</strong>. Incidencia y APP permanecen a la vista para validarlas. Desliza horizontalmente para ver más columnas.</div>
   <div class="table-wrap all-records-table-wrap"><table id="allRecordsTable" class="record-table all-records-table"><thead id="allRecordsHead"></thead><tbody id="allRecordsBody"><tr><td>Importa un XLS para mostrar registros.</td></tr></tbody></table></div>
   <div class="all-records-pagination"><span id="allRecordsPageStatus">0 registros</span><div class="all-records-page-actions"><label for="allRecordsPageSize">Filas por página</label><select id="allRecordsPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" type="button" id="allRecordsPrev">Anterior</button><button class="btn small" type="button" id="allRecordsNext">Siguiente</button></div></div>
-  <footer class="foot">Consulta de registros XLS · Versión 2.5.1</footer>
+  <footer class="foot">Consulta de registros XLS · Versión 2.5.2</footer>
 </section>
 
 
@@ -1197,7 +1219,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
     </div></details>
   </div>
   <p class="sup-footnote">Cálculo informativo. Configura el bono base en Ajustes → 12; los bonos adicionales comienzan en $1,000, $1,500 y $2,000, editables y no acumulables. Guarda los ajustes para sincronizarlos con Netlify; consultar semanas y supervisores no genera escrituras.</p>
-  <footer class="foot">Calculadora de supervisor · Versión 2.5.1</footer>
+  <footer class="foot">Calculadora de supervisor · Versión 2.5.2</footer>
 </section>
 <section id="achievementsPage" class="achievements-page" hidden aria-label="Logros semanales por módulo">
   <div class="achievements-hero">
@@ -1223,12 +1245,12 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
         <div class="field"><label for="achGoalApp">Activaciones APP · % requerido</label><input type="number" inputmode="numeric" min="0.01" max="100" step="0.01" id="achGoalApp" placeholder="Ej. 95"></div>
       </div>
       <div class="achievements-goals-toolbar"><button type="button" class="btn primary small" id="achSaveGoals">Guardar objetivos</button><span id="achGoalsStatus" class="muted" aria-live="polite">Define los objetivos para calcular los porcentajes.</span></div>
-      <p class="achievements-goals-footnote">Las metas se guardan por semana y módulo. Los porcentajes requeridos usan como base: P0 / regulares; Dental, APP y Primera compra / ventas con código. Calidad y Alcance global se derivan de los cinco factores. Sin sesión se conservan en este navegador; con sesión se sincronizan al pulsar Guardar objetivos.</p>
+      <p class="achievements-goals-footnote">Las metas se guardan por semana y módulo. Los porcentajes requeridos usan como base: P0 / regulares; Dental, APP y Primera compra / ventas con código. Calidad Total es el promedio de cuatro calidades y Alcance Global agrega Calidad Total como quinto valor. Sin sesión se conservan en este navegador; con sesión se sincronizan al pulsar Guardar objetivos.</p>
     </div>
   </details>
   <details class="achievements-section achievements-fold achievements-filter-section" id="achAdvanced">
     <summary>Filtros avanzados de registros <span id="achFilterBadge" class="achievements-badge">· Contraídos por defecto</span><label class="ach-print-toggle" title="Incluir esta sección en PDF y PNG"><input type="checkbox" data-ach-print="filters" > Imprimir</label></summary>
-    <div class="achievements-fold-body"><p>Los filtros avanzados, la búsqueda, la semana, el módulo y la inclusión de supervisores también modifican los indicadores. Los folios con incidencia siguen visibles, pero no suman en los resultados.</p>
+    <div class="achievements-fold-body"><p>Los filtros avanzados, la búsqueda, la semana, el módulo y la inclusión de supervisores también modifican los indicadores. Los folios con incidencia siguen visibles, pero no suman en los resultados. La exportación de esta página utiliza el formato administrativo configurable en Ajustes → 15.</p>
       <div class="achievements-filter-grid">
         <div class="field"><label for="achExec">Ejecutivo</label><select id="achExec"><option value="">Todos los ejecutivos</option></select></div>
         <div class="field"><label for="achPayment">Validación de pago</label><select id="achPayment"><option value="">Todas</option><option value="payable">Comisionable</option><option value="notpayable">No pagable</option><option value="nocode">Sin código</option></select></div>
@@ -1270,7 +1292,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
       <div class="achievements-pager"><span id="achRecordStatus">0 registros</span><div class="achievements-pager-options"><label for="achPageSize">Filas</label><select id="achPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" id="achPrev" type="button">Anterior</button><button class="btn small" id="achNext" type="button">Siguiente</button></div></div>
     </div>
   </details>
-  <footer class="foot">Logros semanales · Versión 2.5.1</footer>
+  <footer class="foot">Logros semanales · Versión 2.5.2</footer>
 </section>
 
 
@@ -1299,14 +1321,14 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 2.5.1</footer>
+  <footer class="foot">Acuse de coordinación · Versión 2.5.2</footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 2.5.1</footer>
+<footer class="foot">Final de la presentacion · Versión 2.5.2</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 

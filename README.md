@@ -1,4 +1,19 @@
-# V2.5.0 — Gestión permanente de incidencias y navegación personalizada
+# V2.5.2 — Seguimiento administrativo semanal desde Logros semanales
+
+**Base de esta versión: V2.5.0.** No se tomó la exportación de supervisor de V2.5.1. Las exportaciones PDF y PNG de **Logros semanales** producen ahora un formulario de **Seguimiento administrativo semanal**, carta vertical, con logotipos y firma originales de Visitas de coordinación; las demás páginas mantienen sus exportaciones.
+
+- Datos basados en la **semana y módulo seleccionados**, objetivos semanales capturados, filtros avanzados y opción de incluir supervisores de **Logros semanales**. Los folios con incidencia activa siguen visibles en el informe, pero no se cuentan en los indicadores; se excluyen registros sin código y estatus no pagables de la tabla de ventas completadas. Los folios con bono por dinámica muestran el bono solo si resulta pagable.
+- Identificación, objetivos en unidades/porcentajes, calidad y alcance global según configuraciones reales, **dos tablas dinámicas** con 25 folios por tabla como máximo, casillas de oportunidad comparando alcance real con el requerido, comentarios y plan manuscritos y **firmas al final sin pie posterior**.
+- Con hasta 50 folios sale una hoja carta; si hay más, continúa en hojas adicionales con los registros restantes, sin eliminar folios. El espacio para escritura crece automáticamente cuando hay menos registros. Para imprimir como PDF, elegir **Carta**, márgenes ninguno, gráficos de fondo activados y encabezados/pies del navegador desactivados.
+- **Ajustes → 15. Seguimiento administrativo semanal:** títulos, semana, nombre del coordinador, nombre del supervisor, módulo, ciudad, leyendas, número de líneas, color y elementos visibles. Los ajustes están sincronizados por Netlify por cuenta; se guardan mediante «Guardar plantilla administrativa» o «Guardar ajustes y cerrar». Los datos faltantes en los XLS o los objetivos no se inventan: se muestran «Sin definir» o «—».
+- **Ajustes** cambia de lista extensa a **15 botones por apartado**: pulsa uno para ver su contenido. Los cálculos, incidencias permanentes, sesiones de siete días y menú flotante de V2.5.0 se conservan.
+- No se necesita ninguna migración nueva de PostgreSQL para V2.5.2. Se añade `src/weekly-admin-report.js`; es necesario subir todo el ZIP para que el HTML y el JavaScript coincidan. La función `netlify/functions/settings.js` admite las preferencias de navegación y de esta plantilla.
+
+**Comprobación:** pruebas de sintaxis y regresión, estructura HTML sin IDs duplicados, renderizado de modelo de 0 a 101 folios, distribución en hojas y PDF de muestra de 50 folios validado a una hoja carta. La impresión/PNG real de la aplicación publicada y la compilación final de Vite quedan pendientes de verificar en Netlify.
+
+---
+
+# Historial V2.5.0 — Gestión permanente de incidencias y navegación personalizada
 
 Esta edición recupera automáticamente una sesión de Netlify Identity al reabrir la página o después de que caduque el JWT de acceso (~1 hora), siempre que la cookie de renovación siga válida. **No** guarda contraseñas ni JWT en preferencias: Netlify sigue verificando al usuario en cada llamada a sus Functions. Se registra solo un plazo local de siete días por cuenta/navegador, sin ampliarlo en cada visita. Al cumplirse, cierra Identity y solicita de nuevo las credenciales. Cerrar sesión manualmente lo borra al instante. Se admite una sesión previa válida al instalar esta actualización, iniciando el contador ese día. Un cambio de dispositivo, bloqueo de cookies, modo privado, revocación o vencimiento del refresh token de Netlify pueden exigir ingresar antes; este código no puede prolongar la validez de Identity en el servidor. La cola local de ajustes pendientes se conserva por cuenta si vence la sesión.
 
@@ -198,10 +213,3 @@ Esta calculadora es una simulación de los criterios proporcionados, no una conf
 
 ## V2.4.2
 Secciones de calculadora de supervisor plegables con opción de impresión individual, tablas contraídas por defecto, tarjetas compactas de tres columnas y penalización P0 propia detallada.
-
-
-## V2.5.1 · Seguimiento administrativo semanal (supervisores)
-
-Las opciones **Imprimir/PDF** y **PNG** de la página de supervisor generan el Seguimiento administrativo semanal en **carta vertical**, a partir de los datos reales de la semana seleccionada. Contiene los logos INVEX/MARC y la firma original conservada en `public/assets/visit-header.png` y `public/assets/visit-signature.png`, objetivos y calidades, dos tablas compactas de hasta 25 folios por lado, áreas de oportunidad, comentarios y plan de trabajo manuscritos, y firmas. Las secciones no están numeradas y no existe texto debajo de las firmas.
-
-El registro de ventas completadas incluye los folios con código de barras y clasificación regular/garantizada, omitiendo estatus no pagables. La casilla Inc. mantiene visibles los folios con incidencia aunque estén excluidos de las métricas de pago. Se muestra **Din.** solo para ventas válidas marcadas. Las metas, mínimo y topes siguen la configuración de la calculadora del supervisor. **Hasta 50 folios entran en una hoja carta**; si hay más, se generan hojas adicionales con bloques de 50 para no perder información. El PDF se obtiene con la impresión del navegador (Guardar como PDF, tamaño carta y márgenes Ninguno). Los PNG se descargan por hoja.

@@ -16,7 +16,9 @@ const ALLOWED = new Set([
  'wmSamsMeridaQualityConfigV22',
  'wmSamsMeridaSupervisorsV22',
  'wmSamsMeridaAchievementGoalsV232',
-  'wmSamsMeridaSupervisorCommissionV24'
+  'wmSamsMeridaSupervisorCommissionV24',
+  'wmSamsNavOrderV250',
+  'wmSamsWeeklyAdminReportV252'
 ]);
 const MAX_ENTRIES=12;
 const MAX_TOTAL_BYTES=2_200_000;
