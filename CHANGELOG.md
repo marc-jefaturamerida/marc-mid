@@ -1,3 +1,29 @@
+## 2.5.5 · Fecha por archivo y redacción de exportaciones
+- Solicitud de fecha obligatoria y cancelable para cada archivo nuevo antes de almacenarlo; nombre AAAA-MM-DD en la cuenta y la lista.
+- Netlify acepta fechas como nombre visible y los nombres con extensión de versiones anteriores.
+- Las exportaciones PDF/PNG limpian los términos XLS/XLSX de los textos, incluidas preferencias históricas existentes.
+- Sin migración SQL, sin modificaciones en los registros ni en las incidencias.
+
+## V2.5.4 — Histórico consolidado por módulo (15 de noviembre de 2026)
+
+- Página nueva **Histórico por módulo**, agrupada en Análisis y resultados, sin alterar Histórico individual.
+- Nueve indicadores operativos, promedios de días homólogos y promedios semanales/mensuales solo con registros; calidad y alcance global recalculados.
+- Filtros de módulo, fecha y tipo de período, con inclusión/exclusión de registros de supervisor.
+- Objetivos automáticos por semana con prioridad Logros semanales → calidad módulo → supervisor → suma de ejecutivos. Objetivos diarios/mensuales prorrateados y metas manuales por período.
+- Exportación PDF Carta y PNG paginados con mismos controles del histórico individual, títulos propios y opción de mostrar ejecutivos.
+- Ajustes independientes de módulo con persistencia por cuenta (`wmSamsHistoricalModuleV254`) permitida en Functions.
+- Navegación agrupada y orden editable; predeterminada Comparativa diaria.
+- Tests de regresión y pruebas V2.5.4 completadas; compilación de Netlify sin validar en este entorno.
+
+## V2.5.3 — Histórico individual y agrupación de páginas (15 de noviembre de 2026)
+
+- Nueva pantalla de análisis histórico de colaboradores para los nueve indicadores confirmados. Historial íntegro entre módulos, filtros por fechas/módulo, vista diaria/semanal/mensual y gráfica configurable.
+- Promedios del mismo día de la semana (ej. todos los domingos), semanales y mensuales calculados solo entre períodos con registros; recálculo de calidad y alcance global usando numeradores y objetivos agregados, sin promediar porcentajes.
+- Objetivos prorrateados por día/mes desde metas semanales, con cambios de meta en semanas intermedias; objetivos manuales por colaborador y período, editables en las filas del histórico. Persistencia mediante ajustes de cuenta, sin alterar XLS.
+- Exportación de Histórico individual en PDF (Carta, vertical/horizontal) y PNG con paginación que no omite períodos y configuración visual de título, colores, métricas, promedios y gráfico.
+- Cuatro botones de categorías en navegación: Análisis y resultados, Comisiones, Administración y Configuración; dentro de cada una, una sola línea de pestañas deslizable. Ajustes conserva orden individual y añade cambios de categoría y orden entre categorías. La página principal predeterminada continúa siendo Comparativa diaria.
+- Nuevo almacenamiento sincronizable `wmSamsHistoricalIndividualV253` permitido por Netlify Settings; sin migración SQL. Tests de regresión y V2.5.3 superados. La compilación Vite queda por validar en un ambiente con conexión a NPM.
+
 ## V2.5.2 — Seguimiento administrativo semanal en Logros semanales (13 de noviembre de 2026)
 
 - Rehecha la integración desde V2.5.0; restauradas y preservadas las exportaciones existentes de Calculadora supervisor. Nuevo informe exclusivamente para PDF/PNG de **Logros semanales**.

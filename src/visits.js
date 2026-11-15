@@ -1,3 +1,4 @@
+import {exportFriendlyText} from './import-date.js';
 /* Acuse de visita de coordinación · v2.2.2
    Los filtros, la captura y los cálculos son locales. Solo Guardar visita
    envía un acta a PostgreSQL. La configuración personalizable usa el
@@ -115,17 +116,17 @@ function render(){
  const rows=folioRows(),inci=incidentRows(),sc=score();
  const general=`<div class="visit-grid"><div class="visit-field"><label>Coordinador</label><input readonly value="${esc(config.coordinator)}"></div><div class="visit-field"><label>Fecha de visita</label><input readonly value="${esc(fmt(visit.visitedAt))}"></div>
  <div class="visit-field"><label>${esc(config.labels.module)}</label>${optionSelect('visitModule',modules,visit.module,'Selecciona el módulo')}</div><div class="visit-field"><label>${esc(config.labels.supervisor)}</label>${optionSelect('visitSupervisor',executives,visit.supervisor,'Selecciona un ejecutivo')}</div>
- <div class="visit-field full"><div class="visit-notice">Los módulos y ejecutivos provienen de todos los XLS guardados. Los folios corresponden a la semana actual (lunes a domingo): <b>${fmt(source.mondayOf(visit.visitedAt||today()))} – ${fmt(source.sundayOf(source.mondayOf(visit.visitedAt||today())))}</b>.</div></div></div>`;
+ <div class="visit-field full"><div class="visit-notice">Los módulos y ejecutivos provienen de todos los registros manuales guardados. Los folios corresponden a la semana actual (lunes a domingo): <b>${fmt(source.mondayOf(visit.visitedAt||today()))} – ${fmt(source.sundayOf(source.mondayOf(visit.visitedAt||today())))}</b>.</div></div></div>`;
  const criteria=config.criteria.filter(c=>c.enabled).map((c,i)=>`<div class="visit-card"><div class="visit-card-head">${i+1}. ${esc(c.label)} <span class="visit-muted">· Peso ${scoreFmt(c.weight)}</span></div>${opts(['Cumple','No cumple'],'visitCriterion_'+c.id,visit.sections.checklist[c.id])}</div>`).join('')||'<p class="visit-muted">Agrega criterios desde Ajustes → Visitas de coordinación.</p>';
  const folios=Array.from({length:Math.min(3,rows.length)},(_,i)=>{
    const value=visit.sections.folios[i]||'',sel=rows.find(r=>r.folio===value),old=(visit.sections.folioEvaluations||[]).find(x=>x.folio===value);
    const q=sel?(sel.historyOnly?{pct:old?.quality||0,code:old?.criteria?.code,app:old?.criteria?.app,p0:old?.criteria?.p0,dental:old?.criteria?.dental}:quality(sel)):null;
    const reg=sel?(sel.historyOnly?!!old?.registration:registrationValid(sel)):false;
-   return `<div class="visit-card"><div class="visit-folio-row"><div class="visit-field"><label>Folio ${i+1}</label>${optionSelect('visitFolio'+i,rows.map(r=>r.folio),value,'Selecciona un folio')}</div>${sel?`<b>${q.pct}%</b>`:''}</div>${sel?`<div class="visit-quality-chips"><span class="${reg?'yes':''}">Registro ${reg?'correcto':'incompleto'}</span>${[['code','Código'],['app','APP'],['p0','P0'],['dental','Dental']].map(([k,v])=>`<span class="${q[k]?'yes':''}">${v}: ${q[k]?'Sí':'No'}</span>`).join('')}<span>Calidad ≥ ${config.threshold}%: <b>${q.pct>=config.threshold?'Sí':'No'}</b></span></div><p class="visit-muted">${esc(sel.executive)} · ${sel.hasAppColumn?'APP leída del XLS':'APP: estado predeterminado del Dashboard'}</p>`:''}</div>`;
+   return `<div class="visit-card"><div class="visit-folio-row"><div class="visit-field"><label>Folio ${i+1}</label>${optionSelect('visitFolio'+i,rows.map(r=>r.folio),value,'Selecciona un folio')}</div>${sel?`<b>${q.pct}%</b>`:''}</div>${sel?`<div class="visit-quality-chips"><span class="${reg?'yes':''}">Registro ${reg?'correcto':'incompleto'}</span>${[['code','Código'],['app','APP'],['p0','P0'],['dental','Dental']].map(([k,v])=>`<span class="${q[k]?'yes':''}">${v}: ${q[k]?'Sí':'No'}</span>`).join('')}<span>Calidad ≥ ${config.threshold}%: <b>${q.pct>=config.threshold?'Sí':'No'}</b></span></div><p class="visit-muted">${esc(sel.executive)} · ${sel.hasAppColumn?'APP leída de registros manuales':'APP: estado predeterminado del Dashboard'}</p>`:''}</div>`;
  }).join('')||'<div class="visit-notice">No se encontraron folios con número en la semana actual de este módulo.</div>';
  const incidents=inci.length?inci.map(r=>`<div class="visit-card"><div class="visit-card-head">Folio: ${esc(r.folio)} <span class="visit-muted">· ${esc(r.executive)}</span></div>${opts(['Resuelta','Pendiente'],'visitIncident_'+r.folio,visit.sections.incidents[r.folio])}</div>`).join(''):'<div class="visit-notice">Sin incidencias registradas esta semana. '+(config.noIncidentFullPoints?'Se asignan los puntos completos de la sección.':'La sección queda con cero puntos.')+'</div>';
  const commit=`<div class="visit-grid"><div class="visit-field"><label>Fecha del compromiso</label><input id="visitCommitDate" type="date" value="${esc(visit.sections.commitDate||today())}"></div><div class="visit-field"><label>${esc(config.labels.commit)}</label>${opts(['Si','No','En ceros'],'visitCommit',visit.sections.commitResult)}</div></div><p class="visit-muted">${scoreFmt(configPoints(4))} pts si cumple · 0 pts si no cumple · −${scoreFmt(configPoints(4))} pts en ceros.</p>`;
- $('visitForm').innerHTML=cardSection(0,general)+cardSection(1,criteria)+cardSection(2,`<p class="visit-muted">Elige hasta tres folios. Registro correcto: folio, fecha, módulo y ejecutivo completos; calidad: código, APP, Plan Cero y Plan Dental (25% cada uno), umbral ≥ ${config.threshold}%.</p>${folios}`)+cardSection(3,`<p class="visit-muted">Incidencias de esta semana del módulo, detectadas por la marca de incidencia del Dashboard o la columna del XLS.</p>${incidents}`)+cardSection(4,commit)+`<div class="visit-summary"><div><div class="muted">PUNTUACIÓN TOTAL</div><div class="total" id="visitTotal">${scoreFmt(sc.total)} pts</div></div><span class="muted">${scoreFmt(config.points.reduce((a,b)=>a+(Number(b)||0),0))} pts máximos · salvo penalización</span></div>`;
+ $('visitForm').innerHTML=cardSection(0,general)+cardSection(1,criteria)+cardSection(2,`<p class="visit-muted">Elige hasta tres folios. Registro correcto: folio, fecha, módulo y ejecutivo completos; calidad: código, APP, Plan Cero y Plan Dental (25% cada uno), umbral ≥ ${config.threshold}%.</p>${folios}`)+cardSection(3,`<p class="visit-muted">Incidencias de esta semana del módulo, detectadas por la marca de incidencia del Dashboard o la columna de registros manuales.</p>${incidents}`)+cardSection(4,commit)+`<div class="visit-summary"><div><div class="muted">PUNTUACIÓN TOTAL</div><div class="total" id="visitTotal">${scoreFmt(sc.total)} pts</div></div><span class="muted">${scoreFmt(config.points.reduce((a,b)=>a+(Number(b)||0),0))} pts máximos · salvo penalización</span></div>`;
  // mantener secciones previamente abiertas, recuperables mediante evento externo
  updateScores();
 }
@@ -136,7 +137,7 @@ async function request(path,options={}){
  if(!response.ok)throw Error(data.error||`Error ${response.status}`);return data;
 }
 async function refreshHistory(force=false){
- if(!source.isAuthorized()){$('visitHistoryList').innerHTML='<p class="visit-muted">Sin sesión: puedes preparar y exportar una visita con XLS temporales. Inicia sesión para guardar y consultar el historial en PostgreSQL.</p>';return;}
+ if(!source.isAuthorized()){$('visitHistoryList').innerHTML='<p class="visit-muted">Sin sesión: puedes preparar y exportar una visita con registros manuales temporales. Inicia sesión para guardar y consultar el historial en PostgreSQL.</p>';return;}
  if(loadedOnce&&!force)return;
  try{const data=await request('');history=data.visits||[];loadedOnce=true;historyRender();}
  catch(e){$('visitHistoryList').textContent='No se pudieron recuperar las visitas: '+e.message;}
@@ -294,7 +295,7 @@ async function exportPng(){
    const font=(size=10,bold=false)=>`${bold?'700 ':''}${size}px Arial,Helvetica,sans-serif`;
    function wrap(value,maxWidth,size=9,bold=false){
      x.font=font(size,bold);const result=[];
-     for(const para of String(value??'').split(/\r?\n/)){
+     for(const para of exportFriendlyText(String(value??'')).split(/\r?\n/)){
        if(!para.trim()){result.push('');continue;}
        let line='';
        for(const word of para.trim().split(/\s+/)){
@@ -309,7 +310,7 @@ async function exportPng(){
      }
      return result.length?result:[''];
    }
-   const txt=(s,xx,yy,size=9,bold=false,color=ink,real=false)=>{if(real){x.font=font(size,bold);x.fillStyle=color;x.fillText(String(s),xx,yy);}};
+   const txt=(s,xx,yy,size=9,bold=false,color=ink,real=false)=>{if(real){x.font=font(size,bold);x.fillStyle=color;x.fillText(exportFriendlyText(String(s)),xx,yy);}};
    const lines=(str,xx,yy,maxWidth,size=9,leading=11,bold=false,color=ink,real=false)=>{
      const out=wrap(str,maxWidth,size,bold);if(real)out.forEach((ln,j)=>txt(ln,xx,yy+j*leading+size,size,bold,color,true));return out.length*leading;
    };

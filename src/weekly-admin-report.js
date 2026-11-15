@@ -1,3 +1,4 @@
+import {exportFriendlyText} from './import-date.js';
 /**
  * Informe administrativo de LOGROS SEMANALES (no depende de Calculadora supervisor).
  * Dibuja una hoja carta real (612x792) por cada 50 ventas completadas.
@@ -89,7 +90,7 @@ function paintPage(ctx,model,records,idx,total,assets){
   const text=(x,y,raw,size=8,color=INK,bold=false,align='left',maxW=null)=>{
     ctx.font=`${bold?'bold ':''}${size}px Arial, sans-serif`;
     ctx.fillStyle=color;ctx.textAlign=align;ctx.textBaseline='alphabetic';
-    const full=str(raw);let content=full;
+    const full=exportFriendlyText(str(raw));let content=full;
     if(maxW){while(content.length>1&&ctx.measureText(content).width>maxW)content=content.slice(0,-1);if(content.length<full.length)content=content.slice(0,-1)+'…';}
     ctx.fillText(content,x,H-y);ctx.textAlign='left';
   };

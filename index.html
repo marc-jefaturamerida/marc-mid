@@ -432,6 +432,41 @@ body[data-page="incidents"] #sectionsContainer,body[data-page="incidents"] #quic
 @media(max-width:600px){.settings-section-nav{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px;gap:6px}.settings-section-button{font-size:11px;padding:9px}.weekly-admin-settings-grid,.weekly-admin-toggle-grid{grid-template-columns:1fr}}
 @media print{.settings-section-nav{display:none!important}.achievements-page .ach-print-toggle{display:none!important}}
 .achievements-page .ach-print-toggle{display:none!important}
+
+/* V2.5.4 Histórico individual y grupos navegables */
+.app-groups{display:flex;gap:8px;overflow-x:auto;white-space:nowrap;scrollbar-width:thin;margin:0 0 7px;padding:4px 3px}
+.app-group-btn{flex:none;background:#fff;border:1px solid var(--line);color:var(--blue-deep);border-radius:10px;padding:10px 14px;font-size:12px;font-weight:800;cursor:pointer}
+.app-group-btn.active{background:var(--blue-deep);color:#fff}
+.app-navigation{display:flex!important;flex-wrap:nowrap!important;white-space:nowrap;overflow-x:auto;width:100%!important;max-width:100%;scrollbar-width:thin;overscroll-behavior-inline:contain}
+.app-navigation .app-tab{flex:none!important;white-space:nowrap!important;padding:9px 14px}
+.app-navigation .app-tab[hidden]{display:none!important}
+.history-page[hidden]{display:none!important}.history-page{margin-bottom:28px}
+body[data-page="moduleHistory"] #sectionsContainer,body[data-page="moduleHistory"] #quickFilters,body[data-page="moduleHistory"] #printContext,body[data-page="moduleHistory"] #printRecordsSection,body[data-page="history"] #sectionsContainer,body[data-page="history"] #quickFilters,body[data-page="history"] #printContext,body[data-page="history"] #printRecordsSection{display:none!important}
+.history-heading{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:16px 0}.history-heading h2{margin:0;color:var(--blue-deep);font-size:23px}.history-heading p{font-size:12px;color:var(--sub);max-width:800px}.history-tag{background:#e4eef9;padding:8px;border-radius:8px;color:var(--blue);font-size:11px;font-weight:800;white-space:nowrap}
+.history-controls{background:#fff;border:1px solid var(--line);padding:16px;border-radius:12px;margin-bottom:12px}
+.history-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.history-filters label,.history-settings-grid label{display:grid;gap:5px;font-size:12px;font-weight:700;color:var(--sub)}
+.history-filters select,.history-filters input,.history-settings-grid input,.history-settings-grid select,.history-settings-grid textarea{width:100%;border-radius:8px;border:1px solid #cbd9e6;padding:9px;background:white;color:var(--ink);font:inherit;min-width:0}
+.history-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:12px;flex-wrap:wrap}.history-notice{font-size:11px;color:var(--sub);line-height:1.5;margin:10px 0}
+.history-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:13px 0}.history-kpi{border:1px solid var(--line);background:#fff;padding:13px;border-radius:10px}.history-kpi span{font-size:11px;color:var(--sub);display:block}.history-kpi b{font-size:24px;color:var(--blue-deep);display:block;margin-top:6px}.history-kpi small{font-size:11px;color:var(--sub)}
+.history-averages{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:13px 0}.history-average{border:1px solid #d5e1ed;background:#f0f6fc;padding:13px;border-radius:10px}.history-average strong{font-size:12px;color:var(--blue-deep)}.history-average b{font-size:21px;display:block;color:var(--blue-deep);margin:7px 0}.history-average small{font-size:11px;color:var(--sub);line-height:1.5}
+.history-graph-box,.history-detail{background:#fff;border:1px solid var(--line);border-radius:12px;margin:14px 0;overflow:hidden}.history-box-header{padding:13px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.history-box-header h3{margin:0;color:var(--blue-deep);font-size:16px}.history-box-header span{font-size:11px;color:var(--sub)}.history-chart{overflow-x:auto;padding:14px}.history-chart svg{width:100%;min-width:520px;max-height:260px}
+.history-table-wrap{overflow:auto;max-height:560px}.history-table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}.history-table th,.history-table td{padding:10px 8px;text-align:right;border-bottom:1px solid #e4eaf1}.history-table th:first-child,.history-table td:first-child{text-align:left}.history-table th{background:#eff4fa;position:sticky;top:0}.history-table tbody tr:nth-child(even){background:#f7fafd}.history-table input[type=number]{width:78px;padding:6px;border:1px solid #bccedf;border-radius:6px;text-align:right;color:var(--blue-deep);font:inherit}.history-pagination{display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:10px 15px;font-size:11px;color:var(--sub)}
+.history-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.history-settings-wide{grid-column:1/-1}.history-metric-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:11px 0}.history-metric-choices label{font-size:12px;color:var(--ink);display:flex;gap:6px;align-items:center}.history-metric-choices input{accent-color:var(--blue);width:16px;height:16px}
+.page-order-row select{border:1px solid #cbd9e6;border-radius:7px;background:#fff;padding:6px;min-width:130px}
+@media(max-width:760px){.history-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.history-kpis{grid-template-columns:repeat(2,1fr)}.history-averages{grid-template-columns:1fr}.history-metric-choices{grid-template-columns:repeat(2,1fr)}.history-heading{display:block}.history-tag{display:inline-block}}
+@media(max-width:430px){.history-filters,.history-settings-grid{grid-template-columns:1fr}.history-metric-choices{grid-template-columns:1fr}}
+@media print{.history-page,.app-groups{display:none!important}}
+
+#importDateDialog[hidden]{display:none!important}
+#importDateDialog{position:fixed;inset:0;z-index:1500;background:rgba(5,28,55,.72);display:grid;place-items:center;padding:20px}
+.import-date-card{width:min(480px,100%);max-height:calc(100dvh - 35px);overflow-y:auto;background:#fff;border-radius:16px;padding:24px;box-shadow:0 20px 80px rgba(6,26,50,.3);display:grid;gap:11px}
+.import-date-card h2{margin:0;color:#003b7a}.import-date-filename{font-size:12px;color:#52687e;margin:0;overflow-wrap:anywhere}
+.import-date-card label{font-size:12px;color:#273f59;font-weight:750}
+.import-date-card input[type=date]{display:block;width:100%;padding:12px;height:46px;font:inherit;color:#183553;border-radius:9px;border:1px solid #b5cadb}
+.import-date-help{font-size:12px;color:#61768b;line-height:1.5;margin:0}.import-date-error{font-size:12px;color:#b43d37;min-height:14px;margin:0}
+.import-date-actions{display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+@media(max-width:480px){.import-date-actions{flex-direction:column}.import-date-actions button{width:100%}}
+@media print{#importDateDialog{display:none!important}}
 </style>
 
 <style>
@@ -835,6 +870,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 
 <button class="btn" id="cloudLoginButton" type="button">Ingresar con correo</button><button class="btn" id="cloudSyncButton" type="button" hidden>↻ Sincronizar</button><span class="cloud-session-label" id="cloudSessionLabel" aria-live="polite" title="La nube se consulta al iniciar sesión, al regresar tras una pausa y al sincronizar manualmente">Sin sesión · XLS temporales</span><button class="btn primary" id="chooseXls" type="button">Cargar XLS</button><button class="btn" id="print" type="button">Imprimir / PDF</button><button class="btn" id="exportImage" type="button">Exportar PNG</button><button class="btn" id="export" type="button">Exportar CSV</button><button aria-controls="settingsPanel" aria-expanded="false" class="btn" id="toggleSettings" type="button">⚙ Ajustes</button><input accept=".xls,.xlsx,.csv,.tsv" aria-label="Seleccionar reportes XLS" multiple hidden="" id="xlsInput" type="file"/></div>
 </header>
+<nav class="app-groups" id="appGroupNav" aria-label="Secciones principales"></nav>
 <nav class="app-navigation" role="tablist" aria-label="Vistas de comisiones">
   <button class="app-tab active" type="button" role="tab" aria-selected="true" aria-controls="sectionsContainer" data-page-tab="individual">Calculadora individual</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="teamPage" data-page-tab="team">Comparativo de ejecutivos</button>
@@ -842,11 +878,43 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="accumulatedPage" data-page-tab="accumulated">Acumulado general</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="weeklyPage" data-page-tab="weekly">Comparativa semanal</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="visitPage" data-page-tab="visits">Visitas de coordinación</button>
-  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="allRecordsPage" data-page-tab="allrecords">Registros XLS</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="allRecordsPage" data-page-tab="allrecords">Registros manuales</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="achievementsPage" data-page-tab="achievements">Logros semanales</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="supPage" data-page-tab="supervisor">Calculadora supervisor</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="incidencePage" data-page-tab="incidents">Gestión de incidencias</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="historyPage" data-page-tab="history">Histórico individual</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="moduleHistoryPage" data-page-tab="moduleHistory">Histórico por módulo</button>
 </nav>
+<section class="history-page" id="historyPage" hidden aria-labelledby="historyHeading">
+ <header class="history-heading"><div><div class="eyebrow">ANÁLISIS Y RESULTADOS</div><h2 id="historyHeading">Histórico individual del colaborador</h2><p>Consulta un colaborador a la vez, incluso si cambió de módulo. Los datos proceden de los XLS que conservas y no se crean copias adicionales.</p></div><span class="history-tag">Calidad recalculada</span></header>
+ <div class="history-controls card"><div class="history-filters">
+ <label>Colaborador<select id="histExecutive"><option value="">Selecciona un colaborador</option></select></label>
+ <label>Vista<select id="histPeriod"><option value="day">Por día</option><option value="week">Por semana (lun–dom)</option><option value="month">Por mes natural</option></select></label>
+ <label>Módulo<select id="histModule"><option value="">Todos los módulos</option></select></label>
+ <label>Desde<input type="date" id="histFrom"></label><label>Hasta<input type="date" id="histTo"></label>
+ <label>Promedio de<select id="histWeekday"><option value="all">Todos los días con registros</option><option value="0">Domingos</option><option value="1">Lunes</option><option value="2">Martes</option><option value="3">Miércoles</option><option value="4">Jueves</option><option value="5">Viernes</option><option value="6">Sábados</option></select></label>
+ </div><div class="history-actions"><button type="button" class="btn small" id="histResetFilters">Limpiar filtros</button><button type="button" class="btn small" id="histOpenSettings">Configurar análisis y exportación</button></div></div>
+ <p id="histNotice" class="history-notice" role="status">Selecciona un colaborador para comenzar.</p>
+ <div id="histSummary" class="history-kpis"></div>
+ <div id="histAverages" class="history-averages"></div>
+ <section class="card history-graph-box" id="histChartPanel"><div class="history-box-header"><h3>Evolución histórica</h3><span id="histChartCaption"></span></div><div id="histChart" class="history-chart"></div></section>
+ <section class="card history-detail"><div class="history-box-header"><h3>Histórico detallado</h3><span id="histRowsSummary">—</span></div><div class="history-table-wrap"><table class="history-table"><thead id="histTableHead"></thead><tbody id="histTableBody"></tbody></table></div><div class="history-pagination"><button class="btn small" id="histPrev" type="button">Anterior</button><span id="histPageStatus">—</span><button class="btn small" id="histNext" type="button">Siguiente</button></div><p class="history-notice">Los objetivos automáticos parten de las metas semanales guardadas: día = semana/7; mes = suma diaria de las metas semanales/7. Puedes editar cualquier objetivo desde su fila y restaurarlo dejándolo vacío. Los porcentajes históricos se recalculan con los totales y objetivos, sin promediar porcentajes.</p></section>
+</section>
+<section class="history-page" id="moduleHistoryPage" hidden aria-labelledby="moduleHistoryHeading">
+ <header class="history-heading"><div><div class="eyebrow">ANÁLISIS Y RESULTADOS</div><h2 id="moduleHistoryHeading">Histórico por módulo</h2><p>Analiza los resultados consolidados de un módulo, sus promedios diarios, semanales y mensuales, y la evolución de sus indicadores. Solo usa los XLS disponibles.</p></div><span class="history-tag">Calidad recalculada</span></header>
+ <div class="history-controls card"><div class="history-filters">
+ <label>Módulo<select id="mhExecutive"><option value="">Selecciona un módulo</option></select></label>
+ <label>Vista<select id="mhPeriod"><option value="day">Por día</option><option value="week">Por semana (lun–dom)</option><option value="month">Por mes natural</option></select></label>
+ <label>Ventas de supervisores <select id="mhIncludeSupervisors"><option value="yes">Incluir en el análisis</option><option value="no">Excluir del análisis</option></select></label>
+ <label>Desde<input type="date" id="mhFrom"></label><label>Hasta<input type="date" id="mhTo"></label>
+ <label>Promedio de<select id="mhWeekday"><option value="all">Todos los días con registros</option><option value="0">Domingos</option><option value="1">Lunes</option><option value="2">Martes</option><option value="3">Miércoles</option><option value="4">Jueves</option><option value="5">Viernes</option><option value="6">Sábados</option></select></label>
+ </div><div class="history-actions"><button type="button" class="btn small" id="mhResetFilters">Limpiar filtros</button><button type="button" class="btn small" id="mhOpenSettings">Configurar análisis y exportación</button></div></div>
+ <p id="mhNotice" class="history-notice" role="status">Selecciona un módulo para comenzar.</p>
+ <div id="mhSummary" class="history-kpis"></div>
+ <div id="mhAverages" class="history-averages"></div>
+ <section class="card history-graph-box" id="mhChartPanel"><div class="history-box-header"><h3>Evolución histórica</h3><span id="mhChartCaption"></span></div><div id="mhChart" class="history-chart"></div></section>
+ <section class="card history-detail"><div class="history-box-header"><h3>Histórico detallado</h3><span id="mhRowsSummary">—</span></div><div class="history-table-wrap"><table class="history-table"><thead id="mhTableHead"></thead><tbody id="mhTableBody"></tbody></table></div><div class="history-pagination"><button class="btn small" id="mhPrev" type="button">Anterior</button><span id="mhPageStatus">—</span><button class="btn small" id="mhNext" type="button">Siguiente</button></div><p class="history-notice">Los objetivos automáticos se toman de las metas semanales guardadas del módulo; día = semana/7 y mes = suma de objetivos diarios. Se priorizan las metas de Logros semanales. Puedes editar cualquier objetivo desde su fila y restaurarlo dejándolo vacío. Los porcentajes históricos se recalculan con los totales y objetivos, sin promediar porcentajes.</p></section>
+</section>
 <details class="settings-panel section-card" id="settingsPanel">
 <summary class="settings-panel-title"><span><span class="settings-icon">⚙</span> Ajustes del proyecto</span><small>Elige un apartado para configurar</small></summary>
 <div class="settings-panel-content"><div id="guestSettingsNotice" class="settings-help" hidden role="status" style="margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--blue-soft);font-weight:650">Modo sin sesión: puedes abrir y modificar estas opciones para probar el Dashboard en este dispositivo. No se guardan en Netlify y podrían restablecerse al recargar la página. Inicia sesión para sincronizarlas.</div><div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap"><button class="btn small" id="authLogout" type="button">Cerrar sesión</button><button class="btn primary small" id="saveSettingsAndClose" type="button">Guardar ajustes y cerrar</button><button class="btn small close-settings" id="closeSettings" type="button">Cerrar ajustes ✕</button></div><nav class="settings-section-nav" id="settingsSectionsNav" aria-label="Elegir apartado de Ajustes"></nav><details class="settings-group" id="settingsArchive"><summary class="settings-group-title"><span><span class="settings-number">1</span> Archivos XLS guardados</span></summary><div class="settings-group-body">
@@ -941,9 +1009,42 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 <p id="dynamicBonusStatus" role="status" class="settings-help">Importe inicial: $0.00. Activa las casillas por folio para otorgarlo.</p>
 </div></details>
 
+<details class="settings-group" id="settingsHistoryV253"><summary class="settings-group-title"><span><span class="settings-number">16</span> Histórico individual · análisis, objetivos y exportación</span></summary><div class="settings-group-body">
+<p class="settings-help">Controla el análisis histórico individual y sus exportaciones PDF/PNG. Los objetivos editados en la tabla se guardan por módulo y período para la cuenta actual; los XLS originales permanecen intactos.</p>
+<div class="history-settings-grid">
+<label>Título del reporte<input type="text" id="hsTitle" maxlength="240"></label><label>Subtítulo<input type="text" id="hsSubtitle" maxlength="240"></label>
+<label>Vista inicial<select id="hsPeriod"><option value="day">Día</option><option value="week">Semana</option><option value="month">Mes</option></select></label>
+<label>Promedio por defecto<select id="hsWeekday"><option value="today">Día de la semana al consultar</option><option value="all">Todos los días disponibles</option><option value="0">Domingos</option><option value="1">Lunes</option><option value="2">Martes</option><option value="3">Miércoles</option><option value="4">Jueves</option><option value="5">Viernes</option><option value="6">Sábados</option></select></label>
+<label>Indicador del gráfico<select id="hsChartMetric"></select></label>
+<label>Multiplicador de objetivo semanal predeterminado<input type="number" id="hsMultiplier" min="0.01" max="10" step="0.01"></label>
+<label>Color del reporte<input type="color" id="hsColor"></label>
+<label>Folios históricos por página de exportación<select id="hsRows"><option value="15">15</option><option value="20">20</option><option value="23">23</option><option value="28">28</option><option value="35">35</option></select></label>
+<label>Orientación del PDF<select id="hsOrientation"><option value="portrait">Carta vertical</option><option value="landscape">Carta horizontal</option></select></label>
+<label class="history-settings-wide">Nota inferior del reporte<textarea id="hsNote" maxlength="600" rows="3"></textarea></label></div>
+<p class="settings-help"><strong>Mostrar en pantalla y exportación</strong></p><div id="hsMetricChoices" class="history-metric-choices"></div>
+<div class="history-metric-choices"><label><input type="checkbox" id="hsShowChart"> Gráfico de evolución</label><label><input type="checkbox" id="hsShowSummary"> Indicadores consolidados</label><label><input type="checkbox" id="hsShowAverages"> Promedios día / semana / mes</label><label><input type="checkbox" id="hsShowTable"> Histórico detallado</label><label><input type="checkbox" id="hsShowGoal"> Objetivo por período</label><label><input type="checkbox" id="hsShowModule"> Módulo de cada período</label></div>
+<div class="settings-row-actions"><button type="button" class="btn primary small" id="hsSave">Guardar análisis histórico</button><button type="button" class="btn small" id="hsReset">Restaurar ajustes del análisis</button><button type="button" class="btn small" id="hsClearGoals">Eliminar objetivos históricos personalizados</button></div>
+<p class="settings-help" id="hsStatus" role="status">Sin cambios pendientes.</p></div></details>
+<details class="settings-group" id="settingsModuleHistoryV254"><summary class="settings-group-title"><span><span class="settings-number">17</span> Histórico por módulo · análisis, objetivos y exportación</span></summary><div class="settings-group-body">
+<p class="settings-help">Controla el análisis histórico del módulo y sus exportaciones PDF/PNG. Los objetivos editados en la tabla se guardan por módulo y período para la cuenta actual; los XLS originales permanecen intactos.</p>
+<div class="history-settings-grid">
+<label>Título del reporte<input type="text" id="msTitle" maxlength="240"></label><label>Subtítulo<input type="text" id="msSubtitle" maxlength="240"></label>
+<label>Vista inicial<select id="msPeriod"><option value="day">Día</option><option value="week">Semana</option><option value="month">Mes</option></select></label>
+<label>Promedio por defecto<select id="msWeekday"><option value="today">Día de la semana al consultar</option><option value="all">Todos los días disponibles</option><option value="0">Domingos</option><option value="1">Lunes</option><option value="2">Martes</option><option value="3">Miércoles</option><option value="4">Jueves</option><option value="5">Viernes</option><option value="6">Sábados</option></select></label>
+<label>Indicador del gráfico<select id="msChartMetric"></select></label>
+<label>Multiplicador de objetivo semanal predeterminado<input type="number" id="msMultiplier" min="0.01" max="10" step="0.01"></label>
+<label>Color del reporte<input type="color" id="msColor"></label>
+<label>Folios históricos por página de exportación<select id="msRows"><option value="15">15</option><option value="20">20</option><option value="23">23</option><option value="28">28</option><option value="35">35</option></select></label>
+<label>Orientación del PDF<select id="msOrientation"><option value="portrait">Carta vertical</option><option value="landscape">Carta horizontal</option></select></label>
+<label class="history-settings-wide">Nota inferior del reporte<textarea id="msNote" maxlength="600" rows="3"></textarea></label></div>
+<p class="settings-help"><strong>Mostrar en pantalla y exportación</strong></p><div id="msMetricChoices" class="history-metric-choices"></div>
+<div class="history-metric-choices"><label><input type="checkbox" id="msShowChart"> Gráfico de evolución</label><label><input type="checkbox" id="msShowSummary"> Indicadores consolidados</label><label><input type="checkbox" id="msShowAverages"> Promedios día / semana / mes</label><label><input type="checkbox" id="msShowTable"> Histórico detallado</label><label><input type="checkbox" id="msShowGoal"> Objetivo del módulo por período</label><label><input type="checkbox" id="msShowModule"> Ejecutivos por período</label></div>
+<p class="settings-help">Puedes incluir o excluir ventas de supervisores desde el filtro de la propia página. Los ajustes del módulo se guardan de forma independiente.</p>
+<div class="settings-row-actions"><button type="button" class="btn primary small" id="msSave">Guardar histórico por módulo</button><button type="button" class="btn small" id="msReset">Restaurar ajustes del módulo</button><button type="button" class="btn small" id="msClearGoals">Eliminar objetivos del módulo personalizados</button></div>
+<p class="settings-help" id="msStatus" role="status">Sin cambios pendientes.</p></div></details>
 <details class="settings-group" id="settingsPageOrder"><summary class="settings-group-title"><span><span class="settings-number">14</span> Orden de páginas y página principal</span></summary><div class="settings-group-body">
-<p class="settings-help">Usa las flechas para cambiar la posición de cada página. Marca cuál se abrirá primero. Las preferencias se sincronizan por cuenta cuando inicies sesión.</p>
-<div id="pageOrderList" class="page-order-list"></div><div class="settings-row-actions"><button type="button" class="btn primary small" id="savePageOrder">Guardar orden y página principal</button><button type="button" class="btn small" id="resetPageOrder">Restaurar orden predeterminado</button></div>
+<p class="settings-help">Organiza categorías con botones; puedes cambiar de categoría cada página y ordenar los botones dentro de su grupo. Marca la página principal. Estas preferencias se sincronizan por cuenta.</p>
+<div id="groupOrderList" class="page-order-list"></div><div id="pageOrderList" class="page-order-list"></div><div class="settings-row-actions"><button type="button" class="btn primary small" id="savePageOrder">Guardar orden y página principal</button><button type="button" class="btn small" id="resetPageOrder">Restaurar orden predeterminado</button></div>
 <p class="settings-help" id="pageOrderStatus" role="status">Principal predeterminada: Comparativa diaria.</p>
 </div></details>
 <details class="settings-group" id="settingsWeeklyAdminV252"><summary class="settings-group-title"><span><span class="settings-number">15</span> Seguimiento administrativo semanal · Logros semanales</span></summary><div class="settings-group-body">
@@ -1157,7 +1258,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 
 <section class="all-records-page section-card" id="allRecordsPage" hidden aria-label="Consulta completa de registros XLS">
   <div class="all-records-hero">
-    <div><div class="eyebrow">BASE DE REGISTROS</div><h2>Registros XLS</h2>
+    <div><div class="eyebrow">BASE DE REGISTROS</div><h2>Registros manuales</h2>
     <p>Consulta todas las filas de los XLS activos. Las casillas de Incidencia y APP son editables; los filtros son locales y no generan consultas a Netlify.</p></div>
     <span class="pill" id="allRecordsCount" role="status" aria-live="polite">0 registros</span>
   </div>
@@ -1193,7 +1294,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="all-records-help">Las columnas se muestran según <strong>Ajustes → Tabla de folios</strong>. Incidencia y APP permanecen a la vista para validarlas. Desliza horizontalmente para ver más columnas.</div>
   <div class="table-wrap all-records-table-wrap"><table id="allRecordsTable" class="record-table all-records-table"><thead id="allRecordsHead"></thead><tbody id="allRecordsBody"><tr><td>Importa un XLS para mostrar registros.</td></tr></tbody></table></div>
   <div class="all-records-pagination"><span id="allRecordsPageStatus">0 registros</span><div class="all-records-page-actions"><label for="allRecordsPageSize">Filas por página</label><select id="allRecordsPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" type="button" id="allRecordsPrev">Anterior</button><button class="btn small" type="button" id="allRecordsNext">Siguiente</button></div></div>
-  <footer class="foot">Consulta de registros XLS · Versión 2.5.2</footer>
+  <footer class="foot">Consulta de registros manuales · Versión 2.5.5</footer>
 </section>
 
 
@@ -1219,7 +1320,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
     </div></details>
   </div>
   <p class="sup-footnote">Cálculo informativo. Configura el bono base en Ajustes → 12; los bonos adicionales comienzan en $1,000, $1,500 y $2,000, editables y no acumulables. Guarda los ajustes para sincronizarlos con Netlify; consultar semanas y supervisores no genera escrituras.</p>
-  <footer class="foot">Calculadora de supervisor · Versión 2.5.2</footer>
+  <footer class="foot">Calculadora de supervisor · Versión 2.5.5</footer>
 </section>
 <section id="achievementsPage" class="achievements-page" hidden aria-label="Logros semanales por módulo">
   <div class="achievements-hero">
@@ -1292,7 +1393,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
       <div class="achievements-pager"><span id="achRecordStatus">0 registros</span><div class="achievements-pager-options"><label for="achPageSize">Filas</label><select id="achPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" id="achPrev" type="button">Anterior</button><button class="btn small" id="achNext" type="button">Siguiente</button></div></div>
     </div>
   </details>
-  <footer class="foot">Logros semanales · Versión 2.5.2</footer>
+  <footer class="foot">Logros semanales · Versión 2.5.5</footer>
 </section>
 
 
@@ -1321,14 +1422,14 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 2.5.2</footer>
+  <footer class="foot">Acuse de coordinación · Versión 2.5.5</footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 2.5.2</footer>
+<footer class="foot">Final de la presentacion · Versión 2.5.5</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 
@@ -1337,6 +1438,19 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <button type="button" id="floatPdf">Imprimir / PDF</button><button type="button" id="floatPng">Exportar PNG</button><button type="button" id="floatCsv">Exportar CSV</button>
   <button class="daily-copy-whatsapp" id="dailyCopyWhatsApp" type="button" title="Copiar comparación diaria para WhatsApp" aria-label="Copiar comparativo diario para WhatsApp" hidden disabled>Copiar para WhatsApp</button>
 </div><button class="floating-export-main" id="floatingExportToggle" type="button" aria-expanded="false" aria-controls="floatingExportMenu">Exportar ▴</button></div>
+
+<div id="importDateDialog" class="import-date-dialog" role="dialog" aria-modal="true" aria-labelledby="importDateHeading" hidden>
+  <form id="importDateForm" class="import-date-card">
+    <div class="eyebrow">IDENTIFICACIÓN DEL ARCHIVO</div>
+    <h2 id="importDateHeading">Selecciona la fecha del archivo</h2>
+    <p id="importDateFile" class="import-date-filename"></p>
+    <label for="importDateValue">Fecha que aparecerá como nombre del archivo</label>
+    <input id="importDateValue" type="date" required />
+    <p class="import-date-help">Se guardará con el nombre AAAA-MM-DD. La fecha solo identifica al archivo; no cambia las fechas de los registros internos.</p>
+    <p id="importDateError" class="import-date-error" role="alert"></p>
+    <div class="import-date-actions"><button id="importDateCancel" class="btn" type="button">Cancelar este archivo</button><button class="btn primary" type="submit">Confirmar fecha y cargar</button></div>
+  </form>
+</div>
 <div id="xlsMondayReminder" role="dialog" aria-modal="true" aria-labelledby="mondayHeading" hidden><div class="monday-card"><div class="eyebrow">RECORDATORIO SEMANAL</div><h2 id="mondayHeading">Hoy es lunes: actualiza los XLS</h2><p>Revisa y carga los archivos XLS de todos los módulos para mantener actualizados los reportes y comisiones. Las incidencias se conservan en su base independiente, aunque reemplaces archivos.</p><div class="monday-actions"><button type="button" class="btn" id="mondayDismiss">Entendido</button><button type="button" class="btn primary" id="mondayUpload">Cargar XLS ahora</button></div></div></div>
 <div class="auth-modal" id="cloudModal" hidden role="dialog" aria-modal="true" aria-labelledby="cloudModalTitle">
   <div class="auth-card cloud-auth-card">

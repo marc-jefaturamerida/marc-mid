@@ -1,3 +1,40 @@
+## Novedad V2.5.5 — Fecha al cargar y textos de exportación
+
+Al seleccionar archivos XLS/XLSX/CSV/TSV aparecerá un calendario **por archivo**. La fecha elegida (AAAA-MM-DD) será su nombre visible, sin modificar las fechas de los registros. Cancelar la ventana omite solamente el archivo actual. Es posible cargar archivos diferentes con la misma fecha; se distinguen internamente por identificador y huella del contenido. Los archivos antiguos mantienen el nombre anterior. En el PDF/PNG los textos de referencias al formato XLS/XLSX se muestran como «registros manuales». No se alteró el lector de archivos ni las fórmulas.
+
+## Publicación V2.5.5 — Histórico por módulo
+
+1. Este ZIP incluye **todo el proyecto V2.5.3** más la nueva página. Sustituye el contenido del repositorio completo (no solo `index.html`).
+2. En Termux, dentro de `~/marc-mid`, descomprime el ZIP en la raíz, confirma los archivos y ejecuta:
+   ```bash
+   git add -A
+   git commit -m "INVEX V2.5.5 historico por modulo"
+   git push origin HEAD
+   ```
+3. Netlify debe compilar con `npm run build`, directorio `dist`. No se requieren migraciones adicionales, ni volver a cargar los XLS.
+4. Abre **Análisis y resultados → Histórico por módulo**; selecciona módulo y revisa fechas, promedios y objetivo automático. Si no hay objetivo guardado, edítalo en la tabla.
+5. Para ajustar el reporte, entra a **Ajustes → Histórico por módulo**. Los cambios se sincronizan por cuenta; son independientes de Histórico individual.
+6. Usa **Exportar → Imprimir/PDF** (Carta) o **Exportar PNG**. Si hay muchos períodos se crean las hojas necesarias, sin omitir filas.
+7. Verifica los números de un módulo con varios colaboradores y de otro con ventas de supervisor, y prueba PDF/PNG en el navegador publicado.
+
+**Nota:** se conservaron las 11 páginas anteriores y se añadió una duodécima, sin cambios a comisiones, incidencias ni reportes administrativos.
+
+---
+
+## Publicación V2.5.3 · Histórico individual y grupos de navegación
+
+1. **Trabaja sobre la V2.5.2:** este ZIP ya incluye todas sus páginas, exportaciones e incidencias.
+2. Descomprime el ZIP en la raíz de tu repositorio GitHub, donde están `index.html`, `package.json`, `src/`, `public/`, `netlify/` y `tests/`.
+3. En Termux: `cd ~/marc-mid && git add -A && git commit -m "INVEX V2.5.3 historico individual" && git push origin HEAD`.
+4. Revisa el despliegue de Netlify. Build `npm run build`, directorio de salida `dist`. La actualización no añade migración SQL.
+5. Entra con tu correo, selecciona **Análisis y resultados → Histórico individual**, un ejecutivo y la vista día/semana/mes. Si cambió de módulo, el filtro «Todos los módulos» incluye todo el historial disponible.
+6. Abre **Ajustes → Histórico individual** para editar las métricas, visualización, objetivos y exportación. En **Ajustes → Orden de páginas** personaliza categorías y página de inicio.
+7. Desde el menú flotante, exporta PDF/PNG; el PDF debe imprimirse en **Carta**. Contrasta objetivos y promedios con los XLS de tu cuenta. Los períodos sin registros no se promedian.
+
+**Importante:** eliminar un XLS elimina sus datos del análisis histórico (sin snapshot adicional), pero **no elimina** incidencias guardadas por folio en su tabla permanente. Conserva las copias originales de los XLS para respaldo. Esta entrega no cambia cálculos de pago.
+
+---
+
 ## Publicar V2.5.2 — Exportación administrativa desde Logros semanales
 
 La base es **V2.5.0**; NO se utilizó el código de exportación de supervisor de V2.5.1. El nuevo reporte PDF/PNG pertenece exclusivamente a **Logros semanales**. Incluye 15 botones de Ajustes y la plantilla administrativa personalizable (Ajustes → 15).

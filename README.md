@@ -1,3 +1,58 @@
+## Novedad V2.5.5 — Fecha al cargar y textos de exportación
+
+Al seleccionar archivos XLS/XLSX/CSV/TSV aparecerá un calendario **por archivo**. La fecha elegida (AAAA-MM-DD) será su nombre visible, sin modificar las fechas de los registros. Cancelar la ventana omite solamente el archivo actual. Es posible cargar archivos diferentes con la misma fecha; se distinguen internamente por identificador y huella del contenido. Los archivos antiguos mantienen el nombre anterior. En el PDF/PNG los textos de referencias al formato XLS/XLSX se muestran como «registros manuales». No se alteró el lector de archivos ni las fórmulas.
+
+# V2.5.5 — Histórico por módulo con promedios y exportación
+
+**Base:** proyecto completo V2.5.3. Esta actualización añade la página **Histórico por módulo** dentro de **Análisis y resultados**. Conserva Histórico individual, todas las calculadoras, Logros semanales, incidencias, reportes, navegación, XLS y autenticación. La página principal permanece en Comparativa diaria, salvo que el usuario haya cambiado esta preferencia.
+
+### Consultar la evolución de un módulo
+
+- Selecciona **Análisis y resultados → Histórico por módulo**, el módulo y la vista diaria, semanal (lunes–domingo) o mensual. Los filtros de fechas y de día de la semana (por ejemplo, todos los domingos) funcionan igual que en Histórico individual.
+- La página reúne **los registros de los colaboradores del módulo**, con nueve indicadores: Registros, Ventas, Regulares, Garantizadas, Programa Cero, Plan Dental, APP, Calidad Total y Alcance Global. El análisis puede incluir/excluir registros de supervisores mediante un selector; predeterminado: incluidos. Esta opción modifica los conteos analizados, sin cambiar el objetivo semanal del equipo.
+- Se muestran **promedios por día de la semana, semana y mes solo entre períodos con registros**. Calidad Total y Alcance Global se recalculan a partir de cantidades y objetivos acumulados, no de un promedio de porcentajes. El algoritmo de calidades es el mismo del histórico individual; los umbrales corresponden a la configuración de calidad del módulo.
+- **Objetivo semanal, prioridad:** objetivos de ventas de *Logros semanales* guardados para esa semana y módulo; después objetivo semanal configurado en Calidad del módulo; después objetivo del supervisor; en último término la suma de objetivos de los ejecutivos del módulo con registros esa semana. Si faltan todas esas referencias, se muestra advertencia y puedes fijar la meta manualmente sin inventar un dato. El día utiliza semana/7; el mes suma los objetivos diarios de su calendario.
+- **Objetivos personalizados** por módulo/día, módulo/semana o módulo/mes. Se editan directamente en la tabla; al dejar el campo vacío se recupera el automático. Se guardan en una preferencia independiente de la de los colaboradores.
+- **Exportación PDF/PNG:** menú flotante Exportar. PDF en **Carta** con orientación vertical/horizontal, PNG paginados de alta resolución; todas las filas se incluyen. Puedes elegir los indicadores visibles, gráfico, colores, textos y filas por página. Se permite mostrar la lista de ejecutivos por período (oculta por defecto para preservar legibilidad en carta). No se crea ni se necesita CSV.
+- **Ajustes → Histórico por módulo:** configuración separada de Histórico individual. Permite modificar títulos, subtítulos, nota inferior, métricas, gráfico, período inicial, día de comparación predeterminado, multiplicador de metas semanales, orientación, color, filas por página, secciones visibles y metas por período. Las preferencias se sincronizan por cuenta con la clave `wmSamsHistoricalModuleV254` en Netlify Settings.
+- Se utilizarán **únicamente los XLS disponibles** en la cuenta/sesión. Si se elimina uno, cambiarán los históricos. No se agregan tablas ni migraciones SQL.
+
+**Validación:** `npm run check` y `npm test` incluyen pruebas V2.5.5 de aislamiento de módulos, supervisores, objetivos, promedios, calidades, HTML y paginación PDF/PNG. La instalación de dependencias y la compilación `npm run build` deben confirmarse en Netlify, al igual que la impresión final en navegador.
+
+---
+
+# V2.5.3 — Histórico individual, promedios recalculados y navegación agrupada
+
+**Base técnica:** proyecto completo V2.5.2. Se conservan la exportación administrativa de Logros semanales, la Calculadora supervisor, las 10 pantallas anteriores, los cálculos, los XLS y las incidencias persistentes. La V2.5.3 añade la página **Histórico individual** (11 páginas en total) y cuatro categorías superiores de navegación: Análisis y resultados, Comisiones, Administración y Configuración. La página principal inicial sigue siendo **Comparativa diaria**.
+
+### Analizar un colaborador
+
+- Abre **Análisis y resultados → Histórico individual**. Elige colaborador, vista (día, semana lunes–domingo o mes natural), período de fechas y, si quieres, un módulo. Por defecto se combina **todo el historial de ese colaborador aunque haya trabajado en varios módulos**; el filtro por módulo restringe solo el análisis de esa consulta.
+- Se muestran los **nueve indicadores confirmados**: Registros, Ventas, Regulares, Garantizadas, Programa Cero, Plan Dental, Activaciones APP, Calidad Total y Alcance Global. Puedes ocultar indicadores y cambiar el gráfico en Ajustes.
+- El promedio del día de consulta se puede cambiar a domingo/lunes/etc. Se divide entre **fechas de ese día de la semana con registros**, nunca entre fechas sin XLS. Promedios semanales y mensuales también consideran solo semanas y meses con datos.
+- **Calidad Total y Alcance Global se recalculan con cantidades y objetivos agregados**, no se calcula el promedio de porcentajes ya calculados. Se respetan mínimos configurados (60% inicialmente), topes de Primera Compra y APP al 100%, Calidad Total hasta 100%, y Cumplimiento/Programa Cero/Alcance Global sin tope. Primera Compra se deduce sin doble conteo de ventas que tienen P0 o Dental.
+- La meta diaria automática es el **objetivo semanal / 7**, la semanal el objetivo guardado para esa semana y la mensual la **suma de las metas diarias de todos los días calendario del mes**. Si el objetivo semanal cambia durante el mes, el prorrateo toma el de la semana que corresponde a cada fecha. Se admite multiplicador general editable en Ajustes.
+- Para cambiar un objetivo de un día, semana o mes, escribe el nuevo importe en su fila de Histórico individual. Un campo vacío restaura el objetivo automático. Cada modificación se guarda por **colaborador + nivel de período + fecha de período**, sin alterar los XLS ni los objetivos semanales base. Los objetivos históricos editados se guardan por cuenta y se sincronizan usando la nueva clave `wmSamsHistoricalIndividualV253`.
+- Si eliminas XLS, **el histórico y sus promedios cambian**. No se mantiene snapshot independiente, según la decisión de usar únicamente los archivos disponibles.
+
+### PDF / PNG y control en Ajustes
+
+- En Histórico individual, el menú flotante **Exportar** ofrece PDF (impresión del navegador con tamaño **Carta**) y PNG, con la vista y filtros aplicados. El CSV se oculta para esta página por decisión de exportar solo PDF/PNG.
+- Para imprimir PDF, selecciona «Guardar como PDF», con hojas Carta y sin encabezados/pies automáticos del navegador. Los registros históricos se distribuyen entre las páginas necesarias; la primera reserva espacio para los indicadores, promedios y gráfico cuando están habilitados.
+- **Ajustes → Histórico individual:** título, subtítulo, nota, métricas visibles, indicador y visibilidad del gráfico, objetivos, multiplicador, período/día inicial, orientación Carta vertical/horizontal, cantidad de registros por hoja, color, visibilidad de los KPI, promedios, tabla, meta y módulos. Todos los datos se calculan en el navegador; solo los XLS y preferencias existentes se sincronizan con Netlify.
+- **Ajustes → Orden de páginas:** permite reordenar categorías mediante flechas, reasignar páginas a categorías, ordenarlas dentro de cada una y cambiar la página principal. La cuarta categoría, Configuración, abre Ajustes.
+
+### Instalación y verificación
+
+1. Reemplaza **todos** los archivos y carpetas en la raíz del repositorio GitHub con este ZIP (no solo `index.html`).
+2. Ejecuta `npm install`, `npm run check` y `npm test` si tu entorno tiene acceso a los paquetes; Netlify debe usar `npm run build` y publicar `dist`.
+3. No hay nueva migración PostgreSQL ni necesidad de reimportar XLS. `netlify/functions/settings.js` y `src/cloud-boot.js` incorporan la nueva preferencia sincronizada.
+4. Verifica los cálculos para un domingo concreto, un mes con metas semanales cambiantes y un empleado que haya cambiado de módulo. Después imprime PDF/PNG con bastantes períodos para comprobar las páginas en tu navegador real.
+
+**Validaciones efectuadas:** se aprobaron los tests de regresión V2.5.0/V2.5.2 y los tests nuevos del motor histórico, promedios, mínimos, calidad recalculada, objetivos, impresión y paginación PNG. Una exportación de muestra se inspeccionó en PDF Carta mediante un renderizador de respaldo. El entorno actual no permitió instalar dependencias NPM (`EAI_AGAIN`), de modo que la compilación Vite y pruebas del despliegue Netlify quedan pendientes. Chromium tampoco completó la impresión local; comprueba el diálogo real en el navegador tras publicar.
+
+---
+
 # V2.5.2 — Seguimiento administrativo semanal desde Logros semanales
 
 **Base de esta versión: V2.5.0.** No se tomó la exportación de supervisor de V2.5.1. Las exportaciones PDF y PNG de **Logros semanales** producen ahora un formulario de **Seguimiento administrativo semanal**, carta vertical, con logotipos y firma originales de Visitas de coordinación; las demás páginas mantienen sus exportaciones.

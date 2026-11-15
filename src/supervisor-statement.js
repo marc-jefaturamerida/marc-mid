@@ -1,3 +1,4 @@
+import {exportFriendlyText} from './import-date.js';
 /* V2.4.7 · Exportación de estado de comisión del supervisor.
    Modelo único compartido por la vista para imprimir/PDF y la imagen PNG.
    No calcula de nuevo las comisiones: siempre utiliza supervisorCalculator(). */
@@ -91,7 +92,7 @@ const titleMap={factors:'1 · Indicadores del equipo',bonuses:'2 · Bono y total
 const mkTable=(key,rows)=>`<table class="ss-table ss-${key}"><colgroup>${widths[key].map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead><tr>${headers[key].map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr class="${row.kind==='pay'?'ss-pay':row.kind==='total'?'ss-total':''}">${row.cells.map(cell=>`<td>${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 const section=(key,rows,title)=>`<section class="ss-section ss-section-${key}" data-report-section="ss-${key}"><h2>${esc(title||titleMap[key])}</h2>${mkTable(key,rows)}</section>`;
 export function supervisorStatementHtml(m){
-  if(!m.ready)return '<div id="printPage" class="report-page"><p>Selecciona un supervisor e importa XLS para exportar el reporte.</p></div>';
+  if(!m.ready)return '<div id="printPage" class="report-page"><p>Selecciona un supervisor e carga registros manuales para exportar el reporte.</p></div>';
   const p=m.printed;
   return `<div id="printPage" class="report-page supervisor-statement">
     <header class="ss-banner"><div><h1>Estado de comisión · Supervisor</h1><p>Semana ${esc(m.weekLabel)}</p></div><strong>Nómina semanal</strong></header>
@@ -160,9 +161,9 @@ export function paintSupervisorStatement(ctx,draw,m){
   let y=25;
   const font=(size=11,bold=false)=>`${bold?'bold ':''}${size}px Arial, sans-serif`;
   const rect=(x,z,w,h,c)=>{if(!draw)return;ctx.fillStyle=c;ctx.fillRect(x,z,w,h);};
-  const text=(s,x,z,size=11,bold=false,c=ink,align='left')=>{if(!draw)return;ctx.font=font(size,bold);ctx.fillStyle=c;ctx.textAlign=align;ctx.textBaseline='top';ctx.fillText(String(s??''),x,z);ctx.textAlign='left';};
+  const text=(s,x,z,size=11,bold=false,c=ink,align='left')=>{if(!draw)return;ctx.font=font(size,bold);ctx.fillStyle=c;ctx.textAlign=align;ctx.textBaseline='top';ctx.fillText(exportFriendlyText(String(s??'')),x,z);ctx.textAlign='left';};
   function wrap(s,max,size=10,bold=false){
-    ctx.font=font(size,bold);const parts=String(s??'').split(/\s+/).filter(Boolean);const lines=[];let line='';
+    ctx.font=font(size,bold);const parts=exportFriendlyText(String(s??'')).split(/\s+/).filter(Boolean);const lines=[];let line='';
     for(let word of parts){
       let next=line?line+' '+word:word;
       if(ctx.measureText(next).width<=max){line=next;continue;}
