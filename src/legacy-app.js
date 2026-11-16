@@ -1,4 +1,8 @@
+import {initSettingsTransfer} from './settings-transfer.js';
+import {analyzeImportPreview} from './import-preview.js';
+import {initReminders} from './reminders.js';
 import {RECORD_EDITS_KEY,cleanRecordEdits,overlayRecord,validateRecordFields,EDITABLE_RECORD_FIELDS} from './record-overrides.js';
+import {TEAM_REGISTRY_KEY,cleanTeamRegistry,registryEntry,registryRowEligible,registryNames,registryUpdate,registryGoalAt} from './team-registry.js';
 import {BASE_GOALS_KEY,BASE_METRICS,BASE_TYPES,BASE_RATE_DEFAULTS,isBasePercentage,cleanBaseGoals,upsertBaseGoals,effectiveBaseGoal,headquartersGoal,knownBaseProfiles,mondayISO,normalizeName} from './base-goals.js';
 import {LEADERSHIP_KEY,LEADERSHIP_DEFAULTS,cleanLeadershipSettings,leadershipRange,analyzeLeadership,LEADERSHIP_METRICS,LEADERSHIP_METRIC_LABELS,leadershipTargetGoal,leadershipModuleKey,leadershipWeeklyKey} from './leadership-dashboard.js';
 import {leadershipReportHtml,LEADERSHIP_PRINT_CSS,leadershipPngPages} from './leadership-export.js';
@@ -46,7 +50,7 @@ import {WEEKLY_ADMIN_DEFAULTS,WEEKLY_ADMIN_STORAGE,cleanWeeklyAdminSettings,prel
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='2.6.0';
+  const APP_VERSION='2.7.0';
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -100,28 +104,37 @@ const teamGoals=loadTeamStore(TEAM_GOALS_STORAGE),teamRecoveries=loadTeamStore(T
 function readWeeklyAdminPrefs(){try{return cleanWeeklyAdminSettings(JSON.parse(localStorage.getItem(WEEKLY_ADMIN_STORAGE)||'null'));}catch(_){return cleanWeeklyAdminSettings(null);}}
 let weeklyAdminPrefs=readWeeklyAdminPrefs();
 const PAGE_NAV_KEY='wmSamsNavOrderV250';
-const DEFAULT_PAGE_ORDER=['leadership','daily','history','moduleHistory','individual','team','supervisor','incidents','allrecords','achievements','accumulated','weekly','visits'];
+const DEFAULT_PAGE_ORDER=['leadership','daily','history','moduleHistory','individual','team','supervisor','incidents','reminders','allrecords','achievements','accumulated','weekly','visits'];
 const GROUP_LABELS={analysis:'Análisis y resultados',commissions:'Comisiones',administration:'Administración',settings:'Configuración'};
 const GROUP_DEFAULT=['analysis','commissions','administration','settings'];
-const DEFAULT_GROUP_MAP={leadership:'analysis',daily:'analysis',history:'analysis',moduleHistory:'analysis',team:'analysis',achievements:'analysis',accumulated:'analysis',weekly:'analysis',individual:'commissions',supervisor:'commissions',allrecords:'administration',incidents:'administration',visits:'administration'};
-const PAGE_LABELS={leadership:'Dashboard de Jefatura',daily:'Comparativa diaria',individual:'Calculadora individual',team:'Comparativo de ejecutivos',supervisor:'Calculadora supervisor',incidents:'Gestión de incidencias',allrecords:'Registros manuales',achievements:'Logros semanales',accumulated:'Acumulado general',weekly:'Comparativa semanal',visits:'Visitas de coordinación',history:'Histórico individual',moduleHistory:'Histórico por módulo'};
+const DEFAULT_GROUP_MAP={leadership:'analysis',daily:'analysis',history:'analysis',moduleHistory:'analysis',team:'analysis',achievements:'analysis',accumulated:'analysis',weekly:'analysis',individual:'commissions',supervisor:'commissions',allrecords:'administration',incidents:'administration',reminders:'administration',visits:'administration'};
+const PAGE_LABELS={leadership:'Dashboard de Jefatura',daily:'Comparativa diaria',individual:'Calculadora individual',team:'Comparativo de ejecutivos',supervisor:'Calculadora supervisor',incidents:'Gestión de incidencias',reminders:'Recordatorios',allrecords:'Registros manuales',achievements:'Logros semanales',accumulated:'Acumulado general',weekly:'Comparativa semanal',visits:'Visitas de coordinación',history:'Histórico individual',moduleHistory:'Histórico por módulo'};
 function validNavSettings(value){
-  const arr=Array.isArray(value?.order)?value.order:[],unique=[...new Set(arr.filter(k=>DEFAULT_PAGE_ORDER.includes(k)))];
-  const order=[...unique,...DEFAULT_PAGE_ORDER.filter(k=>!unique.includes(k))];
-  const rawGroups=Array.isArray(value?.groupOrder)?value.groupOrder:[];
-  const groupOrder=[...new Set(rawGroups.filter(g=>GROUP_DEFAULT.includes(g))),...GROUP_DEFAULT.filter(g=>!rawGroups.includes(g))];
-  const groupBy={...DEFAULT_GROUP_MAP};
-  if(value?.groupBy&&typeof value.groupBy==='object')for(const page of DEFAULT_PAGE_ORDER){
-    if(['analysis','commissions','administration'].includes(value.groupBy[page]))groupBy[page]=value.groupBy[page];
-  }
-  const oldDefault=Array.isArray(value?.order)&&!value.order.includes('leadership')&&value?.home==='daily';
-  return {order,groupOrder,groupBy,home:oldDefault?'leadership':DEFAULT_PAGE_ORDER.includes(value?.home)?value.home:'leadership'};
+ const arr=Array.isArray(value?.order)?value.order:[],unique=[...new Set(arr.filter(k=>DEFAULT_PAGE_ORDER.includes(k)))];
+ const order=[...unique,...DEFAULT_PAGE_ORDER.filter(k=>!unique.includes(k))];
+ const customIds=(Array.isArray(value?.groupOrder)?value.groupOrder:[]).filter(g=>/^custom_[a-z0-9]{4,24}$/.test(g)).slice(0,16);
+ const groups=[...GROUP_DEFAULT,...new Set(customIds)];
+ const rawGroups=Array.isArray(value?.groupOrder)?value.groupOrder:[];
+ const deleted=Array.isArray(value?.deletedGroups)?value.deletedGroups.filter(g=>GROUP_DEFAULT.includes(g)&&g!=='settings'):[];
+ const groupOrder=[...new Set(rawGroups.filter(g=>groups.includes(g)&&!deleted.includes(g))),...GROUP_DEFAULT.filter(g=>!deleted.includes(g)&&!rawGroups.includes(g))];
+ const groupBy={...DEFAULT_GROUP_MAP};
+ if(value?.groupBy&&typeof value.groupBy==='object')for(const page of DEFAULT_PAGE_ORDER){if(groupOrder.includes(value.groupBy[page])&&value.groupBy[page]!=='settings')groupBy[page]=value.groupBy[page];}
+ const groupTitles={};for(const g of groupOrder){const n=value?.groupTitles?.[g];if(typeof n==='string'&&n.trim()&&n.trim().length<=80)groupTitles[g]=n.trim();}
+ const pageTitles={};for(const p of DEFAULT_PAGE_ORDER){const n=value?.pageTitles?.[p];if(typeof n==='string'&&n.trim()&&n.trim().length<=80)pageTitles[p]=n.trim();}
+ const oldDefault=Array.isArray(value?.order)&&!value.order.includes('leadership')&&value?.home==='daily';
+ return {order,groupOrder,groupBy,groupTitles,pageTitles,deletedGroups:deleted,home:oldDefault?'leadership':DEFAULT_PAGE_ORDER.includes(value?.home)?value.home:'leadership'};
 }
+function navGroupLabel(g){return pageNavigation.groupTitles?.[g]||GROUP_LABELS[g]||'Nueva sección';}
+function navPageLabel(p){return pageNavigation.pageTitles?.[p]||PAGE_LABELS[p]||p;}
 function loadNavSettings(){try{return validNavSettings(JSON.parse(localStorage.getItem(PAGE_NAV_KEY)||'null'));}catch(_){return validNavSettings(null);}}
 let pageNavigation=loadNavSettings();
 function readLeadershipPrefs(){try{return cleanLeadershipSettings(JSON.parse(localStorage.getItem(LEADERSHIP_KEY)||'null'));}catch(_){return cleanLeadershipSettings(null);}}
 let leadershipPrefs=readLeadershipPrefs(),leadershipSnapshot=null;
 let baseGoals=readBaseGoals();
+let teamRegistry=readTeamRegistry();
+function readTeamRegistry(){try{return cleanTeamRegistry(JSON.parse(localStorage.getItem(TEAM_REGISTRY_KEY)||'null'));}catch(_){return cleanTeamRegistry(null);}}
+function persistTeamRegistry(){localStorage.setItem(TEAM_REGISTRY_KEY,JSON.stringify(teamRegistry));combinedArchiveCache.clear();moduleProfileCache=null;}
+
 function readBaseGoals(){try{return cleanBaseGoals(JSON.parse(localStorage.getItem(BASE_GOALS_KEY)||'null'));}catch(_){return cleanBaseGoals(null);}}
 function saveBaseGoals(){localStorage.setItem(BASE_GOALS_KEY,JSON.stringify(baseGoals));}
 function resolveAnalysisGoal(type,name,week,metric='sales',fallback=null){
@@ -163,7 +176,7 @@ let incidentLoaded=false, incidentLoading=false, incidentPageIndex=1;
 
 function loadTeamStore(key){try{const v=JSON.parse(localStorage.getItem(key)||'{}');return v&&typeof v==='object'&&!Array.isArray(v)?v:{}}catch(_){return {}}}
 function teamKey(week,name){return `${week}::${name}`;}
-function executiveGoal(week,name){const n=teamGoals[teamKey(week,name)];return Number.isInteger(n)&&n>0?n:qualityConfig.execWeeklyGoal;}
+function executiveGoal(week,name){const n=teamGoals[teamKey(week,name)];if(Number.isInteger(n)&&n>0)return n;const base=effectiveBaseGoal(baseGoals,'executive',name,week,'sales').value;if(base>0)return base;const reg=registryEntry(teamRegistry,'executives',name);return registryGoalAt(reg,week)||qualityConfig.execWeeklyGoal;}
 function executiveRecovery(week,name){const n=teamRecoveries[teamKey(week,name)];return Number.isFinite(n)&&n>=0?n:0;}
 function setExecutiveGoal(week,name,goal){if(Number.isInteger(goal)&&goal>=1){teamGoals[teamKey(week,name)]=goal;try{localStorage.setItem(TEAM_GOALS_STORAGE,JSON.stringify(teamGoals))}catch(_){}}}
 function setExecutiveRecovery(week,name,recover){if(Number.isFinite(recover)&&recover>=0){teamRecoveries[teamKey(week,name)]=recover;try{localStorage.setItem(TEAM_RECOVERY_STORAGE,JSON.stringify(teamRecoveries))}catch(_){}}}
@@ -523,24 +536,26 @@ function renderIncidencePage(){
   list.innerHTML=visible.map(r=>{
     const comments=Array.isArray(r.comments)?r.comments:[];
     const commentsText=comments.slice(-2).map(c=>`<div>${esc(c.text||'')}<small class="inc-muted"> · ${esc(incidentLocalDate(c.createdAt))}</small></div>`).join('')||'<span class="inc-muted">Sin comentarios</span>';
-    return `<tr><td><b>${esc(r.folio)}</b></td><td>${esc(r.module||'—')}<div class="inc-muted">${esc(r.executive||'—')}</div></td><td><span class="inc-tag ${r.active?'warn':'good'}">${r.active?'Activa':'Inactiva'}</span></td><td><span class="inc-tag ${r.resolved?'good':'warn'}">${r.resolved?'Resuelta':'Pendiente'}</span></td><td><div class="inc-comments">${commentsText}</div>${comments.length>2?`<small class="inc-muted">${comments.length} comentarios en total</small>`:''}</td><td>${esc(incidentLocalDate(r.updated_at))}</td><td><button type="button" data-edit-incident="${esc(r.folio_key)}">Ver / editar</button></td></tr>`;
+    return `<tr tabindex="0" role="button" aria-label="Ver incidencia ${esc(r.folio)}" data-incident-row="${esc(r.folio_key)}"><td data-label="Folio"><b>${esc(r.folio)}</b></td><td data-label="Módulo / ejecutivo">${esc(r.module||'—')}<div class="inc-muted">${esc(r.executive||'—')}</div></td><td data-label="Incidencia"><span class="inc-tag ${r.active?'warn':'good'}">${r.active?'Activa':'Inactiva'}</span></td><td data-label="Resolución"><span class="inc-tag ${r.resolved?'good':'warn'}">${r.resolved?'Resuelta':'Pendiente'}</span></td><td data-label="Comentarios"><div class="inc-comments">${commentsText}</div>${comments.length>2?`<small class="inc-muted">${comments.length} comentarios en total</small>`:''}</td><td data-label="Último cambio">${esc(incidentLocalDate(r.updated_at))}</td><td data-label="Acción"><button type="button" data-edit-incident="${esc(r.folio_key)}">Ver detalle</button></td></tr>`;
   }).join('')||`<tr><td colspan="7">${locked?'Inicia sesión para consultar incidencias permanentes.':'No hay incidencias para estos filtros.'}</td></tr>`;
   if(!incidentLoading)incidentStatus(locked?'Inicia sesión para guardar y consultar incidencias en PostgreSQL.':`${found.length} de ${rows.length} registros mostrados. Los folios existen aunque no estén en ningún XLS.`);
 }
 function resetIncidentForm(){
-  for(const id of ['incFolio','incModule','incExecutive','incComment'])el(id).value='';
+  for(const id of ['incFolio','incComment'])el(id).value='';
+  activeCatalogSelect('incModule','modules','','Seleccionar módulo activo');activeCatalogSelect('incExecutive','executives','','Seleccionar ejecutivo activo');
   el('incFolio').readOnly=false;el('incActive').checked=true;el('incResolved').checked=false;el('incHistory').innerHTML='';
   el('incFormTitle').textContent='Registrar o actualizar incidencia';el('incFormStatus').textContent='Nueva incidencia por folio.';
 }
 function editIncident(key){
   const record=incidentRecords.get(key);if(!record)return;
+  el('incDetailOverlay').hidden=true;el('incFormPanel').hidden=false;
   el('incFolio').value=record.folio;el('incFolio').readOnly=true;
-  el('incModule').value=record.module||'';el('incExecutive').value=record.executive||'';
+  activeCatalogSelect('incModule','modules',record.module||'','Seleccionar módulo activo');activeCatalogSelect('incExecutive','executives',record.executive||'','Seleccionar ejecutivo activo');
   el('incComment').value='';el('incActive').checked=record.active;el('incResolved').checked=record.resolved;
   el('incFormTitle').textContent='Editar folio '+record.folio;
   el('incFormStatus').textContent=`${(record.comments||[]).length} comentario(s) conservados · alta: ${incidentLocalDate(record.created_at)} · resuelta: ${incidentLocalDate(record.resolved_at)}. Escribe uno nuevo para agregarlo al historial.`;
   el('incHistory').innerHTML='<strong>Historial de comentarios</strong>'+((record.comments||[]).map(c=>`<div class="inc-history-item">${esc(incidentLocalDate(c.createdAt))}: ${esc(c.text||'')}</div>`).join('')||'<p>Sin comentarios anteriores.</p>');
-  el('incFolio').scrollIntoView({behavior:'smooth',block:'center'});
+  el('incFormPanel').scrollIntoView({behavior:'smooth',block:'start'});
 }
 async function saveIncidentForm(){
   const data={folio:el('incFolio').value.trim(),module:el('incModule').value.trim(),executive:el('incExecutive').value.trim(),comment:el('incComment').value.trim(),active:el('incActive').checked,resolved:el('incResolved').checked,replaceMetadata:true};
@@ -548,7 +563,7 @@ async function saveIncidentForm(){
   if(!isAuthorized()){status.textContent='Inicia sesión para guardar incidencias en la nube.';return;}
   if(!data.folio){status.textContent='El folio es obligatorio.';return;}
   const btn=el('incSave');btn.disabled=true;status.textContent='Guardando en PostgreSQL…';
-  try{updateIncidentMap(await window.APP_CLOUD.putIncident(data));status.textContent='Incidencia guardada y sincronizada. Reaparecerá si vuelves a importar este folio.';el('incComment').value='';syncIncidentDisplays();}
+  try{updateIncidentMap(await window.APP_CLOUD.putIncident(data));status.textContent='Incidencia guardada y sincronizada.';el('incComment').value='';el('incFormPanel').hidden=true;resetIncidentForm();syncIncidentDisplays();}
   catch(error){status.textContent='No se pudo guardar: '+(error.message||error);}
   finally{btn.disabled=false;}
 }
@@ -558,15 +573,41 @@ function exportIncidentCsv(){
   const blob=new Blob(['\ufeff'+csv.map(row=>row.map(val).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='incidencias_permanentes_'+dateIso(new Date())+'.csv';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+let incidentDetailKey='';
+function showIncidentDetail(key){
+ const record=incidentRecords.get(key);if(!record)return;
+ incidentDetailKey=key;const comments=Array.isArray(record.comments)?record.comments:[];
+ el('incDetailTitle').textContent='Incidencia · '+record.folio;
+ el('incDetailBody').innerHTML=[['Folio',record.folio],['Módulo',record.module||'—'],['Ejecutivo',record.executive||'—'],['Incidencia',record.active?'Activa · excluye comisión':'Inactiva'],['Seguimiento',record.resolved?'Resuelta':'Pendiente'],['Alta',incidentLocalDate(record.created_at)],['Último cambio',incidentLocalDate(record.updated_at)]].map(([a,b])=>`<div class="inc-detail-line"><span>${esc(a)}</span><strong>${esc(b)}</strong></div>`).join('')+
+  `<h3>Historial de comentarios</h3><div class="inc-detail-comments">${comments.map(c=>`<p><small>${esc(incidentLocalDate(c.createdAt))}</small><br>${esc(c.text||'')}</p>`).join('')||'<p>Sin comentarios.</p>'}</div>`;
+ el('incDetailStatus').textContent='';el('incDetailOverlay').hidden=false;
+}
+async function deleteIncidentFromDetail(){
+ const record=incidentRecords.get(incidentDetailKey);if(!record)return;
+ if(!isAuthorized()){el('incDetailStatus').textContent='Inicia sesión para eliminar.';return;}
+ if(!confirm(`¿Enviar la incidencia del folio ${record.folio} a la papelera? Podrás recuperarla en Ajustes → Seguridad, y dejará de afectar los cálculos mientras esté en papelera.`))return;
+ const btn=el('incDetailDelete');btn.disabled=true;
+ try{await window.APP_CLOUD.deleteIncident(record.folio);incidentRecords.delete(incidentDetailKey);el('incDetailOverlay').hidden=true;incidentDetailKey='';syncIncidentDisplays();}
+ catch(error){el('incDetailStatus').textContent='No se pudo mover a papelera: '+(error.message||error);}
+ finally{btn.disabled=false;}
+}
 function initIncidences(){
   el('incSave').addEventListener('click',()=>{void saveIncidentForm();});
   el('incClear').addEventListener('click',resetIncidentForm);
+  el('incNew').addEventListener('click',()=>{resetIncidentForm();el('incFormPanel').hidden=false;el('incFormPanel').scrollIntoView({behavior:'smooth',block:'start'});});
+  el('incFormClose').addEventListener('click',()=>{el('incFormPanel').hidden=true;});
+  el('incDetailClose').addEventListener('click',()=>{el('incDetailOverlay').hidden=true;});
+  el('incDetailOverlay').addEventListener('click',e=>{if(e.target===el('incDetailOverlay'))el('incDetailOverlay').hidden=true;});
+  el('incDetailEdit').addEventListener('click',()=>editIncident(incidentDetailKey));
+  el('incDetailDelete').addEventListener('click',()=>{void deleteIncidentFromDetail();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!el('incDetailOverlay').hidden)el('incDetailOverlay').hidden=true;});
   el('incRefresh').addEventListener('click',()=>{void refreshIncidents(false);});
   el('incSearch').addEventListener('input',()=>{incidentPageIndex=1;renderIncidencePage();});
   el('incFilter').addEventListener('change',()=>{incidentPageIndex=1;renderIncidencePage();});
   el('incPrev').addEventListener('click',()=>{incidentPageIndex--;renderIncidencePage();});
   el('incNext').addEventListener('click',()=>{incidentPageIndex++;renderIncidencePage();});
-  el('incRows').addEventListener('click',event=>{const btn=event.target.closest('[data-edit-incident]');if(btn)editIncident(btn.dataset.editIncident);});
+  el('incRows').addEventListener('click',event=>{const row=event.target.closest('[data-incident-row]'),button=event.target.closest('[data-edit-incident]');if(button||row)showIncidentDetail(button?.dataset.editIncident||row.dataset.incidentRow);});
+  el('incRows').addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target.matches('[data-incident-row]')){event.preventDefault();showIncidentDetail(event.target.dataset.incidentRow);}});
   el('incExportCsv').addEventListener('click',exportIncidentCsv);
   renderIncidencePage();
 }
@@ -622,8 +663,9 @@ function combinedArchiveData(reports){
     if(patched&&patched!==r){patched.fecha=isoDate(patched.fecha)||'';patched.week=patched.fecha?mondayOf(patched.fecha):'';}
     return patched;
   }).filter(Boolean);
-  rows.forEach((r,i)=>r.i=i);
-  const result={headers,rows,appColumn:null};
+  const visibleRows=rows.filter(r=>registryRowEligible(teamRegistry,r));
+  visibleRows.forEach((r,i)=>r.i=i);
+  const result={headers,rows:visibleRows,appColumn:null};
   if(combinedArchiveCache.size>6)combinedArchiveCache.clear();
   combinedArchiveCache.set(cacheKey,{refs:[...reports],result});
   return result;
@@ -696,6 +738,20 @@ function chooseImportArchiveDate(fileName){
     dialog.addEventListener('keydown',escapeKey);
   });
 }
+function confirmImportPreview(data,fileName,existing){
+ const report=analyzeImportPreview(data,existing),dialog=el('importPreviewOverlay');
+ const host=el('importPreviewBody');if(!dialog||!host)return Promise.resolve(true);
+ const ths=['Fecha','Folio','Módulo','Ejecutivo','Código'];
+ const row=r=>[r.fecha,r.folio,r.module,r.executive,r.code].map(v=>`<td>${esc(v||'—')}</td>`).join('');
+ host.innerHTML=`<p><strong>${esc(fileName)}</strong> · ${number.format(report.total)} filas</p><div class="preview-metrics">`+
+ [['Duplicados en archivo',report.duplicatesInside],['Ya presentes en historial',report.duplicatesInHistory],['Sin fecha válida',report.missingDate],['Sin folio',report.missingFolio],['Sin código',report.missingCode]].map(([l,v])=>`<div><b>${v}</b><span>${esc(l)}</span></div>`).join('')+
+ `</div><p class="settings-help">Columnas opcionales faltantes: ${esc(report.optionalMissing.join(', ')||'Ninguna')}. La importación conserva las filas originales; no elimina datos ni altera reglas de comisiones. Los posibles duplicados son advertencias para revisión.</p><div class="preview-table-wrap"><table><thead><tr>${ths.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${report.preview.map(r=>`<tr>${row(r)}</tr>`).join('')}</tbody></table></div>`;
+ dialog.hidden=false;
+ return new Promise(resolve=>{const ok=el('importPreviewConfirm'),cancel=el('importPreviewCancel');
+  const finish=value=>{dialog.hidden=true;ok.removeEventListener('click',accept);cancel.removeEventListener('click',decline);resolve(value);};
+  const accept=()=>finish(true),decline=()=>finish(false);ok.addEventListener('click',accept);cancel.addEventListener('click',decline);
+ });
+}
 async function importXlsFiles(files){
   if(!files?.length)return;
   // Sólo una sesión autorizada puede incorporar datos a IndexedDB.
@@ -710,9 +766,10 @@ async function importXlsFiles(files){
       if(file.size>XLS_LIMIT)throw Error('El archivo supera 30 MB.');
       const buffer=await file.arrayBuffer(),fingerprint=bytesFingerprint(new Uint8Array(buffer));
       if(target.some(r=>r.fingerprint===fingerprint)){duplicated++;continue;}
+      const data=await parseExcelFile(buffer,file.name);
+      if(!await confirmImportPreview(data,file.name,target)){cancelled++;continue;}
       const displayName=await chooseImportArchiveDate(file.name);
       if(displayName===null){cancelled++;continue;}
-      const data=await parseExcelFile(buffer,file.name);
       if(data.missingOptional?.length)warnings.push(`${file.name}: faltan ${data.missingOptional.join(', ')} (se dejan vacíos)`);
       const record={id:'xls_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9),
         name:displayName,size:file.size,addedAt:Date.now(),fingerprint,
@@ -1402,7 +1459,7 @@ function initHistory(){
   if(raw)historyPrefs.periodGoals[key]=amount;else delete historyPrefs.periodGoals[key];
   localStorage.setItem(HISTORY_KEY,JSON.stringify(historyPrefs));renderHistory();
  });
- el('hsSave').addEventListener('click',commitHistorySettings);
+ el('hsSave').addEventListener('click',()=>{if(commitHistorySettings()&&el('settingsPanel').open)toggleSettings(false);});
  el('hsReset').addEventListener('click',()=>{const goals=historyPrefs.periodGoals;historyPrefs=cleanHistorySettings({...HISTORY_DEFAULTS,periodGoals:goals});refreshHistorySettingsEditor();commitHistorySettings();});
  el('hsClearGoals').addEventListener('click',()=>{if(!confirm('¿Restaurar todos los objetivos diarios, semanales y mensuales personalizados?'))return;historyPrefs.periodGoals={};localStorage.setItem(HISTORY_KEY,JSON.stringify(historyPrefs));el('hsStatus').textContent='Objetivos históricos personalizados restaurados.';renderHistory();});
  populateHistoryFilters();renderHistory();
@@ -1545,7 +1602,7 @@ function initModuleHistory(){
  });
  el('mhIncludeSupervisors').value=moduleHistoryPrefs.includeSupervisors?'yes':'no';
  el('mhIncludeSupervisors').addEventListener('change',()=>{moduleHistoryPrefs.includeSupervisors=el('mhIncludeSupervisors').value==='yes';localStorage.setItem(MODULE_HISTORY_KEY,JSON.stringify(moduleHistoryPrefs));moduleHistoryView.page=1;renderModuleHistory();});
- el('msSave').addEventListener('click',commitModuleHistorySettings);
+ el('msSave').addEventListener('click',()=>{if(commitModuleHistorySettings()&&el('settingsPanel').open)toggleSettings(false);});
  el('msReset').addEventListener('click',()=>{const goals=moduleHistoryPrefs.periodGoals;moduleHistoryPrefs=cleanModuleHistorySettings({...MODULE_HISTORY_DEFAULTS,periodGoals:goals});refreshModuleHistorySettingsEditor();commitModuleHistorySettings();});
  el('msClearGoals').addEventListener('click',()=>{if(!confirm('¿Restaurar todos los objetivos diarios, semanales y mensuales personalizados?'))return;moduleHistoryPrefs.periodGoals={};localStorage.setItem(MODULE_HISTORY_KEY,JSON.stringify(moduleHistoryPrefs));el('msStatus').textContent='Objetivos históricos personalizados restaurados.';renderModuleHistory();});
  populateModuleFilters();renderModuleHistory();
@@ -2399,6 +2456,9 @@ function populateSupervisorCalculatorFilters(){
 }
 function supervisorModuleGoal(module,week,teamRows){
   if(supSettings.goals[module]>0)return supSettings.goals[module];
+  const baseGoal=effectiveBaseGoal(baseGoals,'module',module,week,'sales').value;
+  if(baseGoal>0)return baseGoal;
+  const registryGoal=registryGoalAt(registryEntry(teamRegistry,'modules',module),week);if(registryGoal>0)return registryGoal;
   const preset=Number(moduleQualityOptions(module).weeklySales)||0;
   if(preset>0)return preset;
   const names=[...new Set(teamRows.map(r=>r.executive).filter(Boolean))];
@@ -2741,12 +2801,13 @@ function renderLeadership(){
  el('leaderKpis').innerHTML=kpis.map(a=>card(...a)).join('');
  const score=n=>n===null?'—':number.format(n);
  el('leaderModuleRows').innerHTML=modules.map(m=>`<tr><td><button class="base-goal-inline" type="button" data-base-goal-type="module" data-base-goal-name="${esc(m.name)}">${esc(m.name)}</button></td><td>${m.counts.records}</td><td>${m.counts.sales}</td><td>${score(m.goal)}</td><td>${lPct(m.completion)}</td><td>${lPct(m.conversion)}</td><td>${lPct(m.quality)}</td><td>${lPct(m.global)}</td><td>${m.pendingIncidents}</td></tr>`).join('')||'<tr><td colspan="9">Sin módulos disponibles. Importa registros manuales.</td></tr>';
- const targetRows=[];
- for(const m of modules){for(const key of LEADERSHIP_METRICS){const t=m.targets[key];
-  if(!t)continue;
-  targetRows.push(`<tr><td><button class="base-goal-inline" type="button" data-base-goal-type="module" data-base-goal-name="${esc(m.name)}">${esc(m.name)}</button></td><td>${esc(LEADERSHIP_METRIC_LABELS[key])}</td><td>${t.value===null?'—':(t.unit==='percent'?lPct(t.value):number.format(t.value))}</td><td>${t.unit==='percent'?lPct(t.actual):number.format(t.actual)}</td><td>${lPct(t.progress)}</td><td>${esc(t.source)}</td></tr>`);
- }}
- el('leaderTargetsRows').innerHTML=targetRows.join('')||'<tr><td colspan="6">Sin objetivos disponibles.</td></tr>';
+ el('leaderTargetsCards').innerHTML=modules.map(m=>{
+  const cells=LEADERSHIP_METRICS.filter(key=>m.targets[key]).map(key=>{
+   const t=m.targets[key],goal=t.value===null?'—':t.unit==='percent'?lPct(t.value):number.format(t.value),actual=t.unit==='percent'?lPct(t.actual):number.format(t.actual);
+   return `<tr><td><div class="target-main"><span class="target-key">${esc(LEADERSHIP_METRIC_LABELS[key])}</span><strong class="target-progress" title="Porcentaje de avance">${lPct(t.progress)}</strong></div><div class="target-values"><span>Objetivo <b>${goal}</b></span><span>Logrado <b>${actual}</b></span></div><details class="target-origin"><summary title="Origen: ${esc(t.source)}">Origen: ${esc(t.source)}</summary><div>${esc(t.source)}</div></details></td></tr>`;
+  }).join('');
+  return `<details class="leader-target-card" open><summary><strong title="${esc(m.name)}">${esc(m.name)}</strong><span class="target-sales">${number.format(m.counts.sales)} ventas</span></summary><table><tbody>${cells}</tbody></table></details>`;
+ }).join('')||'<p class="leadership-footnote">Sin módulos ni objetivos disponibles.</p>';
  el('leaderPeopleRows').innerHTML=people.slice(0,leadershipPrefs.topPeople).map(p=>`<tr><td><button class="base-goal-inline" type="button" data-base-goal-type="executive" data-base-goal-name="${esc(p.name)}">${esc(p.name)}</button>${p.supervisor?' · SUP':''}</td><td>${esc(p.modules.join(', '))}</td><td>${p.counts.records}</td><td>${p.counts.sales}</td><td>${lPct(p.conversion)}</td><td>${lPct(p.contribution)}</td></tr>`).join('')||'<tr><td colspan="6">Sin colaboradores en el período seleccionado.</td></tr>';
  const labels=[['completion','Cumplimiento'],['purchase','Primera compra'],['p0','Programa Cero'],['app','Activaciones APP']];
  el('leaderQualityCards').innerHTML=labels.map(([key,label])=>`<div class="leadership-factor"><span>${label}</span><b>${lPct(total.factors[key])}</b><small>Alcance real ${lPct(total.actual[key])}</small></div>`).join('')+
@@ -2758,7 +2819,9 @@ function renderLeadership(){
  el('leaderTrend').innerHTML=trend.length?`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Tendencia diaria de ventas válidas"><line x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}" stroke="#adc5d8"/><text x="${L}" y="${T+10}" fill="#60758a" font-size="11">${max}</text>${bars}</svg>`:'No existen fechas con registros en el período seleccionado.';
  el('leaderProjectionCaption').textContent=leadershipPrefs.projectionMode==='weighted'?'Pronóstico ponderado por día de la semana':'Pronóstico lineal: días naturales';
  el('leaderProjection').innerHTML=modules.map(m=>`<div class="leadership-projection"><strong>${esc(m.name)}</strong><b>${m.projected===null?'No aplica':number.format(m.projected)+' ventas'}</b><small>${m.projected===null?'Disponible al consultar la semana actual con objetivo configurado.':`Cumplimiento proyectado ${lPct(m.projectedCompletion)}. ${m.dailyNeeded===null?'':`Necesarias ${m.dailyNeeded} ventas/día restante.`}`}<br>Objetivo: ${m.goal===null?'sin configurar':number.format(m.goal)} · ${esc(m.goalSource)}</small></div>`).join('')||'<p class="leadership-footnote">Sin módulos para proyectar.</p>';
- el('leaderAlerts').innerHTML=alerts.slice(0,40).map(a=>`<div class="leadership-alert ${a.level}"><span>${a.level==='high'?'!':a.level==='medium'?'⚠':'i'}</span><div><b>${esc(a.module)} · ${esc(a.category)}</b>${esc(a.message)}</div></div>`).join('')||'<p class="leadership-footnote">Sin señales activas para los umbrales configurados. Comprueba que los datos estén actualizados.</p>';
+ const priorities=[...alerts].sort((a,b)=>({high:0,medium:1,info:2}[a.level]??3)-({high:0,medium:1,info:2}[b.level]??3));
+ const high=priorities.filter(a=>a.level==='high').length,medium=priorities.filter(a=>a.level==='medium').length;
+ el('leaderAlerts').innerHTML=`<div class="jm-alert-summary"><b>Atención prioritaria</b><span>${high} alertas críticas · ${medium} alertas preventivas · ${priorities.length} señales en total</span></div>`+priorities.slice(0,40).map(a=>`<div class="leadership-alert ${a.level}"><span>${a.level==='high'?'!':a.level==='medium'?'⚠':'i'}</span><div><b>${esc(a.module)} · ${esc(a.category)}</b>${esc(a.message)}</div></div>`).join('')||'<p class="leadership-footnote">Sin señales activas para los umbrales configurados. Comprueba que los datos estén actualizados.</p>';
  const modPick=el('leaderActionModule'),old=modPick.value;
  modPick.innerHTML='<option value="">Todos / Jefatura</option>'+modules.map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('');
  modPick.value=modules.some(m=>m.name===old)?old:'';
@@ -2815,7 +2878,7 @@ function baseGoalSaveProfile(){
  try{const updated=upsertBaseGoals(baseGoals,{type,name,from,goals});
   localStorage.setItem(BASE_GOALS_KEY,JSON.stringify(updated));baseGoals=updated;
   baseGoalList();refreshBaseGoalDependentViews();baseGoalLoadValues();
-  el('baseGoalStatus').textContent='Objetivos guardados. Vigencias anteriores intactas. Sincronización automática al iniciar sesión.';
+  el('baseGoalStatus').textContent='Objetivos guardados. Vigencias anteriores intactas. Sincronización automática al iniciar sesión.';modal.hidden=true;if(el('settingsPanel').open)toggleSettings(false);
  }catch(error){el('baseGoalStatus').textContent=error.message;}
 }
 function refreshBaseGoalDependentViews(){
@@ -2907,7 +2970,7 @@ function leaderGoalSave(){
  if(Object.keys(base).length)defaults[modKey]=base;else delete defaults[modKey];
  if(Object.keys(specific).length)weekly[weekKey]=specific;else delete weekly[weekKey];
  leadershipPrefs=cleanLeadershipSettings({...leadershipPrefs,defaultGoals:defaults,weeklyGoals:weekly});
- if(!persistLeadership())return;renderLeadership();status.textContent='Objetivos guardados en este navegador; se sincronizan cuando hay sesión.';
+ if(!persistLeadership())return;renderLeadership();status.textContent='Objetivos guardados en este navegador; se sincronizan cuando hay sesión.';if(el('settingsPanel').open)toggleSettings(false);
 }
 function initLeadershipGoalSettings(){
  leaderGoalSettingsEditor();
@@ -2926,7 +2989,7 @@ function initLeadershipGoalSettings(){
   leadershipPrefs=cleanLeadershipSettings({...leadershipPrefs,weekdayWeights:weights,
    projectionMode:el('lsProjectionMode').value,goalFallback:el('lsGoalFallback').value,
    minQualityAlert:minimum,minTargetProgress:progress,alertTargets:el('lsAlertTargets').value==='yes'});
-  if(!persistLeadership())return;renderLeadership();el('lsGoalStatus').textContent='Proyección, fuente de metas y alertas guardadas.';
+  if(!persistLeadership())return;renderLeadership();el('lsGoalStatus').textContent='Proyección, fuente de metas y alertas guardadas.';if(el('settingsPanel').open)toggleSettings(false);
  });
  el('lsGoalHelp').addEventListener('click',()=>{alert('Proyección lineal = ventas válidas acumuladas hasta hoy / días naturales transcurridos × 7. Ponderada = ventas acumuladas hasta hoy / suma de pesos transcurridos × suma de los 7 pesos. El % proyectado se divide entre la meta semanal. Las metas específicas de Jefatura tienen prioridad sobre las metas base y estas sobre las fuentes existentes. Los objetivos de los demás indicadores son cantidades semanales de seguimiento, no cambian la calidad ni las comisiones.');});
 }
@@ -2960,7 +3023,7 @@ function initLeadership(){
  el('leaderPeriod').addEventListener('change',()=>{leaderPeriodToggled();renderLeadership();});
  for(const id of ['leaderFrom','leaderTo','leaderSupervisor'])el(id).addEventListener('change',renderLeadership);
  el('leadershipSettingsOpen').addEventListener('click',()=>{if(!el('settingsPanel').open)el('toggleSettings').click();el('settingsSectionsNav').querySelector('[data-settings-group="settingsLeadershipV256"]')?.click();});
- el('lsSave').addEventListener('click',saveLeadershipSettings);
+ el('lsSave').addEventListener('click',()=>{saveLeadershipSettings();if(!el('lsStatus').textContent.startsWith('Error'))toggleSettings(false);});
  el('lsRestore').addEventListener('click',()=>{leadershipPrefs=cleanLeadershipSettings({...LEADERSHIP_DEFAULTS,actions:leadershipPrefs.actions});refreshLeadershipSettingsEditor();saveLeadershipSettings();});
  el('leaderActionForm').addEventListener('submit',event=>{
   event.preventDefault();const description=el('leaderActionText').value.trim(),due=el('leaderActionDue').value;
@@ -2999,30 +3062,84 @@ async function exportLeadershipPng(){
  }catch(error){alert('No se pudo exportar PNG: '+error.message);}finally{button.disabled=false;button.textContent=previous;}
 }
 
+// V2.6.1 · Edición del catálogo, activo/inactivo prospectivo y objetivos editables.
+function activeCatalogNames(type){
+ const detected=type==='modules'?baseModuleNames():baseExecutiveNames();
+ return registryNames(teamRegistry,type,{activeOnly:true,detected});
+}
+function activeCatalogSelect(id,type,current='',blank='Sin asignar'){
+ const target=el(id);if(!target)return;
+ const names=activeCatalogNames(type),chosen=String(current||''),inList=names.some(n=>normalizeName(n)===normalizeName(chosen));
+ target.innerHTML=`<option value="">${esc(blank)}</option>`+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')+
+  (chosen&&!inList?`<option value="${esc(chosen)}" selected disabled>${esc(chosen)} · histórico / inactivo</option>`:'');
+ target.value=chosen;
+}
+function renderTeamRegistryEditor(){
+ const host=el('registryRows');if(!host)return;
+ const type=el('registryType').value,entries=teamRegistry[type]||[];
+ el('registryModuleBox').hidden=type!=='executives';
+ activeCatalogSelect('registryModule','modules',el('registryModule').value,'Sin asignar');
+ const detected=type==='modules'?baseModuleNames():baseExecutiveNames();
+ el('registryNameSuggestions').innerHTML=detected.map(n=>`<option value="${esc(n)}"></option>`).join('');
+ host.innerHTML=entries.length?entries.slice().sort((a,b)=>a.name.localeCompare(b.name,'es')).map(r=>`<div class="registry-row ${r.active?'':'inactive'}"><div><b>${esc(r.name)}</b><small>${r.active?'Activo':'Inactivo'} · Meta ${r.weeklyGoal??'heredada'} ${r.module?'· '+esc(r.module):''}</small></div><button class="btn small" type="button" data-registry-edit="${esc(r.name)}">Editar</button></div>`).join(''):'<p class="settings-help">No hay registros administrados de este tipo. Los nombres detectados en los XLS se conservan como activos hasta que se registren aquí.</p>';
+}
+function clearTeamRegistryEditor(){
+ el('registryName').value='';el('registryName').dataset.original='';el('registryGoal').value='';el('registryActive').checked=true;
+ el('registryModule').value='';el('registryStatus').textContent='Nuevo registro. Los datos históricos no se modifican.';
+}
+function initTeamRegistry(){
+ if(!el('registryRows'))return;
+ el('registryType').addEventListener('change',()=>{clearTeamRegistryEditor();renderTeamRegistryEditor();});
+ el('registryNew').addEventListener('click',clearTeamRegistryEditor);
+ el('registryRows').addEventListener('click',e=>{
+  const button=e.target.closest('[data-registry-edit]');if(!button)return;
+  const entry=registryEntry(teamRegistry,el('registryType').value,button.dataset.registryEdit);if(!entry)return;
+  el('registryName').value=entry.name;el('registryName').dataset.original=entry.name;
+  el('registryGoal').value=entry.weeklyGoal??'';el('registryActive').checked=entry.active;
+  activeCatalogSelect('registryModule','modules',entry.module,'Sin asignar');
+  el('registryStatus').textContent='Editando '+entry.name+'. La desactivación conserva los resultados anteriores a su fecha de baja.';
+  el('registryName').scrollIntoView({behavior:'smooth',block:'nearest'});
+ });
+ el('registrySave').addEventListener('click',()=>{
+  try{
+   const type=el('registryType').value,name=el('registryName').value.trim(),original=el('registryName').dataset.original||'';
+   const previous=teamRegistry;
+   teamRegistry=registryUpdate(teamRegistry,type,{name,weeklyGoal:el('registryGoal').value,active:el('registryActive').checked,module:el('registryModule').value},original,dateIso(new Date()));
+   try{persistTeamRegistry();}catch(error){teamRegistry=previous;throw error;}
+   clearTeamRegistryEditor();renderTeamRegistryEditor();
+   refreshArchiveData(true);refreshAfterRecordChange();
+   if(el('settingsPanel').open)toggleSettings(false);
+  }catch(error){el('registryStatus').textContent=error.message||String(error);}
+ });
+ renderTeamRegistryEditor();
+}
 function renderGroupNav(){
  const holder=el('appGroupNav');if(!holder)return;
- holder.innerHTML=pageNavigation.groupOrder.map(g=>`<button type="button" class="app-group-btn ${g===activeGroup?'active':''}" data-group-nav="${g}">${esc(GROUP_LABELS[g])}</button>`).join('');
+ holder.innerHTML=pageNavigation.groupOrder.map(g=>`<button type="button" class="app-group-btn ${g===activeGroup?'active':''}" data-group-nav="${g}">${esc(navGroupLabel(g))}</button>`).join('');
 }
 function applyNavOrder(){
  const nav=document.querySelector('.app-navigation');if(!nav)return;
- for(const page of pageNavigation.order){const tab=nav.querySelector(`[data-page-tab="${page}"]`);if(tab){nav.appendChild(tab);tab.hidden=pageNavigation.groupBy[page]!==activeGroup;}}
+ for(const page of pageNavigation.order){const tab=nav.querySelector(`[data-page-tab="${page}"]`);if(tab){nav.appendChild(tab);tab.textContent=navPageLabel(page);tab.hidden=pageNavigation.groupBy[page]!==activeGroup;}}
  renderGroupNav();
 }
 function renderNavOrderEditor(){
  const host=el('pageOrderList');if(!host)return;
  const groupHolder=el('groupOrderList');
- groupHolder.innerHTML=pageNavigation.groupOrder.map((g,i)=>`<div class="page-order-row"><b>${esc(GROUP_LABELS[g])}</b><div class="page-order-actions"><button type="button" data-group-move="${g}" data-order-dir="-1" ${i===0?'disabled':''} title="Subir categoría">↑</button><button type="button" data-group-move="${g}" data-order-dir="1" ${i===pageNavigation.groupOrder.length-1?'disabled':''} title="Bajar categoría">↓</button></div></div>`).join('');
+ groupHolder.innerHTML=pageNavigation.groupOrder.map((g,i)=>{
+  const count=pageNavigation.order.filter(p=>pageNavigation.groupBy[p]===g).length;
+  return `<div class="page-order-row"><label>Nombre de sección <input type="text" data-group-title="${g}" value="${esc(navGroupLabel(g))}" maxlength="80" aria-label="Título de la sección" /></label><div class="page-order-actions"><button type="button" data-group-move="${g}" data-order-dir="-1" ${i===0?'disabled':''} title="Subir sección">↑</button><button type="button" data-group-move="${g}" data-order-dir="1" ${i===pageNavigation.groupOrder.length-1?'disabled':''} title="Bajar sección">↓</button>${g==='settings'?'':`<button type="button" data-group-delete="${g}" title="Eliminar sección" ${count?'disabled':''}>Eliminar</button>`}</div><small>${g==='settings'?'Ajustes: sección fija':count+' página(s)'}</small></div>`;
+ }).join('');
  host.innerHTML=pageNavigation.groupOrder.filter(g=>g!=='settings').flatMap(group=>{
   const pages=pageNavigation.order.filter(p=>pageNavigation.groupBy[p]===group);
-  return [`<h4>${esc(GROUP_LABELS[group])}</h4>`,...pages.map((page,index)=>`<div class="page-order-row"><b>${index+1}. ${esc(PAGE_LABELS[page])}</b><div class="page-order-actions"><button type="button" data-order-move="${page}" data-order-dir="-1" title="Subir página" ${index===0?'disabled':''}>↑</button><button type="button" data-order-move="${page}" data-order-dir="1" title="Bajar página" ${index===pages.length-1?'disabled':''}>↓</button></div><label>Categoría <select data-page-group="${page}">${Object.keys(GROUP_LABELS).filter(g=>g!=='settings').map(g=>`<option value="${g}" ${group===g?'selected':''}>${esc(GROUP_LABELS[g])}</option>`).join('')}</select></label><label><input type="radio" name="navMainPage" value="${page}" ${page===pageNavigation.home?'checked':''}> Principal</label></div>`)]
+  return [`<h4>${esc(navGroupLabel(group))}</h4>`,...pages.map((page,index)=>`<div class="page-order-row"><label>Título de la página<input type="text" data-page-title="${page}" maxlength="80" value="${esc(navPageLabel(page))}" /></label><div class="page-order-actions"><button type="button" data-order-move="${page}" data-order-dir="-1" title="Subir página" ${index===0?'disabled':''}>↑</button><button type="button" data-order-move="${page}" data-order-dir="1" title="Bajar página" ${index===pages.length-1?'disabled':''}>↓</button></div><label>Sección <select data-page-group="${page}">${pageNavigation.groupOrder.filter(g=>g!=='settings').map(g=>`<option value="${g}" ${group===g?'selected':''}>${esc(navGroupLabel(g))}</option>`).join('')}</select></label><label><input type="radio" name="navMainPage" value="${page}" ${page===pageNavigation.home?'checked':''}> Principal</label></div>`)]
  }).join('');
 }
 function saveNavSettings(){
  try{localStorage.setItem(PAGE_NAV_KEY,JSON.stringify(pageNavigation));}catch(error){el('pageOrderStatus').textContent='No se pudo guardar: '+error.message;return;}
- applyNavOrder();el('pageOrderStatus').textContent='Categorías, páginas y principal guardadas'+(isAuthorized()?' · sincronización en cola.':'. Inicia sesión para sincronizar.');
+ applyNavOrder();renderNavOrderEditor();if(el('settingsPanel').open)toggleSettings(false);el('pageOrderStatus').textContent='Categorías, páginas y principal guardadas'+(isAuthorized()?' · sincronización en cola.':'. Inicia sesión para sincronizar.');
 }
 function initNavOrder(){
- pageNavigation=loadNavSettings();activeGroup=pageNavigation.groupBy[activePage]||'analysis';applyNavOrder();renderNavOrderEditor();
+ pageNavigation=loadNavSettings();activeGroup=pageNavigation.groupBy[activePage]||pageNavigation.groupOrder[0];applyNavOrder();renderNavOrderEditor();window.INVEX_REMINDERS?.refresh();
  el('appGroupNav').addEventListener('click',event=>{
   const btn=event.target.closest('[data-group-nav]');if(!btn)return;
   const group=btn.dataset.groupNav;
@@ -3031,6 +3148,10 @@ function initNavOrder(){
   if(first)switchPage(first);
  });
  el('groupOrderList').addEventListener('click',event=>{
+  const deletion=event.target.closest('[data-group-delete]');
+  if(deletion){const g=deletion.dataset.groupDelete;if(pageNavigation.order.some(p=>pageNavigation.groupBy[p]===g)){el('pageOrderStatus').textContent='Mueve primero las páginas de esa sección.';return;}
+   if(!confirm('¿Eliminar esta sección vacía del menú?'))return;
+   pageNavigation.groupOrder=pageNavigation.groupOrder.filter(x=>x!==g);if(GROUP_DEFAULT.includes(g))pageNavigation.deletedGroups.push(g);delete pageNavigation.groupTitles[g];renderNavOrderEditor();return;}
   const btn=event.target.closest('[data-group-move]');if(!btn)return;
   const index=pageNavigation.groupOrder.indexOf(btn.dataset.groupMove),next=index+Number(btn.dataset.orderDir);
   if(index<0||next<0||next>=pageNavigation.groupOrder.length)return;
@@ -3045,6 +3166,19 @@ function initNavOrder(){
   const a=pageNavigation.order.indexOf(pages[index]),b=pageNavigation.order.indexOf(pages[next]);
   [pageNavigation.order[a],pageNavigation.order[b]]=[pageNavigation.order[b],pageNavigation.order[a]];
   renderNavOrderEditor();el('pageOrderStatus').textContent='Orden modificado. Pulsa Guardar.';
+ });
+ el('groupOrderList').addEventListener('input',event=>{if(event.target.matches('[data-group-title]')){
+  const g=event.target.dataset.groupTitle;pageNavigation.groupTitles[g]=event.target.value.trim().slice(0,80);
+ }});
+ el('pageOrderList').addEventListener('input',event=>{if(event.target.matches('[data-page-title]')){
+  pageNavigation.pageTitles[event.target.dataset.pageTitle]=event.target.value.trim().slice(0,80);
+ }});
+ el('navAddSection').addEventListener('click',()=>{
+  const title=el('navNewSectionName').value.trim();if(!title){el('pageOrderStatus').textContent='Escribe el nombre de la nueva sección.';return;}
+  if(pageNavigation.groupOrder.length>=20){el('pageOrderStatus').textContent='Máximo 20 secciones.';return;}
+  const id='custom_'+Date.now().toString(36);
+  pageNavigation.groupOrder.splice(pageNavigation.groupOrder.indexOf('settings'),0,id);pageNavigation.groupTitles[id]=title.slice(0,80);
+  el('navNewSectionName').value='';renderNavOrderEditor();el('pageOrderStatus').textContent='Sección creada. Asigna páginas y pulsa Guardar.';
  });
  el('pageOrderList').addEventListener('change',event=>{
   if(event.target.name==='navMainPage')pageNavigation.home=event.target.value;
@@ -3083,7 +3217,7 @@ const FILTER_MOVES={
  history:['histWeekday','histResetFilters'],moduleHistory:['mhWeekday','mhIncludeSupervisors','mhResetFilters'],
  leadership:['leaderSupervisor'],allrecords:['allRecordsAdvanced','allRecordsSearch'],
  achievements:['achAdvanced','achSearch','achIncludeSupervisors'],
- supervisor:['supSearch'],incidents:['incSearch','incFilter']
+ supervisor:['supSearch'],incidents:['incSearch','incFilter'],reminders:[]
 };
 const secondaryFilterSlots=new Map();
 function filterControlWrapper(id){
@@ -3186,6 +3320,7 @@ function recordEditorMarkup(record){
  return Object.keys(EDITABLE_RECORD_FIELDS).map(key=>{
   const val=String(record[key]||'');
   if(['guaranteed','dental','p0'].includes(key))return `<label>${labels[key]}<select data-record-edit="${key}"><option value="Si" ${isYes(val)?'selected':''}>Sí</option><option value="No" ${!isYes(val)?'selected':''}>No</option></select></label>`;
+  if(key==='module'||key==='executive'){const type=key==='module'?'modules':'executives',available=activeCatalogNames(type),isAllowed=available.some(n=>normalizeName(n)===normalizeName(val));return `<label>${labels[key]}<select data-record-edit="${key}" aria-label="${labels[key]}">${val&&!isAllowed?`<option value="${esc(val)}" selected>${esc(val)} · histórico (conservar)</option>`:''}${available.map(n=>`<option value="${esc(n)}" ${normalizeName(n)===normalizeName(val)?'selected':''}>${esc(n)}</option>`).join('')}</select></label>`;}
   return `<label>${labels[key]}<input data-record-edit="${key}" type="${key==='fecha'?'date':'text'}" maxlength="400" value="${esc(val)}"></label>`;
  }).join('');
 }
@@ -3213,7 +3348,9 @@ function showBulkRecordEditor(){
  el('recordActionData').innerHTML='';el('recordEditFields').hidden=true;
  el('recordBulkFields').hidden=false;
  const fields=[['status','Resultado del trámite'],['guaranteed','Garantizada'],['dental','Plan Dental'],['p0','Programa Cero'],['module','Módulo'],['executive','Ejecutivo'],['code','Código de barras'],['appToggle','Activación APP'],['bonusToggle','Bono por dinámica']];
- el('recordBulkFields').innerHTML=`<label>Campo a modificar<select id="recordBulkField">${fields.map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label>Nuevo valor<input id="recordBulkValue" type="text" value="" placeholder="Escribe el nuevo valor"></label>`;
+ el('recordBulkFields').innerHTML=`<label>Campo a modificar<select id="recordBulkField">${fields.map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label>Nuevo valor<span id="recordBulkValueHost"></span></label>`;
+ function updateBulkValue(){const field=el('recordBulkField').value,available=activeCatalogNames(field==='module'?'modules':'executives');el('recordBulkValueHost').innerHTML=(field==='module'||field==='executive')?`<select id="recordBulkValue"><option value="">Selecciona una opción activa</option>${available.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>`:`<input id="recordBulkValue" type="text" placeholder="Escribe el nuevo valor">`;}
+ el('recordBulkField').addEventListener('change',updateBulkValue);updateBulkValue();
  el('recordActionEdit').hidden=true;el('recordActionSave').hidden=false;el('recordActionCopy').hidden=true;el('recordActionIncident').hidden=true;el('recordActionDelete').hidden=true;
  el('recordActionStatus').textContent='Para Garantizada, Dental, P0, APP y Bono por dinámica utiliza Sí o No.';
  showRecordDeletedList();el('recordActionOverlay').hidden=false;
@@ -3222,6 +3359,7 @@ function saveRecordChange(){
  if(recordBulkMode){
   const field=el('recordBulkField').value,raw=el('recordBulkValue').value.trim();
   if(!raw){el('recordActionStatus').textContent='Introduce el nuevo valor antes de guardar.';return;}
+  if(['module','executive'].includes(field)&&!activeCatalogNames(field==='module'?'modules':'executives').some(n=>normalizeName(n)===normalizeName(raw))){el('recordActionStatus').textContent='Selecciona un valor activo del catálogo.';return;}
   if(['guaranteed','dental','p0','appToggle','bonusToggle'].includes(field)&&!['SI','S','NO','N'].includes(normalize(raw))){el('recordActionStatus').textContent='Para este campo escribe Sí o No.';return;}
   if(selectedRecordUids.size>500){el('recordActionStatus').textContent='Máximo 500 registros por operación.';return;}
   for(const uid of selectedRecordUids){
@@ -3254,7 +3392,7 @@ function openIncidentFromAction(){
  closeRecordAction();switchPage('incidents');
  const key=incidentFolioKey(row);
  if(key&&incidentRecords.has(key))editIncident(key);
- else{resetIncidentForm();el('incFolio').value=row.folio;el('incModule').value=row.module||'';el('incExecutive').value=row.executive||'';}
+ else{resetIncidentForm();el('incFormPanel').hidden=false;el('incFolio').value=row.folio;activeCatalogSelect('incModule','modules',row.module||'');activeCatalogSelect('incExecutive','executives',row.executive||'');}
  el('incFolio').scrollIntoView({behavior:'smooth',block:'center'});
 }
 function initRecordManagement(){
@@ -3337,6 +3475,7 @@ function switchPage(page){
   el('achievementsPage').hidden=activePage!=='achievements';
   el('supPage').hidden=activePage!=='supervisor';
   el('incidencePage').hidden=activePage!=='incidents';
+  el('remindersPage').hidden=activePage!=='reminders';
   el('historyPage').hidden=activePage!=='history';
   el('moduleHistoryPage').hidden=activePage!=='moduleHistory';
   el('leadershipPage').hidden=activePage!=='leadership';
@@ -3433,6 +3572,23 @@ el('teamTable').addEventListener('click',e=>{
     const needed=nextTarget?Math.max(0,Math.ceil(nextTarget.min*d.goal/100-1e-10)-validSales):0;
     return {ok:true,warnings,validReg,validGuar,validSales,validDental,validApp,validP0,excludedSales,completion,tier,p0rate,p0Penalty,incPenalty,penalty,salePay,dentalPay,appPay,p0Pay,gross,bonus,beforePenalty,p0Discount,incidenceDiscount,discounts,afterPenalty,recover:d.recover,dynamicBonusCount,dynamicBonus,netBeforeDynamic,net,nextTarget,needed,inc:d.inc,goal:d.goal};
   }
+  // V2.7: Tres variantes comparables, todas con calculate() inalterado.
+  function renderThreeScenarios(){
+    const host=el('jmScenarioResults');if(!host)return;
+    const base=calculate(state.base),primary=calculate(state.sim);
+    const variant=(name)=>{
+      const values={};for(const key of ['reg','dental','p0']){
+       const input=document.querySelector(`[data-jm-variant="${name}"][data-jm-field="${key}"]`);
+       const n=Number(input?.value||0);if(!Number.isInteger(n)||n<0||n>1000)return {ok:false,errors:['Las cantidades adicionales deben ser enteros de 0 a 1000.']};
+       values[key]=n;
+      }
+      const next={...state.sim,reg:state.sim.reg+values.reg,app:state.sim.app+values.reg,dental:state.sim.dental+values.dental,p0:state.sim.p0+values.p0};
+      return calculate(next);
+    };
+    const variants=[['Simulación actual',primary],['Simulación 2',variant('two')],['Simulación 3',variant('three')]];
+    const cells=variants.map(([name,result])=>`<div class="jm-scenario-result"><b>${name}</b>${result.ok?`<strong>${mx(result.net)}</strong><span>${pct(result.completion)} · ${result.validSales} ventas válidas</span><small>${result.tier?.label||'Sin escalón'} · ${result.p0Penalty?'−15% por P0':''}${result.incPenalty?' Penalización por incidencias '+result.incPenalty+'%':''}</small><small>Contra base: ${base.ok?mx(round(result.net-base.net)):'—'}</small>`:`<span class="jm-error">${esc(result.errors.join(' '))}</span>`}</div>`).join('');
+    host.innerHTML=`<div class="jm-scenario-results">${cells}</div>`;
+  }
   // V14 · Edición autorizada de importes por escalón (sin cambiar umbrales ni penalizaciones).
   function renderCommissionRateEditor(){
     el('rateEditorRows').innerHTML=TIER.map((tier,i)=>`<tr><th scope="row">${esc(tier.label)}</th>${RATE_FIELDS.map(key=>`<td><input type="number" inputmode="decimal" min="0" max="1000000" step="0.01" value="${tier[key]}" data-rate-index="${i}" data-rate-key="${key}" aria-label="${RATE_LABELS[key]} · ${esc(tier.label)}" /></td>`).join('')}</tr>`).join('');
@@ -3469,6 +3625,7 @@ el('teamTable').addEventListener('click',e=>{
     el('rateEditorStatus').textContent='Tarifas originales restauradas.';
   });
   window.CALC_ENGINE={calculate,tiers:TIER};
+  el('jmScenarioLab')?.addEventListener('input',renderThreeScenarios);
 
   function setForm(which){for(const k of KEYS){const input=document.querySelector(`[data-scenario="${which}"] [data-field="${k}"]`);input.value=state[which][k];}}
   function syncForm(which){const d={dynamicBonusCount:state[which].dynamicBonusCount||0};for(const k of KEYS){const input=document.querySelector(`[data-scenario="${which}"] [data-field="${k}"]`);d[k]=input.value===''?NaN:Number(input.value);}state[which]=d;}
@@ -3520,6 +3677,16 @@ el('teamTable').addEventListener('click',e=>{
     }
     const valid=a.ok&&b.ok;
     const delta=valid?round(b.net-a.net):null;
+    const sourceNode=el('jmCalcGoalSource');
+    if(sourceNode){
+     const source=importActive()?(
+       Number.isInteger(teamGoals[teamKey(imported.week,imported.executive)])?'Meta semanal editada':
+       effectiveBaseGoal(baseGoals,'executive',imported.executive,imported.week,'sales').value>0?
+         effectiveBaseGoal(baseGoals,'executive',imported.executive,imported.week,'sales').source:
+       registryEntry(teamRegistry,'executives',imported.executive)?.weeklyGoal>0?'Catálogo de ejecutivo':'Objetivo general de calculadora'):
+       'Captura manual / objetivo editable';
+     sourceNode.textContent=`Origen de meta: ${source} · Valor ${state.base.goal} (editable). Las tarifas se mantienen independientes.`;
+    }
     el('deltaTotal').textContent=valid?(delta>0?'+':'')+mx(delta):'—';
     el('deltaTotal').classList.toggle('negative',valid&&delta<0);
     el('deltaOverview').textContent=valid?(delta===0?'Sin diferencia entre escenarios':delta>0?'La simulación genera una comisión mayor':'La simulación genera una comisión menor'):'Revisa los errores de los escenarios';
@@ -3561,6 +3728,7 @@ el('teamTable').addEventListener('click',e=>{
       let deltaV=valid&&type!=='pctExempt'&&type!=='tier'?(b[key]-a[key])*(type==='negMoney'?-1:1):0;
       return `<tr class="${rowClass||''}"><td>${esc(label)}</td><td>${renderValue(a,key,type)}</td><td>${renderValue(b,key,type)}</td><td class="${deltaV>0?'positive':deltaV<0?'negative':''}">${diff(key,type)}</td></tr>`;
     }).join('');
+    renderThreeScenarios();
     const selectedBase=a.ok&&a.tier?a.tier.min:null;
     const selectedSim=b.ok&&b.tier?b.tier.min:null;
     document.querySelectorAll('.rate-table tbody tr').forEach(tr=>{
@@ -3764,7 +3932,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   }
   function initWeeklyAdminSettings(){
     refreshWeeklyAdminSettingsEditor();
-    el('weeklyAdminSave').addEventListener('click',commitWeeklyAdminSettings);
+    el('weeklyAdminSave').addEventListener('click',()=>{if(commitWeeklyAdminSettings())toggleSettings(false);});
     el('weeklyAdminReset').addEventListener('click',()=>{
       weeklyAdminPrefs=cleanWeeklyAdminSettings(WEEKLY_ADMIN_DEFAULTS);
       refreshWeeklyAdminSettingsEditor();commitWeeklyAdminSettings();
@@ -3772,10 +3940,21 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     // Menú de Ajustes mediante botones. Solo se ve el apartado elegido.
     const details=[...el('settingsPanel').querySelectorAll('.settings-panel-content > details.settings-group')];
     const nav=el('settingsSectionsNav');
-    nav.innerHTML=details.map((node,i)=>{
-      const label=(node.querySelector(':scope > summary')?.textContent||node.id).replace(/^\s*\d+\s*[·.]?\s*/,'').trim();
-      return `<button class="settings-section-button" type="button" data-settings-group="${node.id}" aria-expanded="false">${i+1}. ${esc(label)}</button>`;
-    }).join('');
+    const categories=[
+      ['Archivos y datos',['settingsArchive','settingsTeamRegistryV261','settingsBaseGoalsV258','settingsTransferV261','settingsActions','settingsFolios']],
+      ['Comisiones y calidad',['settingsRates','settingsQualityV22','settingsSupervisorsV22','settingsSupervisorCommissionV24','settingsDynamicBonus']],
+      ['Reportes y análisis',['settingsHistoryV253','settingsModuleHistoryV254','settingsLeadershipV256','settingsLeadershipGoalsV257','settingsWeeklyAdminV252','settingsReportTexts','settingsExport']],
+      ['Interfaz y navegación',['settingsAppearance','settingsSections','settingsPageOrder','settingsVisits']]
+    ];
+    const numbered=new Set();let number=0;
+    nav.innerHTML=categories.map(([title,ids])=>{
+      const buttons=ids.map(id=>details.find(d=>d.id===id)).filter(Boolean).map(node=>{
+       numbered.add(node.id);number++;
+       const label=(node.querySelector(':scope > summary')?.textContent||node.id).replace(/^\s*\d+\s*[·.]?\s*/,'').trim();
+       return `<button class="settings-section-button" type="button" data-settings-group="${node.id}" aria-expanded="false">${number}. ${esc(label)}</button>`;
+      }).join('');
+      return `<details class="settings-menu-category" open><summary>${esc(title)}</summary><div>${buttons}</div></details>`;
+    }).join('')+details.filter(d=>!numbered.has(d.id)).map(node=>`<button class="settings-section-button" type="button" data-settings-group="${node.id}">${esc(node.querySelector('summary')?.textContent||node.id)}</button>`).join('');
     nav.addEventListener('click',e=>{
       const btn=e.target.closest('[data-settings-group]');if(!btn)return;
       const target=el(btn.dataset.settingsGroup),willOpen=!target.open;
@@ -3842,7 +4021,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     if(!record||!confirm(`¿Eliminar el XLS guardado «${record.name}»? Esta acción no se puede deshacer.`))return;
     try{await archiveDelete(record.id);archive.reports=archive.reports.filter(r=>r.id!==record.id);
       archive.selection.ids=archive.selection.ids.filter(x=>x!==record.id);archiveSelectionSave();refreshArchiveData(true);
-    }catch(err){alert('No se pudo eliminar: '+err.message);}
+    }catch(err){alert('No se pudo mover a papelera: '+err.message);}
   });
   el('archiveClear').addEventListener('click',async()=>{
     if(!archive.reports.length||!confirm('¿Borrar TODOS los XLS guardados en tu cuenta? No podrás recuperarlos desde la aplicación.'))return;
@@ -4455,17 +4634,18 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   window.addEventListener('beforeprint',()=>{try{if(activePage!=='achievements'||cachedWeeklyAdminAssets())buildReport();}catch(error){console.warn('Reporte de impresión:',error);}});
   window.CALC_REPORT={buildReport,layout:uiLayout};
 
-  initAllRecordsPage();initAchievements();initWeeklyAdminSettings();initQualitySettings();initBaseGoals();initSupervisorCalculator();initIncidences();initHistory();initModuleHistory();initLeadership();initNavOrder();initFloatingExport();initFloatingFilters();initRecordManagement();initGlobalCollapses();initMondayReminder();
+  initReminders();initSettingsTransfer();
+  initAllRecordsPage();initAchievements();initTeamRegistry();initWeeklyAdminSettings();initQualitySettings();initBaseGoals();initSupervisorCalculator();initIncidences();initHistory();initModuleHistory();initLeadership();initNavOrder();initFloatingExport();initFloatingFilters();initRecordManagement();initGlobalCollapses();initMondayReminder();
   restore();setForm('base');setForm('sim');render();initializeWeeklyDates();refreshAuthorizedPages();switchPage(pageNavigation.home);initArchive();
   window.APP_CLOUD?.registerRefresh(async()=>{
     if(!isAuthorized())return;
     archive.reports=await archiveGetAll();archive.temporaryMode=false;
-    archiveSelectionRestore();loadFolioFlags();recordEdits=readRecordEdits();selectedRecordUids.clear();combinedArchiveCache.clear();loadCommissionRates();
+    archiveSelectionRestore();loadFolioFlags();teamRegistry=readTeamRegistry();renderTeamRegistryEditor();recordEdits=readRecordEdits();selectedRecordUids.clear();combinedArchiveCache.clear();loadCommissionRates();
     for(const key of Object.keys(teamGoals))delete teamGoals[key];Object.assign(teamGoals,loadTeamStore(TEAM_GOALS_STORAGE));
     qualityConfig=cleanQualityConfig(storedJson(QUALITY_STORAGE_V22));
     leadershipPrefs=readLeadershipPrefs();baseGoals=readBaseGoals();baseGoalList();refreshLeadershipSettingsEditor();leaderGoalSettingsEditor();
     weeklyAdminPrefs=readWeeklyAdminPrefs();refreshWeeklyAdminSettingsEditor();historyPrefs=readHistoryPrefs();refreshHistorySettingsEditor();moduleHistoryPrefs=readModuleHistoryPrefs();refreshModuleHistorySettingsEditor();
-    pageNavigation=loadNavSettings();activeGroup=pageNavigation.groupBy[activePage]||'analysis';applyNavOrder();renderNavOrderEditor();
+    pageNavigation=loadNavSettings();activeGroup=pageNavigation.groupBy[activePage]||pageNavigation.groupOrder[0];applyNavOrder();renderNavOrderEditor();window.INVEX_REMINDERS?.refresh();
     if(firstCloudNavigation){firstCloudNavigation=false;el('histPeriod').value=historyPrefs.defaultPeriod;el('histWeekday').value=historyPrefs.defaultWeekday==='today'?String(new Date().getDay()):historyPrefs.defaultWeekday;el('mhPeriod').value=moduleHistoryPrefs.defaultPeriod;el('mhWeekday').value=moduleHistoryPrefs.defaultWeekday==='today'?String(new Date().getDay()):moduleHistoryPrefs.defaultWeekday;el('mhIncludeSupervisors').value=moduleHistoryPrefs.includeSupervisors?'yes':'no';switchPage(pageNavigation.home);}
     dynamicBonusConfig=loadDynamicBonus();if(el('dynamicBonusAmount'))el('dynamicBonusAmount').value=dynamicBonusAmount();
     refreshArchiveData(true);await refreshIncidents(true);refreshAuthorizedPages();if(activePage==='leadership')renderLeadership();render();window.VISITS?.refreshSources();

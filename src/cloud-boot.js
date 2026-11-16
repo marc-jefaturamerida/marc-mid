@@ -29,7 +29,9 @@ const KEYS = new Set([
   'wmSamsHistoricalModuleV254',
   'wmSamsBaseGoalsV258',
   'wmSamsLeadershipV256',
-  'wmSamsRecordEditsV260'
+  'wmSamsRecordEditsV260',
+  'wmSamsTeamRegistryV261',
+  'wmSamsRemindersV261'
 ]);
 const PENDING_PREFIX = 'wmSamsCloudPendingV19:';
 const SESSION_EXPIRED_FLAG='wmSamsSessionExpiredV249';
@@ -38,11 +40,11 @@ const MIN_AWAY_MS = 10 * 60 * 1000;
 const RETRY_DELAYS_MS = [30000, 120000]; // Dos intentos; después solo manual / regreso / reconexión.
 const MAX_BATCH_KEYS = 12;
 const MAX_BATCH_BYTES = 1700000;
-let user=null, suspended=true, afterLogin=null, inviteToken='', passwordReset=false;
+let user=null, suspended=true,conflictBlocked=false, afterLogin=null, inviteToken='', passwordReset=false;
 let sessionExpiredOnBoot=false;
 let saveTimer=0, retryTimer=0, flushPromise=null, retryCount=0;
 let checking=false, checkingTimer=0, lastWakeCheck=0, awaySince=null;
-let pending=new Map(), fileSignatures=new Map(), refresher=null, incidenceVersions=new Map(), incidentsChecked=false;
+let revisions=new Map(),pending=new Map(), fileSignatures=new Map(), refresher=null, incidenceVersions=new Map(), incidentsChecked=false;
 const $=id=>document.getElementById(id);
 const nativeSet=Storage.prototype.setItem;
 const nativeRemove=Storage.prototype.removeItem;
@@ -116,7 +118,7 @@ function persistPending(){
   }catch(err){sessionMessage('No se pudo conservar la cola local de ajustes', 'error');}
 }
 function scheduleSave(delay=WRITE_DEBOUNCE_MS){
-  if(!user||suspended||!pending.size)return;
+  if(!user||suspended||!pending.size||conflictBlocked)return;
   clearTimeout(saveTimer);
   pendingMessage();
   if(!navigator.onLine)return;
@@ -152,7 +154,8 @@ async function hydrate(){
   suspended=true;
   clearDashboardCache();
   if(user){
-    const {settings}=await api('settings');
+    const {settings,revisions:remoteRevisions}=await api('settings');
+    revisions=new Map(Object.entries(remoteRevisions||{}).map(([k,v])=>[k,Number(v)||0]));
     for(const [key,value] of Object.entries(settings||{}))if(KEYS.has(key)&&typeof value==='string'&&value.length){
       nativeSet.call(localStorage,key,value);
     }
@@ -174,7 +177,7 @@ function snapshotBatch(){
   return result;
 }
 async function flush(){
-  if(!user||!pending.size)return;
+  if(!user||!pending.size||conflictBlocked)return;
   if(flushPromise)return flushPromise;
   clearTimeout(saveTimer);saveTimer=0;
   clearTimeout(retryTimer);retryTimer=0;
@@ -184,14 +187,19 @@ async function flush(){
     try{
       while(pending.size){
         const entries=snapshotBatch();
-        await api('settings',{method:'PUT',body:JSON.stringify({entries})});
-        for(const {key,value} of entries){if(pending.get(key)===value)pending.delete(key);}
+        const expectedRevisions=Object.fromEntries(entries.map(({key})=>[key,revisions.get(key)||0]));
+        const result=await api('settings',{method:'PUT',body:JSON.stringify({entries,expectedRevisions})});
+        for(const {key,value} of entries){
+          if(Number.isInteger(result.revisions?.[key]))revisions.set(key,result.revisions[key]);
+          if(pending.get(key)===value)pending.delete(key);
+        }
         persistPending();
       }
-      retryCount=0;sessionMessage(savedMessage());
+      retryCount=0;conflictBlocked=false;$('jmResolveConflict').hidden=true;sessionMessage(savedMessage());
     }catch(err){
       pendingMessage();toast('Cambios pendientes: '+escapeMsg(err));
-      if(navigator.onLine&&retryCount<RETRY_DELAYS_MS.length){
+      if(/conflicto|dispositivo|revisión|revision/i.test(escapeMsg(err))){conflictBlocked=true;$('jmResolveConflict').hidden=false;sessionMessage('Conflicto entre dispositivos · exporta respaldo antes de resolver','error');}
+      if(navigator.onLine&&!/conflicto|dispositivo|revisión|revision/i.test(escapeMsg(err))&&retryCount<RETRY_DELAYS_MS.length){
         retryTimer=setTimeout(()=>{retryTimer=0;void flush();},RETRY_DELAYS_MS[retryCount++]);
       }
     }
@@ -199,7 +207,7 @@ async function flush(){
   try{await flushPromise;}finally{
     flushPromise=null;
     // Si se editó una clave mientras se guardaba el lote, procesar el valor nuevo.
-    if(pending.size&&!retryTimer&&retryCount===0)scheduleSave();
+    if(pending.size&&!conflictBlocked&&!retryTimer&&retryCount===0)scheduleSave();
   }
 }
 function filesSignature(){return JSON.stringify([...fileSignatures].sort(([a],[b])=>a.localeCompare(b)));}
@@ -234,6 +242,10 @@ async function clearFiles(){
   fileSignatures.clear();
 }
 async function listIncidents(){if(!user)return [];const data=await api('incidents');const rows=Array.isArray(data.incidents)?data.incidents:[];incidenceVersions=new Map(rows.map(r=>[r.folio_key,Date.parse(r.updated_at||'')||0]));incidentsChecked=true;return rows;}
+async function listTrash(){if(!user)return [];const data=await api('incidents?deleted=1');return data.incidents||[];}
+async function restoreIncident(folio){if(!user)throw Error('Inicia sesión.');return api('incidents',{method:'POST',body:JSON.stringify({folio,action:'restore'})});}
+async function listAudit(){if(!user)return [];const data=await api('audit');return data.events||[];}
+async function deleteIncident(folio){if(!user)throw Error('Inicia sesión para eliminar incidencias.');return api('incidents',{method:'DELETE',body:JSON.stringify({folio})});}
 async function putIncident(payload){if(!user)throw Error('Inicia sesión para guardar incidencias.');const data=await api('incidents',{method:'PUT',body:JSON.stringify(payload)});if(data.incident?.folio_key){incidenceVersions.set(data.incident.folio_key,Date.parse(data.incident.updated_at||'')||0);incidentsChecked=true;}return data.incident;}
 async function expireSession(){
   // Los cambios pendientes ya están en la cola local por cuenta; no se borran.
@@ -257,10 +269,15 @@ async function signOut(){
 }
 function setupModal(){
   $('cloudLoginButton').addEventListener('click',()=>user?signOut():openLogin());
+  $('jmResolveConflict').addEventListener('click',()=>{
+    if(!conflictBlocked)return;
+    if(!confirm('Se detectaron ajustes más recientes en otro dispositivo. PRIMERO exporta un respaldo JSON de tus ajustes si quieres conservarlos. ¿Descartar únicamente tus cambios locales pendientes y recargar desde Netlify?'))return;
+    pending.clear();persistPending();conflictBlocked=false;location.reload();
+  });
   $('cloudSyncButton').addEventListener('click',async()=>{
     if(!navigator.onLine){toast('No hay conexión. Los cambios pendientes se conservan localmente.');return;}
     await flush();
-    if(pending.size){toast('Primero deben guardarse los ajustes pendientes.');return;}
+    if(pending.size){toast(conflictBlocked?'Hay conflicto. Exporta respaldo JSON y usa Resolver conflicto.':'Primero deben guardarse los ajustes pendientes.');return;}
     sessionMessage('Actualizando desde la nube…','pending');
     location.reload(); // Una sola ronda de carga; evita una consulta previa redundante.
   });
@@ -291,8 +308,8 @@ function setupModal(){
 }
 window.APP_CLOUD={
   get user(){return user;},
-  openLogin,logout:signOut,listFiles,putFile,deleteFile,clearFiles,listIncidents,putIncident,
-  registerRefresh:fn=>{refresher=fn;},flush,
+  openLogin,logout:signOut,listFiles,putFile,deleteFile,clearFiles,listIncidents,putIncident,deleteIncident,
+  registerRefresh:fn=>{refresher=fn;},flush,listTrash,restoreIncident,listAudit,
   get pendingCount(){return pending.size;}
 };
 setupModal();

@@ -69,5 +69,5 @@ const html=fs.readFileSync('index.html','utf8'),src=fs.readFileSync('src/legacy-
 for(const needle of ['moduleHistoryPage','settingsModuleHistoryV254','mhExecutive','msSave','data-page-tab="moduleHistory"'])assert(html.includes(needle),needle);
 for(const needle of ["activePage==='moduleHistory'",'renderModuleHistory()','buildModuleHistoryReport()','exportModuleHistoryPng()','MODULE_HISTORY_KEY'])assert(src.includes(needle),needle);
 for(const file of ['src/cloud-boot.js','netlify/functions/settings.js'])assert(fs.readFileSync(file,'utf8').includes(MODULE_HISTORY_KEY));
-assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'2.6.0');
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'2.7.0');
 console.log('V2.5.4: módulos aislados, promedios, objetivos, cuatro calidades, exportación y navegación: OK');

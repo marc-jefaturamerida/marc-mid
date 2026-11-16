@@ -7,7 +7,7 @@ export const LEADERSHIP_DEFAULTS=Object.freeze({
  period:'week',includeSupervisors:true,showTrend:true,showPeople:true,showQuality:true,
  showAlerts:true,showActions:true,showModules:true,showProjection:true,showTargets:true,
  minConversion:20,minProjectedCompletion:100,staleDays:2,topPeople:12,
- exportTitle:'Dashboard de Jefatura',exportSubtitle:'Seguimiento consolidado de módulos',
+ exportTitle:'Jefatura Mid Marc · Dashboard de Jefatura',exportSubtitle:'Seguimiento consolidado de módulos',
  exportNote:'Estimaciones operativas basadas en registros manuales disponibles; no sustituyen las comisiones oficiales.',
  color:'#003b7a',actions:[],
  // Metas semanales absolutas por módulo y semana; sin tocar metas de comisiones.

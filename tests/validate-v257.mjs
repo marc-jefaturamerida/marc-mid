@@ -29,8 +29,8 @@ assert.equal(m.salesToDate,2);assert.equal(m.projected,4.5); // 2 x 9 pesos / 4 
 assert.equal(m.counts.sales,3); // Fechas futuras presentes no influyen en proyección.
 assert.equal(result.modules.find(x=>x.name==='Aviación').goal,null);
 const html=fs.readFileSync('index.html','utf8'),app=fs.readFileSync('src/legacy-app.js','utf8');
-for(const id of ['leaderExpandAll','leaderCollapseAll','leaderTargetsSection','leaderTargetsRows','lsGoalModule','lsGoalWeek','lsGoalSave','lsGoalConfigSave','settingsLeadershipGoalsV257'])assert(html.includes(`id="${id}"`),id);
+for(const id of ['leaderExpandAll','leaderCollapseAll','leaderTargetsSection','leaderTargetsCards','lsGoalModule','lsGoalWeek','lsGoalSave','lsGoalConfigSave','settingsLeadershipGoalsV257'])assert(html.includes(`id="${id}"`),id);
 assert(app.includes('initLeadershipCollapse()'));assert(app.includes('initLeadershipGoalSettings()'));
 assert(LEADERSHIP_METRICS.length===9);
-assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'2.6.0');
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'2.7.0');
 console.log('V2.5.7: objetivos por módulo/semana, fuentes, proyección lineal/ponderada y secciones plegables: OK');

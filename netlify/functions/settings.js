@@ -23,7 +23,9 @@ const ALLOWED = new Set([
   'wmSamsHistoricalModuleV254',
   'wmSamsBaseGoalsV258',
   'wmSamsLeadershipV256',
-  'wmSamsRecordEditsV260'
+  'wmSamsRecordEditsV260',
+  'wmSamsTeamRegistryV261',
+  'wmSamsRemindersV261'
 ]);
 const MAX_ENTRIES=12;
 const MAX_TOTAL_BYTES=2_200_000;
@@ -52,20 +54,33 @@ export default async function handler(request){
     if(request.method==='PUT'){
       const body=await jsonBody(request,2_600_000);
       const entries=validateEntries(body);
-      // Un único INSERT parametrizado con JSONB para todas las claves modificadas.
-      // Evita reescrituras y aumentos de revisión si el valor ya existe idéntico.
-      const payload=JSON.stringify(entries.map(({key,value})=>({setting_key:key,setting_value:value})));
-      const rows=await db.sql`
-        INSERT INTO dashboard_settings (owner_id,setting_key,setting_value)
-        SELECT ${owner}, input.setting_key, input.setting_value
-        FROM jsonb_to_recordset(${payload}::jsonb) AS input(setting_key text,setting_value text)
-        ON CONFLICT (owner_id,setting_key) DO UPDATE SET
-          setting_value=EXCLUDED.setting_value,
-          revision=dashboard_settings.revision+1,
-          updated_at=now()
-        WHERE dashboard_settings.setting_value IS DISTINCT FROM EXCLUDED.setting_value
-        RETURNING setting_key,revision`;
-      return send({ok:true,written:rows.length,received:entries.length});
+      const expected=body.expectedRevisions;
+      if(!expected||typeof expected!=='object'||Array.isArray(expected)||entries.some(e=>!Number.isSafeInteger(expected[e.key])||expected[e.key]<0))
+        return send({error:'Faltan revisiones de sincronización; recarga antes de editar.'},409);
+      const previous=await db.sql`SELECT setting_key, revision, setting_value FROM dashboard_settings WHERE owner_id=${owner}`;
+      const current=new Map(previous.map(r=>[r.setting_key,r]));
+      const conflicts=entries.filter(e=>(Number(current.get(e.key)?.revision||0)!==Number(expected[e.key]))).map(e=>e.key);
+      if(conflicts.length)return send({error:'Otro dispositivo modificó ajustes. Tus cambios locales se conservaron; sincroniza o exporta un respaldo antes de resolver el conflicto.',conflicts},409);
+      // Una clave no puede sobrescribir una revisión más nueva: comparación atómica por UPDATE/INSERT.
+      const revisions={};let written=0;
+      for(const {key,value} of entries){
+        const existing=current.get(key);
+        if(existing?.setting_value===value){revisions[key]=Number(existing.revision);continue;}
+        const rows=existing?
+          await db.sql`UPDATE dashboard_settings SET setting_value=${value},revision=revision+1,updated_at=NOW()
+            WHERE owner_id=${owner} AND setting_key=${key} AND revision=${expected[key]} RETURNING revision`:
+          await db.sql`INSERT INTO dashboard_settings(owner_id,setting_key,setting_value) VALUES (${owner},${key},${value})
+            ON CONFLICT (owner_id,setting_key) DO NOTHING RETURNING revision`;
+        if(!rows.length)return send({error:'Conflicto de actualización concurrente; no se sobrescribieron datos más recientes.',conflicts:[key],revisions},409);
+        revisions[key]=Number(rows[0].revision);written++;
+      }
+      if(written){try{
+        const details=JSON.stringify({keys:entries.map(e=>e.key),written});
+        await db.sql`INSERT INTO dashboard_audit_events(owner_id,actor_id,entity_type,entity_key,operation,details)
+          VALUES (${owner},${owner},'settings','account','update',${details}::jsonb)`;
+      }catch(error){console.warn('settings audit unavailable:',error?.message);}}
+      return send({ok:true,written,received:entries.length,revisions});
+
     }
     return send({error:'Método no permitido'},405);
   }catch(err){console.error('settings:',err);return responseError(err);}

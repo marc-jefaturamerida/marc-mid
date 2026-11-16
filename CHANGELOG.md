@@ -1,3 +1,57 @@
+# CHANGELOG — Jefatura Mid Marc
+
+## V2.7.0 — 16 de noviembre de 2026
+
+- Nombre visible, metadatos y documentación actualizados a **Jefatura Mid Marc**. Sin cambios en el motor de comisiones ni sus escalones.
+- Catálogo más robusto con identificadores estables, alias, vigencia de metas semanales y estados activos con fechas históricas. Los objetivos base y las metas del catálogo se resuelven sin eliminar excepciones semanales.
+- Vista previa de cada XLS/CSV: diagnóstico de filas, muestra, duplicados, fechas faltantes, folios y códigos ausentes, previo a la carga.
+- Tabla adaptable a celular en páginas comparativas e históricos; ajustes filtrables por buscador y categorías.
+- Calculadora individual con tres simulaciones comparables y aclaración del origen editable del objetivo. Se reutiliza `calculate()` original.
+- Resumen de alertas por prioridad en Dashboard de Jefatura.
+- Papelera de incidencias, restauración inactiva, eventos de auditoría e historial en Ajustes; migración `20261116080000_jefatura_v27_audit_trash.sql`.
+- Sincronización de ajustes con revisión optimista en API; impide sobrescrituras silenciosas por otros dispositivos y conserva una cola local para resolver conflictos.
+- Archivo de respaldo JSON actualizado a 2.7, compatible con el formato de claves anterior.
+- Nuevas pruebas `tests/validate-v270.mjs`.
+
+**Compatibilidad:** claves de configuración, archivos XLS, identificadores históricos de folio y fórmulas de comisiones preservados. La auditoría comienza a registrar desde V2.7; no fabrica un historial anterior. No se convierte un XLS ni se cambian sus filas en la importación.
+
+**Límites comprobados:** todas las pruebas automáticas pasan. No se pudo verificar `npm run build` por instalación de dependencias incompleta. Sin pruebas reales de Netlify en este entorno.
+
+---
+
+# INVEX V2.6.1 — Ajuste de tarjetas de Jefatura (16 de noviembre de 2026)
+
+- **Objetivos operativos y su origen:** tarjetas compactadas aproximadamente a una cuarta parte de su superficie anterior en escritorio, con cuadrícula adaptativa de ~215 px de ancho, menor espaciado y una sola columna de valores por indicador.
+- Se mantienen visibles los nombres de los indicadores, sus objetivos, resultados y avances. El origen se muestra de forma abreviada y se despliega al tocarlo. En móvil las tarjetas siguen usando una columna legible.
+- **Sin cambios** en cálculos, porcentajes, registros, catálogo ni persistencia. Es un ajuste de presentación sobre V2.6.1.
+
+---
+
+# INVEX V2.6.1 — Catálogo, incidencias móviles, recordatorios y configuración
+
+**Fecha:** 16 de noviembre de 2026. **Base:** V2.6.0 completa. **Compatibilidad:** se preservan las fórmulas de cálculo de comisión, calidad y Alcance Global, y el contrato de correcciones lógicas por folio `wmSamsRecordEditsV260`.
+
+## Cambios funcionales
+
+- **Gestión central de módulos y ejecutivos:** catálogo administrable con nombre, módulo vinculado, meta semanal opcional y estado activo/inactivo. Estado prospectivo por día de cambio; se conservan los registros anteriores a la fecha de baja en históricos. Se filtra el conjunto de datos antes de alimentar reportes, sin modificar los XLS. Los selectores de edición admiten elementos activos y muestran el valor histórico sin convertirlo en opción nueva.
+- **Calculadoras:** metas específicas existentes siguen teniendo prioridad; las metas del catálogo sirven de respaldo predeterminado y son editables. No se modifican escalones, factores, umbrales, bonos ni fórmulas.
+- **Incidencias:** listado adaptable a tarjetas móviles, vista completa al pulsar una fila, botones Editar y Eliminar, formulario de altas inicialmente recogido. Eliminar requiere confirmación y borra definitivamente el folio en la base de incidencias del usuario. La eliminación lógica de registros de venta permanece distinta.
+- **Jefatura:** en Objetivos operativos y su origen, tarjetas plegables por módulo con indicadores, objetivos, resultado, cumplimiento y procedencia.
+- **Navegación (sección 21):** alta de secciones personalizadas, edición de títulos de secciones y páginas, reordenación y asignación de páginas, y eliminación de secciones vacías. No crea páginas funcionales nuevas. Se conserva la sección de configuración.
+- **Ajustes:** cuatro grupos temáticos y revisión de controles aparentemente duplicados. Se mantienen separados los que operan sobre objetos o cálculos distintos. Guardados explícitos de los editores actualizados cierran el panel, mientras errores de validación conservan el formulario.
+- **Recordatorios en la app:** página de administración y ventanas emergentes con horario local, repeticiones, activar/desactivar, posponer y confirmación. Solo funcionan con la aplicación abierta, sin push externo.
+- **Respaldos de configuración:** JSON con lista blanca de claves; exportación local e importación bajo sesión con confirmación, sincronización y recarga; excluye archivos XLS, incidencias de la base y credenciales.
+
+## Persistencia, archivos y pruebas
+
+- Nuevas claves `wmSamsTeamRegistryV261` y `wmSamsRemindersV261` en PostgreSQL `dashboard_settings` por cuenta, usando la estructura existente, sin crear migración SQL relacional adicional.
+- Nuevo endpoint DELETE autenticado en `netlify/functions/incidents.js`.
+- Nuevos módulos `src/team-registry.js`, `src/reminders.js`, `src/settings-transfer.js` y prueba `tests/validate-v261.mjs`.
+- Manual vigente: `MANUAL_USUARIO_INVEX_V261.md` y `public/MANUAL_INVEX_V261.pdf`. Los manuales históricos no se empaquetan; el historial técnico anterior permanece en este CHANGELOG.
+- Verificaciones locales: `npm run check` y `npm test`. Compilación Netlify y flujo real de PostgreSQL/Identity requieren prueba en entorno desplegado.
+
+---
+
 # INVEX V2.6.0 — Menús de filtros, gestión de registros y edición múltiple
 
 **Base:** V2.5.9 completa. No se cambian las fórmulas de comisión, calidad, proyecciones, vigencias de objetivos ni la estructura PostgreSQL.
