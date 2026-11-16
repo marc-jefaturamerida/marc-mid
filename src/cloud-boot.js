@@ -26,7 +26,10 @@ const KEYS = new Set([
   'wmSamsNavOrderV250',
   'wmSamsWeeklyAdminReportV252',
   'wmSamsHistoricalIndividualV253',
-  'wmSamsHistoricalModuleV254'
+  'wmSamsHistoricalModuleV254',
+  'wmSamsBaseGoalsV258',
+  'wmSamsLeadershipV256',
+  'wmSamsRecordEditsV260'
 ]);
 const PENDING_PREFIX = 'wmSamsCloudPendingV19:';
 const SESSION_EXPIRED_FLAG='wmSamsSessionExpiredV249';

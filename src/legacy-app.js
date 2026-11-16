@@ -1,3 +1,7 @@
+import {RECORD_EDITS_KEY,cleanRecordEdits,overlayRecord,validateRecordFields,EDITABLE_RECORD_FIELDS} from './record-overrides.js';
+import {BASE_GOALS_KEY,BASE_METRICS,BASE_TYPES,BASE_RATE_DEFAULTS,isBasePercentage,cleanBaseGoals,upsertBaseGoals,effectiveBaseGoal,headquartersGoal,knownBaseProfiles,mondayISO,normalizeName} from './base-goals.js';
+import {LEADERSHIP_KEY,LEADERSHIP_DEFAULTS,cleanLeadershipSettings,leadershipRange,analyzeLeadership,LEADERSHIP_METRICS,LEADERSHIP_METRIC_LABELS,leadershipTargetGoal,leadershipModuleKey,leadershipWeeklyKey} from './leadership-dashboard.js';
+import {leadershipReportHtml,LEADERSHIP_PRINT_CSS,leadershipPngPages} from './leadership-export.js';
 import {MODULE_HISTORY_KEY,MODULE_HISTORY_DEFAULTS,cleanModuleHistorySettings,moduleNames,analyzeModuleHistory,resolveModuleWeeklyGoal,moduleKey} from './module-history.js';
 import {HISTORY_KEY,HISTORY_METRICS,HISTORY_DEFAULTS,cleanHistorySettings,analyzeHistory,overrideKey} from './individual-history.js';
 import {historyReportHtml,historyPrintCss,historyPngPages} from './history-export.js';
@@ -42,7 +46,7 @@ import {WEEKLY_ADMIN_DEFAULTS,WEEKLY_ADMIN_STORAGE,cleanWeeklyAdminSettings,prel
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='2.5.5';
+  const APP_VERSION='2.6.0';
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -96,11 +100,11 @@ const teamGoals=loadTeamStore(TEAM_GOALS_STORAGE),teamRecoveries=loadTeamStore(T
 function readWeeklyAdminPrefs(){try{return cleanWeeklyAdminSettings(JSON.parse(localStorage.getItem(WEEKLY_ADMIN_STORAGE)||'null'));}catch(_){return cleanWeeklyAdminSettings(null);}}
 let weeklyAdminPrefs=readWeeklyAdminPrefs();
 const PAGE_NAV_KEY='wmSamsNavOrderV250';
-const DEFAULT_PAGE_ORDER=['daily','history','moduleHistory','individual','team','supervisor','incidents','allrecords','achievements','accumulated','weekly','visits'];
+const DEFAULT_PAGE_ORDER=['leadership','daily','history','moduleHistory','individual','team','supervisor','incidents','allrecords','achievements','accumulated','weekly','visits'];
 const GROUP_LABELS={analysis:'Análisis y resultados',commissions:'Comisiones',administration:'Administración',settings:'Configuración'};
 const GROUP_DEFAULT=['analysis','commissions','administration','settings'];
-const DEFAULT_GROUP_MAP={daily:'analysis',history:'analysis',moduleHistory:'analysis',team:'analysis',achievements:'analysis',accumulated:'analysis',weekly:'analysis',individual:'commissions',supervisor:'commissions',allrecords:'administration',incidents:'administration',visits:'administration'};
-const PAGE_LABELS={daily:'Comparativa diaria',individual:'Calculadora individual',team:'Comparativo de ejecutivos',supervisor:'Calculadora supervisor',incidents:'Gestión de incidencias',allrecords:'Registros manuales',achievements:'Logros semanales',accumulated:'Acumulado general',weekly:'Comparativa semanal',visits:'Visitas de coordinación',history:'Histórico individual',moduleHistory:'Histórico por módulo'};
+const DEFAULT_GROUP_MAP={leadership:'analysis',daily:'analysis',history:'analysis',moduleHistory:'analysis',team:'analysis',achievements:'analysis',accumulated:'analysis',weekly:'analysis',individual:'commissions',supervisor:'commissions',allrecords:'administration',incidents:'administration',visits:'administration'};
+const PAGE_LABELS={leadership:'Dashboard de Jefatura',daily:'Comparativa diaria',individual:'Calculadora individual',team:'Comparativo de ejecutivos',supervisor:'Calculadora supervisor',incidents:'Gestión de incidencias',allrecords:'Registros manuales',achievements:'Logros semanales',accumulated:'Acumulado general',weekly:'Comparativa semanal',visits:'Visitas de coordinación',history:'Histórico individual',moduleHistory:'Histórico por módulo'};
 function validNavSettings(value){
   const arr=Array.isArray(value?.order)?value.order:[],unique=[...new Set(arr.filter(k=>DEFAULT_PAGE_ORDER.includes(k)))];
   const order=[...unique,...DEFAULT_PAGE_ORDER.filter(k=>!unique.includes(k))];
@@ -110,10 +114,39 @@ function validNavSettings(value){
   if(value?.groupBy&&typeof value.groupBy==='object')for(const page of DEFAULT_PAGE_ORDER){
     if(['analysis','commissions','administration'].includes(value.groupBy[page]))groupBy[page]=value.groupBy[page];
   }
-  return {order,groupOrder,groupBy,home:DEFAULT_PAGE_ORDER.includes(value?.home)?value.home:'daily'};
+  const oldDefault=Array.isArray(value?.order)&&!value.order.includes('leadership')&&value?.home==='daily';
+  return {order,groupOrder,groupBy,home:oldDefault?'leadership':DEFAULT_PAGE_ORDER.includes(value?.home)?value.home:'leadership'};
 }
 function loadNavSettings(){try{return validNavSettings(JSON.parse(localStorage.getItem(PAGE_NAV_KEY)||'null'));}catch(_){return validNavSettings(null);}}
 let pageNavigation=loadNavSettings();
+function readLeadershipPrefs(){try{return cleanLeadershipSettings(JSON.parse(localStorage.getItem(LEADERSHIP_KEY)||'null'));}catch(_){return cleanLeadershipSettings(null);}}
+let leadershipPrefs=readLeadershipPrefs(),leadershipSnapshot=null;
+let baseGoals=readBaseGoals();
+function readBaseGoals(){try{return cleanBaseGoals(JSON.parse(localStorage.getItem(BASE_GOALS_KEY)||'null'));}catch(_){return cleanBaseGoals(null);}}
+function saveBaseGoals(){localStorage.setItem(BASE_GOALS_KEY,JSON.stringify(baseGoals));}
+function resolveAnalysisGoal(type,name,week,metric='sales',fallback=null){
+ const own=type==='headquarters'?headquartersGoal(baseGoals,week,metric,baseModuleNames()):effectiveBaseGoal(baseGoals,type,name,week,metric);
+ if(own.value!==null)return own;
+ return typeof fallback==='function'?fallback():{value:null,source:own.source};
+}
+let moduleProfileCache=null;
+function baseModuleNames(){
+ const source=historyData();
+ const fingerprint=[source,archive.reports,baseGoals,qualityConfig,supSettings];
+ if(moduleProfileCache&&moduleProfileCache.refs.every((v,i)=>v===fingerprint[i]))return moduleProfileCache.names;
+ const names=knownBaseProfiles(baseGoals,'module',[
+  ...moduleNames(source),...Object.keys(qualityConfig.modules||{}),
+  ...Object.keys(supSettings.goals||{}),
+  ...Object.keys(leadershipPrefs.defaultGoals||{}),
+  ...archive.reports.flatMap(r=>{const idx=r.headers.findIndex(h=>normalize(h)==='MODULO');if(idx<0)return [];const seen=new Map();for(const row of r.rows){const name=String(row[idx]||'').trim();if(name&&!seen.has(normalizeName(name)))seen.set(normalizeName(name),name);}return [...seen.values()];})
+ ]);
+ moduleProfileCache={refs:fingerprint,names};return names;
+}
+function baseExecutiveNames(){return knownBaseProfiles(baseGoals,'executive',[
+ ...historyData().map(r=>r.executive),...Object.keys(teamGoals).map(k=>k.includes('::')?k.slice(k.indexOf('::')+2):'')
+ ]);}
+
+
 let activePage=pageNavigation.home;
 let activeGroup=pageNavigation.groupBy[activePage]||'analysis';
 let firstCloudNavigation=true;
@@ -394,6 +427,11 @@ function drawImportMeta(name){
 const ARCHIVE_DB='wmSamsArchivoComisionesV9', ARCHIVE_STORE='reports';
 const ARCHIVE_SELECTION_KEY='wmSamsArchivoSeleccionV9', FOLIO_FLAGS_KEY='wmSamsFolioFlagsV9';
 const archive={db:null,reports:[],selection:{mode:'all',ids:[]},ready:false,tempReports:[],temporaryMode:false};
+let recordEdits=readRecordEdits();
+function readRecordEdits(){try{return cleanRecordEdits(JSON.parse(localStorage.getItem(RECORD_EDITS_KEY)||'{}'));}catch(_){return {};}}
+function persistRecordEdits(){localStorage.setItem(RECORD_EDITS_KEY,JSON.stringify(recordEdits));combinedArchiveCache.clear();}
+const selectedRecordUids=new Set();
+let recordActionCurrent=null,recordActionVisibleText='',recordBulkMode=false;
 function archiveSelectionRestore(){
   try{const v=JSON.parse(localStorage.getItem(ARCHIVE_SELECTION_KEY)||'null');
     if(v&&['all','selected'].includes(v.mode)&&Array.isArray(v.ids))archive.selection={mode:v.mode,ids:v.ids.filter(x=>typeof x==='string')};
@@ -550,8 +588,13 @@ const archiveClear=()=>isAuthorized()?window.APP_CLOUD.clearFiles():Promise.reje
 function hashString(s){let x=2166136261;for(let i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619);}return (x>>>0).toString(36);}
 function bytesFingerprint(bytes){let x=2166136261;for(const c of bytes){x^=c;x=Math.imul(x,16777619);}return `${bytes.length}-${(x>>>0).toString(36)}`;}
 function selectedArchiveReports(){const ids=new Set(archive.selection.ids);return archive.selection.mode==='all'?archive.reports:archive.reports.filter(r=>ids.has(r.id));}
+const combinedArchiveCache=new Map();
+function recordEditKey(row){const folio=normalize(row.originalFolio??row.folio);return folio?'f_'+hashString(folio)+'_'+hashString([...folio].reverse().join('')):row.uid;}
 function combinedArchiveData(reports){
   if(!reports.length)return null;
+  const cacheKey=reports.map(r=>String(r.id)).join('|');
+  const hit=combinedArchiveCache.get(cacheKey);
+  if(hit&&hit.refs.length===reports.length&&reports.every((r,i)=>hit.refs[i]===r))return hit.result;
   const headers=[],seen=new Set();
   reports.forEach(rep=>rep.headers.forEach(h=>{const key=normalize(h);if(!seen.has(key)){headers.push(h);seen.add(key);}}));
   const map=new Map();
@@ -572,8 +615,18 @@ function combinedArchiveData(reports){
       map.set(basis+'#'+next,out); // el reporte más reciente prevalece para el mismo folio.
     }
   }
-  const rows=[...map.values()];rows.forEach((r,i)=>r.i=i);
-  return {headers,rows,appColumn:null};
+  // Aplicar correcciones guardadas SIN modificar las filas originales ni los archivos de Netlify.
+  const rows=[...map.values()].map(r=>{
+    r.overrideKey=recordEditKey(r);r.originalFolio=r.folio;
+    const patched=overlayRecord(r,headers,recordEdits[r.overrideKey]||recordEdits[r.uid],h=>XLS_CANONICAL_BY_ALIAS.get(normalize(h))||h);
+    if(patched&&patched!==r){patched.fecha=isoDate(patched.fecha)||'';patched.week=patched.fecha?mondayOf(patched.fecha):'';}
+    return patched;
+  }).filter(Boolean);
+  rows.forEach((r,i)=>r.i=i);
+  const result={headers,rows,appColumn:null};
+  if(combinedArchiveCache.size>6)combinedArchiveCache.clear();
+  combinedArchiveCache.set(cacheKey,{refs:[...reports],result});
+  return result;
 }
 function renderArchiveList(){
   if(!el('archiveList'))return;
@@ -595,7 +648,7 @@ function refreshArchiveData(forceImportMode=false){
   if(data){
     inputMode='import';document.body.classList.add('import-mode');
     imported.week=previousWeek;imported.executive=previousExec;simDirty=false;
-    initializeTableView(data);chooseWeekAndExecutive();renderDaily();
+    initializeTableView(data);chooseWeekAndExecutive();if(activePage==='daily')renderDaily();
     drawImportMeta('');
     el('recordsDisclosure').open=true;
   }else{
@@ -603,19 +656,19 @@ function refreshArchiveData(forceImportMode=false){
     if(forceImportMode||inputMode==='import')resetToManual();
     el('weekSelect').innerHTML='<option value="">Sin semanas disponibles</option>';el('weekSelect').disabled=true;
     el('executiveSelect').innerHTML='<option value="">Sin ejecutivos disponibles</option>';el('executiveSelect').disabled=true;
-    populateTeamModules();renderTeam();renderDaily();
+    populateTeamModules();if(activePage==='team')renderTeam();if(activePage==='daily')renderDaily();
     statusBox(archive.temporaryMode?'Sin archivos temporales en esta sesión.':archive.reports.length?'No hay archivos seleccionados. Activa al menos uno desde Ajustes.':'No hay archivos guardados. Usa «Cargar XLS» para importar.');
   }
   renderArchiveList();
-  renderQualitySettings();renderSupervisorSettings();
-  renderAccumulated();
-  renderWeekly();
+  if(el('settingsBaseGoalsV258')?.open)baseGoalList();renderQualitySettings();renderSupervisorSettings();
+  if(activePage==='accumulated')renderAccumulated();
+  if(activePage==='weekly')renderWeekly();
   allRecordsView.selectedValues.clear();
   el('allRecordsColumn').value='';el('allRecordsValueSearch').value='';
-  populateAllRecordsMainFilters();populateAllRecordsColumns();allRecordsView.page=1;renderAllRecords();
-  achievementsView.page=1;achievementsView.chosen.clear();populateAchFilters();renderAchievements();
-  populateSupervisorCalculatorFilters();renderSupervisorCalculator();renderSupervisorCalculatorSettings();
-  populateHistoryFilters();renderHistory();populateModuleFilters();renderModuleHistory();
+  populateAllRecordsMainFilters();populateAllRecordsColumns();allRecordsView.page=1;if(activePage==='allrecords')renderAllRecords();
+  achievementsView.page=1;achievementsView.chosen.clear();populateAchFilters();if(activePage==='achievements')renderAchievements();
+  populateSupervisorCalculatorFilters();if(activePage==='supervisor')renderSupervisorCalculator();renderSupervisorCalculatorSettings();
+  populateHistoryFilters();if(activePage==='history')renderHistory();populateModuleFilters();if(activePage==='moduleHistory')renderModuleHistory();if(activePage==='leadership')renderLeadership();
 }
 function chooseImportArchiveDate(fileName){
   const dialog=el('importDateDialog'),form=el('importDateForm'),date=el('importDateValue');
@@ -890,11 +943,11 @@ function renderAllRecords(){
   el('allRecordsCount').textContent=`${number.format(count)} / ${number.format(total)} registros`;
   el('allRecordsActiveFilters').textContent=allRecordsActiveFilterCount()?`${allRecordsActiveFilterCount()} filtro(s) activo(s)`:'Ningún filtro adicional';
   el('allRecordsSummary').innerHTML=`<span>${number.format(count)} visibles</span><span>${rows.filter(hasCode).length} con código</span><span>${rows.filter(selectedIncident).length} incidencias</span><span>${rows.filter(appEnabled).length} APP activas</span>`;
-  el('allRecordsHead').innerHTML='<tr>'+cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')+'</tr>';
+  el('allRecordsHead').innerHTML='<tr><th class="record-select-header" title="Selección múltiple">✓</th>'+cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')+'</tr>';
   host.innerHTML=visible.length?visible.map(r=>{
     const classes=[selectedIncident(r)?'flagged':'',excluded(r)?'unpayable':'',!appEnabled(r)?'app-disabled':''].filter(Boolean).join(' ');
-    return `<tr class="${classes}">`+cols.map(c=>`<td>${tableCellMarkup(r,c)}</td>`).join('')+'</tr>';
-  }).join(''):`<tr><td class="empty-table" colspan="${Math.max(1,cols.length)}">${total?'No hay registros que coincidan con estos filtros.':'No hay XLS cargados. Usa «Cargar XLS».'}</td></tr>`;
+    return `<tr data-record-uid="${esc(r.uid)}" class="${classes}"><td class="record-select-cell"><input type="checkbox" data-record-select="${esc(r.uid)}" aria-label="Seleccionar folio ${esc(r.folio)}" ${selectedRecordUids.has(r.uid)?'checked':''}></td>`+cols.map(c=>`<td>${tableCellMarkup(r,c)}</td>`).join('')+'</tr>';
+  }).join(''):`<tr><td class="empty-table" colspan="${Math.max(1,cols.length+1)}">${total?'No hay registros que coincidan con estos filtros.':'No hay registros cargados.'}</td></tr>`;
   el('allRecordsPageStatus').textContent=count?`Filas ${number.format(start+1)}–${number.format(Math.min(start+allRecordsView.pageSize,count))} de ${number.format(count)} · Página ${allRecordsView.page} de ${pages}`:`0 registros · Página 1 de 1`;
   el('allRecordsPrev').disabled=allRecordsView.page<=1;
   el('allRecordsNext').disabled=allRecordsView.page>=pages;
@@ -947,10 +1000,10 @@ function renderRecords(){
   const activeApps=current.filter(r=>payable(r)&&appEnabled(r)).length;
   el('recordsCount').textContent=`${current.length} registros del ejecutivo`;
   el('recordCounters').innerHTML=`<span>${visible.length} filas visibles</span><span>${current.filter(hasCode).length} con Código (selección)</span><span>${activeApps} APP válidas</span><span>${flaggedCurrent} incidencias marcadas</span><span>${nonPay} ventas no pagables</span>`;
-  el('recordsHead').innerHTML='<tr>'+cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')+'</tr>';
+  el('recordsHead').innerHTML='<tr><th class="record-select-header">✓</th>'+cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')+'</tr>';
   el('recordsBody').innerHTML=visible.length?visible.map(r=>{
     const classes=[selectedIncident(r)?'flagged':'',excluded(r)?'unpayable':'',!appEnabled(r)?'app-disabled':''].filter(Boolean).join(' ');
-    return `<tr class="${classes}">`+cols.map(c=>`<td>${tableCellMarkup(r,c)}</td>`).join('')+'</tr>';
+    return `<tr data-record-uid="${esc(r.uid)}" class="${classes}"><td class="record-select-cell"><input type="checkbox" data-record-select="${esc(r.uid)}" aria-label="Seleccionar folio ${esc(r.folio)}" ${selectedRecordUids.has(r.uid)?'checked':''}></td>`+cols.map(c=>`<td>${tableCellMarkup(r,c)}</td>`).join('')+'</tr>';
   }).join(''):`<tr><td colspan="${Math.max(1,cols.length)}" class="empty-table">No hay filas que coincidan con los filtros.</td></tr>`;
   // La impresión siempre corresponde al ejecutivo/semana, aunque en pantalla se active el alcance «Todo el archivo».
   const printRows=applyTableFilters(current);
@@ -1015,7 +1068,7 @@ function renderTeam(){
   el('teamRows').innerHTML=group.length?group.map(e=>{
     const r=e.result,good=r.ok,completion=good?pct(r.completion):'—';
     const completionBar=good?Math.min(100,Math.max(0,r.completion)):0;
-    return `<tr><td><div class="executive-name">${esc(e.name)}</div><div class="executive-module">${esc(e.module)}</div></td>
+    return `<tr><td><button type="button" class="base-goal-inline executive-name" data-base-goal-type="executive" data-base-goal-name="${esc(e.name)}">${esc(e.name)}</button><div class="executive-module">${esc(e.module)}</div></td>
       <td><input class="goal-mini" type="number" min="1" step="1" value="${e.goal}" data-team-goal="${esc(e.name)}" aria-label="Meta semanal de ${esc(e.name)}" title="Objetivo semanal editable" /></td>
       <td><span class="progress-value">${completion}</span><span class="progress-meter"><i style="width:${completionBar}%"></i></span></td>
       <td>${good?r.validReg:'—'}</td><td>${good?r.validGuar:'—'}</td><td><strong>${good?r.validSales:'—'}</strong></td>
@@ -1119,13 +1172,20 @@ function availableWeeks(rows){
 }
 function qualityWeeklyGoal(rows,name,groupBy,granularity){
   if(name==='TOTAL'){
+    if(groupBy==='module'){
+      const weeks=granularity==='daily'?[rows[0]?.fecha?mondayOf(rows[0].fecha):'']:availableWeeks(rows);
+      const totals=weeks.map(week=>resolveAnalysisGoal('headquarters','Jefatura',week,'sales'));
+      if(totals.length&&totals.every(g=>g.value!==null))return totals.reduce((sum,g)=>sum+g.value,0)*(granularity==='daily'?1/7:1);
+    }
     const names=[...new Set(rows.map(r=>String(r[groupBy]||'').trim()).filter(Boolean))];
     return names.reduce((sum,member)=>sum+qualityWeeklyGoal(groupRowsFor(rows,groupBy,member),member,groupBy,granularity),0);
   }
   const weeks=granularity==='daily'?[rows[0]?.fecha?mondayOf(rows[0].fecha):''] : availableWeeks(rows);
   if(groupBy==='executive'){
-    return weeks.reduce((sum,week)=>sum+(week?executiveGoal(week,name):qualityConfig.execWeeklyGoal),0)*(granularity==='daily'?1/7:1);
+    return weeks.reduce((sum,week)=>sum+(resolveAnalysisGoal('executive',name,week,'sales').value ?? (week?executiveGoal(week,name):qualityConfig.execWeeklyGoal)),0)*(granularity==='daily'?1/7:1);
   }
+  const configured=weeks.map(week=>resolveAnalysisGoal(name==='TOTAL'?'headquarters':'module',name,week,'sales'));
+  if(configured.every(goal=>goal.value!==null))return configured.reduce((sum,goal)=>sum+goal.value,0)*(granularity==='daily'?1/7:1);
   const cfg=moduleQualityOptions(name);
   if(cfg.weeklySales>0)return cfg.weeklySales*weeks.length*(granularity==='daily'?1/7:1);
   return weeks.reduce((sum,week)=>{
@@ -1143,8 +1203,17 @@ function qualityResult(rows,groupBy,name,granularity='weekly',goalOverride=null)
     app:counters.sales>0?100*counters.apps/counters.sales:0,
     purchase:counters.sales>0?100*counters.purchase/counters.sales:0};
   const factors={};
+  // Metas porcentuales operativas vigentes por las semanas efectivamente consultadas.
+  // No afecta comisiones ni las tarifas de los colaboradores.
+  const qualityWeeks=[...new Set(rows.map(r=>r.week|| (r.fecha?mondayOf(r.fecha):'')).filter(Boolean))];
   for(const key of QUALITY_FACTORS){
     const rule=qualityRule(key,name,groupBy);
+    const rateKey={purchase:'purchase',p0:'p0',app:'apps'}[key];
+    if(rateKey&&qualityWeeks.length){
+      const type=groupBy==='executive'?'executive':name==='TOTAL'?'headquarters':'module';
+      const rates=qualityWeeks.map(week=>resolveAnalysisGoal(type,name,week,rateKey).value);
+      if(rates.every(v=>Number.isFinite(v)&&v>0))rule.required=rates.reduce((a,b)=>a+b,0)/rates.length;
+    }
     const value=qualityMetricFactor(actual[key],rule.required,{minimum:rule.minimum,maximum:(key==='completion'||key==='p0'?null:rule.maximum)})??0;
     factors[key]=key==='purchase'||key==='app'?Math.min(100,value):value;
   }
@@ -1185,8 +1254,33 @@ function historyCurrentRows(){
     dental:isYes(r.dental),p0:isYes(r.p0),app:appEnabled(r)
   }));
 }
+/** Reglas operativas vigentes por cada período histórico (no alteran comisiones).
+ * Cada porcentaje conserva su vigencia semanal y no se transforma en cantidad.
+ */
+function baseRulesForHistory(type,name,fallback){
+ const dayList=(kind,key)=>{
+  if(!key)return [];
+  if(kind==='day')return [key];
+  const start=kind==='month'?key+'-01':key;
+  const end=kind==='month'?dateIso(new Date(Number(key.slice(0,4)),Number(key.slice(5,7)),0,12)):weekShift(key,6);
+  const days=[];let date=start;
+  for(let i=0;i<32&&date<=end;i++,date=weekShift(date,1))days.push(date);
+  return days;
+ };
+ return ({kind,key,periods=[]})=>{
+  const dates=kind==='summary'?periods.flatMap(p=>dayList(p.kind,p.key)):dayList(kind,key);
+  const base=Object.fromEntries(['completion','purchase','p0','app'].map(k=>[k,{...fallback[k]}]));
+  for(const [factor,metric] of [['purchase','purchase'],['p0','p0'],['app','apps']]){
+   if(!dates.length)continue;
+   const values=dates.map(date=>resolveAnalysisGoal(type,name,mondayOf(date),metric).value);
+   if(values.every(v=>Number.isFinite(v)&&v>0))base[factor].required=values.reduce((a,b)=>a+b,0)/values.length;
+  }
+  return base;
+ };
+}
 function historyRules(){
-  return Object.fromEntries(['completion','purchase','p0','app'].map(k=>[k,qualityRule(k,'','executive')]));
+  const fallback=Object.fromEntries(['completion','purchase','p0','app'].map(k=>[k,qualityRule(k,'','executive')]));
+  return baseRulesForHistory('executive',el('histExecutive').value,fallback);
 }
 function historyAnalyze(){
  const name=el('histExecutive').value,kind=el('histPeriod').value;
@@ -1196,7 +1290,10 @@ function historyAnalyze(){
  for(const row of source)if(normalize(row.executive)===normalize(name)&&row.week&&!byWeek.has(row.week))byWeek.set(row.week,row.executive);
  // Si el nombre figura con distinta capitalización en un XLS antiguo,
  // recuperar la meta semanal guardada con la grafía de esa misma semana.
- const goalFor=(week)=>executiveGoal(week,byWeek.get(week)||name);
+ const goalFor=(week)=>{
+   const value=resolveAnalysisGoal('executive',name,week,'sales');
+   return value.value!==null?value.value:executiveGoal(week,byWeek.get(week)||name);
+ };
  return analyzeHistory({rows:records,name,kind,module:el('histModule').value,
     weekday:el('histWeekday').value,from:el('histFrom').value,to:el('histTo').value,
     weeklyGoal:goalFor,settings:historyPrefs,rules:historyRules()});
@@ -1205,7 +1302,7 @@ function historyWeekdayLabel(){const value=el('histWeekday').value;return value=
 function historyGoalForm(p){
  const name=el('histExecutive').value,kind=el('histPeriod').value;
  const key=overrideKey(name,kind,p.key),edited=Object.hasOwn(historyPrefs.periodGoals,key);
- return `<input type="number" data-history-goal="${esc(p.key)}" step="0.01" min="0.01" max="99999" value="${p.goal.toFixed(2)}" title="Objetivo ${edited?'personalizado':'automático'}; vacía el campo para restaurarlo" aria-label="Objetivo ${esc(p.key)}"><small>${edited?' Editado':' Auto'}</small>`;
+ return `<input type="number" data-history-goal="${esc(p.key)}" step="0.01" min="0.01" max="99999" value="${p.goal.toFixed(2)}" title="Objetivo ${edited?'personalizado':'automático'}; vacía el campo para restaurarlo" aria-label="Objetivo ${esc(p.key)}"><small>${edited?' Excepción de período':' Objetivo base/automático'}</small>`;
 }
 function historyGraph(data){
  const host=el('histChart'),list=data.periods.slice(-24),key=historyPrefs.chartMetric;
@@ -1329,10 +1426,14 @@ function moduleHistoryAnalyze(){
  const module=el('mhExecutive').value;if(!module)return null;
  const rows=moduleHistoryRows(),raw=historyData();
  const actualName=moduleNames(raw).find(m=>moduleKey(m)===moduleKey(module))||module;
- const weeklyGoal=(week)=>resolveModuleWeeklyGoal({week,module:actualName,achievementGoals:achievementGoalStore,
+ const weeklyGoal=(week)=>{
+   const goal=resolveAnalysisGoal('module',actualName,week,'sales');
+   if(goal.value!==null)return goal.value;
+   return resolveModuleWeeklyGoal({week,module:actualName,achievementGoals:achievementGoalStore,
    configuredGoal:moduleQualityOptions(actualName).weeklySales,
    supervisorGoal:supSettings.goals[actualName],rows:raw,getExecutiveGoal:executiveGoal,isSupervisor:supervisorRow});
- const rules=Object.fromEntries(['completion','purchase','p0','app'].map(k=>[k,qualityRule(k,actualName,'module')]));
+ };
+ const rules=baseRulesForHistory('module',actualName,Object.fromEntries(['completion','purchase','p0','app'].map(k=>[k,qualityRule(k,actualName,'module')])));
  return analyzeModuleHistory({rows,module:actualName,kind:el('mhPeriod').value,weekday:el('mhWeekday').value,
    from:el('mhFrom').value,to:el('mhTo').value,weeklyGoal,
    includeSupervisors:moduleHistoryPrefs.includeSupervisors,settings:moduleHistoryPrefs,rules});
@@ -1341,7 +1442,7 @@ function moduleWeekdayLabel(){const value=el('mhWeekday').value;return value==='
 function moduleGoalForm(p){
  const name=el('mhExecutive').value,kind=el('mhPeriod').value;
  const key=overrideKey(name,kind,p.key),edited=Object.hasOwn(moduleHistoryPrefs.periodGoals,key);
- return `<input type="number" data-module-goal="${esc(p.key)}" step="0.01" min="0.01" max="99999" value="${p.goal.toFixed(2)}" title="Objetivo ${edited?'personalizado':'automático'}; vacía el campo para restaurarlo" aria-label="Objetivo ${esc(p.key)}"><small>${edited?' Editado':' Auto'}</small>`;
+ return `<input type="number" data-module-goal="${esc(p.key)}" step="0.01" min="0.01" max="99999" value="${p.goal.toFixed(2)}" title="Objetivo ${edited?'personalizado':'automático'}; vacía el campo para restaurarlo" aria-label="Objetivo ${esc(p.key)}"><small>${edited?' Excepción de período':' Objetivo base/automático'}</small>`;
 }
 function moduleGraph(data){
  const host=el('mhChart'),list=data.periods.slice(-24),key=moduleHistoryPrefs.chartMetric;
@@ -1484,7 +1585,14 @@ function achParseGoal(input,key){
 }
 function achReadGoals(){
   const obj=achievementGoalStore[achGoalScope()]||{};
-  return Object.fromEntries(Object.keys(ACH_GOAL_INPUTS).map(k=>[k,achParseGoal(obj[k],k)]));
+  const week=achValue('achWeek'),module=achValue('achModule');
+  return Object.fromEntries(Object.keys(ACH_GOAL_INPUTS).map(k=>{
+   const manual=achParseGoal(obj[k],k);
+   if(manual!==null)return [k,manual];
+   const baseKey=k==='app'?'apps':k;
+   const goal=resolveAnalysisGoal(module&&module!=='*'?'module':'headquarters',module||'Jefatura',week,baseKey);
+   return [k,goal.value>0?goal.value:null];
+  }));
 }
 function achShowGoals(){
   const goals=achReadGoals();
@@ -1564,7 +1672,9 @@ function achData(){
     factors[key]=value===null?null:(key==='purchase'||key==='app'?Math.min(100,value):value);
   }
   const {composite,global}=correctedGlobalQuality(factors);
-  const qualityRequirement=qualityRule('quality',module,'module');
+  const qualityRequirement={...qualityRule('quality',module,'module')};
+  const qualityTarget=resolveAnalysisGoal(module&&module!=='*'?'module':'headquarters',module||'Jefatura',achValue('achWeek'),'quality');
+  if(qualityTarget.value>0)qualityRequirement.required=qualityTarget.value;
   const globalReach=global;
   // 'Alcance' es siempre el porcentaje grande; el resultado sujeto a mínimos y
   // máximos configurables se expone abajo como 'Calidad' en cada tarjeta.
@@ -1666,8 +1776,8 @@ function renderAchievements(){
   const pages=Math.max(1,Math.ceil(records.length/achievementsView.pageSize));
   achievementsView.page=Math.min(Math.max(1,achievementsView.page),pages);
   const start=(achievementsView.page-1)*achievementsView.pageSize,visible=records.slice(start,start+achievementsView.pageSize);
-  el('achRecordsHead').innerHTML='<tr>'+cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')+'</tr>';
-  el('achRecordsBody').innerHTML=visible.length?visible.map(r=>`<tr class="${selectedIncident(r)?'flagged':''}">${cols.map(c=>`<td>${tableCellMarkup(r,c)}</td>`).join('')}</tr>`).join(''):`<tr><td class="achievements-empty" colspan="${Math.max(1,cols.length)}">${imported.data?'No hay registros que coincidan con los filtros.':'Carga un XLS para consultar los registros.'}</td></tr>`;
+  el('achRecordsHead').innerHTML='<tr><th class="record-select-header">✓</th>'+cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')+'</tr>';
+  el('achRecordsBody').innerHTML=visible.length?visible.map(r=>`<tr data-record-uid="${esc(r.uid)}" class="${selectedIncident(r)?'flagged':''}"><td class="record-select-cell"><input type="checkbox" data-record-select="${esc(r.uid)}" aria-label="Seleccionar folio ${esc(r.folio)}" ${selectedRecordUids.has(r.uid)?'checked':''}></td>${cols.map(c=>`<td>${tableCellMarkup(r,c)}</td>`).join('')}</tr>`).join(''):`<tr><td class="achievements-empty" colspan="${Math.max(1,cols.length+1)}">${imported.data?'No hay registros que coincidan con los filtros.':'Carga un XLS para consultar los registros.'}</td></tr>`;
   el('achRecordSummary').innerHTML=`<span>${number.format(records.length)} folios filtrados en la tabla</span><span>${number.format(rows.length)} contados en indicadores</span><span>${rows.filter(hasCode).length} ventas válidas</span><span>${number.format(incidents.length)} incidencias excluidas</span>`;
   el('achRecordStatus').textContent=records.length?`Filas ${start+1}–${Math.min(start+achievementsView.pageSize,records.length)} de ${records.length} · Página ${achievementsView.page}/${pages}`:'0 registros';
   el('achPrev').disabled=achievementsView.page<=1;el('achNext').disabled=achievementsView.page>=pages;
@@ -1756,7 +1866,16 @@ function renderSupervisorSettings(){
   const modules=knownExecutivesByModule();
   host.innerHTML=modules.length?modules.map(({module,names})=>`<div class="module-goal-card"><strong>${esc(module)}</strong><div class="supervisor-choice-row">${names.length?names.map(name=>`<label><input type="checkbox" data-supervisor-module="${esc(module)}" data-supervisor-name="${esc(name)}" ${(supervisorConfig[module]||[]).includes(name)?'checked':''}/> ${esc(name)}</label>`).join(''):'<span class="muted">Sin ejecutivos en los XLS activos.</span>'}</div></div>`).join(''):'<p class="settings-help">Importa un XLS para identificar supervisores disponibles.</p>';
 }
-function renderQualityPages(){if(el('dailyPage'))renderDaily();if(el('accumulatedPage'))renderAccumulated();if(el('weeklyPage'))renderWeekly();if(el('achievementsPage'))renderAchievements();if(el('historyPage'))renderHistory();if(el('moduleHistoryPage'))renderModuleHistory();}
+function renderQualityPages(){
+ // Evitar repintar y filtrar todos los históricos cuando se cambia un ajuste.
+ if(activePage==='daily')renderDaily();
+ else if(activePage==='accumulated')renderAccumulated();
+ else if(activePage==='weekly')renderWeekly();
+ else if(activePage==='achievements')renderAchievements();
+ else if(activePage==='history')renderHistory();
+ else if(activePage==='moduleHistory')renderModuleHistory();
+ else if(activePage==='leadership')renderLeadership();
+}
 function setQualityField(cfg,kind,key,inputValue){
   const target=kind==='target'?'targets':kind==='minimum'?'minima':kind==='maximum'?'maxima':'weights';
   if(target==='maxima'&&inputValue===''){cfg.maxima[key]=null;return true;}
@@ -1863,7 +1982,7 @@ function dailyDeltaMarkup(current,previous){
 function dailyRowMarkup(g,isTotal=false,groupBy='module'){
   const quality=qualityResult(g.currentRows,groupBy,g.name,'daily').global;
   const before=qualityResult(g.previousRows,groupBy,g.name,'daily').global;
-  return `<tr${isTotal?' class="daily-total-row"':''}><td><span class="daily-entity" title="${esc(g.name)}">${esc(g.name)}</span></td>${DAILY_METRICS.map(k=>`<td data-daily-metric="${k}"><span class="daily-val">${g.current[k]}</span>${dailyDeltaMarkup(g.current[k],g.previous[k])}</td>`).join('')}<td><span class="daily-val">${qualityPercentText(quality)}</span><span class="daily-diff same">Anterior: ${qualityPercentText(before)}</span></td></tr>`;
+  return `<tr${isTotal?' class="daily-total-row"':''}><td>${isTotal?`<span class="daily-entity">TOTAL</span>`:`<button class="base-goal-inline" type="button" data-base-goal-type="${groupBy==='module'?'module':'executive'}" data-base-goal-name="${esc(g.name)}">${esc(g.name)}</button>`}</td>${DAILY_METRICS.map(k=>`<td data-daily-metric="${k}"><span class="daily-val">${g.current[k]}</span>${dailyDeltaMarkup(g.current[k],g.previous[k])}</td>`).join('')}<td><span class="daily-val">${qualityPercentText(quality)}</span><span class="daily-diff same">Anterior: ${qualityPercentText(before)}</span></td></tr>`;
 }
 function renderDaily(){
   if(!el('dailyModuleRows'))return;
@@ -1966,7 +2085,7 @@ function accumulatedGroups(rows,groupBy){
 }
 function accumulatedRowMarkup(group,isTotal=false,groupBy='module'){
   const q=qualityResult(group.rows,groupBy,group.name,'accumulated').global;
-  return `<tr${isTotal?' class="daily-total-row"':''}><td><span class="daily-entity" title="${esc(group.name)}">${esc(group.name)}</span></td>${DAILY_METRICS.map(key=>`<td><span class="daily-val">${number.format(group.metrics[key])}</span></td>`).join('')}<td><span class="daily-val">${qualityPercentText(q)}</span></td></tr>`;
+  return `<tr${isTotal?' class="daily-total-row"':''}><td>${isTotal?`<span class="daily-entity">TOTAL</span>`:`<button class="base-goal-inline" type="button" data-base-goal-type="${groupBy==='module'?'module':'executive'}" data-base-goal-name="${esc(group.name)}">${esc(group.name)}</button>`}</td>${DAILY_METRICS.map(key=>`<td><span class="daily-val">${number.format(group.metrics[key])}</span></td>`).join('')}<td><span class="daily-val">${qualityPercentText(q)}</span></td></tr>`;
 }
 function accumulatedPeriodText(){
   const start=el('accumulatedFrom').value,end=el('accumulatedTo').value;
@@ -2046,6 +2165,8 @@ function hasWeeklyGoalOverride(week,key){
 }
 function weeklyGoalFor(week,key,primaryWeek,metrics){
   if(hasWeeklyGoalOverride(week,key))return weeklyGoals[week][key];
+  const metricName={reg:'regular',guar:'guaranteed',app:'apps',p0:'p0',purchase:'purchase',dental:'dental',records:'records',sales:'sales'}[key];
+  if(metricName){const base=resolveAnalysisGoal('headquarters','Jefatura',week,metricName);if(base.value!==null)return base.value;}
   // Cada semana usa el total logrado en su propia tabla como objetivo base de Plan Cero (regulares) y Dental (ventas).
   if(key==='p0'||key==='dental'){
     const totals=metrics||weeklyGroups(week).totals.metrics;
@@ -2095,7 +2216,7 @@ function weeklyPanelMarkup(week,primaryWeek){
   const totalQuality=qualityResult(data.rows,'module','TOTAL','weekly',weeklyGoalFor(week,'sales',primaryWeek,data.totals.metrics)||null);
   const overall=totalQuality.global;
   const metricCells=g=>WEEKLY_DISPLAY_METRICS.map(k=>`<td>${number.format(weeklyMetricValue(g.metrics,g.rows,k))}</td>`).join('');
-  const rowMarkup=g=>`<tr><td><span class="daily-entity" title="${esc(g.name)}">${esc(g.name)}</span></td>${metricCells(g)}<td class="quality-global">${qualityPercentText(qualityFor(g))}</td></tr>`;
+  const rowMarkup=g=>`<tr><td><button class="base-goal-inline" type="button" data-base-goal-type="module" data-base-goal-name="${esc(g.name)}">${esc(g.name)}</button></td>${metricCells(g)}<td class="quality-global">${qualityPercentText(qualityFor(g))}</td></tr>`;
   const inputRow=`<tr class="goal-row"><td>OBJETIVOS</td>${WEEKLY_DISPLAY_METRICS.map(k=>weeklyGoalMarkup(week,k,primaryWeek,data.totals.metrics)).join('')}<td class="weekly-rule-goal" title="Porcentaje requerido de Calidad en Ajustes">${weeklyTargetPct('quality')}</td></tr>`;
   const totalRow=`<tr class="weekly-total"><td>TOTAL ACUMULADO</td>${metricCells(data.totals)}<td class="quality-global">${qualityPercentText(overall)}</td></tr>`;
   const progressRow=`<tr class="weekly-progress"><td>CUMPLIMIENTO</td>${WEEKLY_DISPLAY_METRICS.map(k=>{
@@ -2431,7 +2552,7 @@ function supTableMarkup(rows,c,tableKind,forReport=false){
       forReport?(type==='incident'?(incident?'Sí':'No'):(app?'Sí':'No')):
       type==='incident'?`<input type="checkbox" data-sup-incident-id="${esc(r.uid||String(r.i))}" ${incident?'checked':''} aria-label="Marcar incidencia ${esc(r.folio)}">`:
       `<input type="checkbox" data-sup-app-id="${esc(r.uid||String(r.i))}" ${app?'checked':''} ${hasCode(r)?'':'disabled'} aria-label="APP activa ${esc(r.folio)}">`;
-    return `<tr class="${incident?'sup-incident':''}">${cells.map(x=>`<td>${esc(x)}</td>`).join('')}<td>${checkbox('app')}</td><td>${checkbox('incident')}</td><td>${checkbox('dynamicBonus')}</td><td>${tableKind==='own'?(valid?mx(supRowFee(r,c)):'No paga'):(valid?'Válido':'Excluido')}</td></tr>`;
+    return `<tr ${forReport?'':`data-record-uid="${esc(r.uid)}"`} class="${incident?'sup-incident':''}">${cells.map(x=>`<td>${esc(x)}</td>`).join('')}<td>${checkbox('app')}</td><td>${checkbox('incident')}</td><td>${checkbox('dynamicBonus')}</td><td>${tableKind==='own'?(valid?mx(supRowFee(r,c)):'No paga'):(valid?'Válido':'Excluido')}</td></tr>`;
   }).join('');
   return `<table class="sup-record-table ${forReport?'sup-report-records':''}"><thead><tr>${['Fecha','Ejecutivo','Folio','Tipo','Código','P0','Dental','APP','Incidencia','Bono adicional',tableKind==='own'?'Bruto por folio':'Estado'].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body||'<tr><td colspan="11">Sin registros para la selección actual.</td></tr>'}</tbody></table>`;
 }
@@ -2543,8 +2664,340 @@ function refreshAuthorizedPages(){
   if(activePage==='supervisor'){populateSupervisorCalculatorFilters();renderSupervisorCalculator();}
   if(activePage==='history'){populateHistoryFilters();renderHistory();}
   if(activePage==='moduleHistory'){populateModuleFilters();renderModuleHistory();}
+  if(activePage==='leadership')renderLeadership();
 }
 
+
+
+/** JEFATURA V2.5.7: solo los datos históricos disponibles, sin datos inventados. */
+const leadershipLegacyGoalMemo=new Map();
+function leadershipGoal(week,module){
+ const source=historyData(),actual=module;
+ const cacheKey=week+'|'+moduleKey(module);
+ const cached=leadershipLegacyGoalMemo.get(cacheKey);
+ if(cached&&cached.rows===source)return cached.goal;
+ const saved=achievementGoalStore[JSON.stringify([week,actual])];
+ const goal=resolveModuleWeeklyGoal({week,module:actual,achievementGoals:achievementGoalStore,
+  configuredGoal:moduleQualityOptions(actual).weeklySales,supervisorGoal:supSettings.goals[actual],
+  rows:source,getExecutiveGoal:executiveGoal,isSupervisor:supervisorRow});
+ let label='Suma de metas individuales identificadas en registros';
+ if(Number(saved?.sales)>0)label='Logros semanales';
+ else if(Number(moduleQualityOptions(actual).weeklySales)>0)label='Calidad del módulo';
+ else if(Number(supSettings.goals[actual])>0)label='Calculadora supervisor';
+ const result={value:goal>0?goal:null,source:label};
+ if(leadershipLegacyGoalMemo.size>1000)leadershipLegacyGoalMemo.clear();
+ leadershipLegacyGoalMemo.set(cacheKey,{rows:source,goal:result});return result;
+}
+function leadershipMetricGoal(week,module,metric){
+ return resolveAnalysisGoal('module',module,week,metric,()=>leadershipTargetGoal(leadershipPrefs,week,module,metric,leadershipGoal));
+}
+function leadershipHeadquartersGoal(week,metric){
+ return resolveAnalysisGoal('headquarters','Jefatura',week,metric);
+}
+function leadershipKnownModules(){
+ const available=new Map();
+ for(const name of [...baseModuleNames(),...moduleNames(historyData()),...Object.keys(qualityConfig.modules),...Object.keys(supSettings.goals||{}),
+   ...Object.keys(leadershipPrefs.defaultGoals||{}),
+   ...Object.keys(leadershipPrefs.weeklyGoals||{}).map(k=>{try{return JSON.parse(k)[1]}catch(_){return ''}})]){
+  const text=String(name||'').trim();if(text&&!available.has(moduleKey(text)))available.set(moduleKey(text),text);
+ }
+ return [...available.values()].sort((a,b)=>a.localeCompare(b,'es'));
+}
+
+function leadershipRows(){return historyData().map(r=>({fecha:r.fecha,module:r.module,executive:r.executive,
+ supervisor:supervisorRow(r),valid:payable(r),code:hasCode(r),regular:isNo(r.guaranteed),guaranteed:isYes(r.guaranteed),
+ dental:isYes(r.dental),p0:isYes(r.p0),app:appEnabled(r),incident:selectedIncident(r)}));}
+function persistLeadership(){try{localStorage.setItem(LEADERSHIP_KEY,JSON.stringify(leadershipPrefs));return true;}catch(error){el('lsStatus').textContent='Error al guardar: '+error.message;return false;}}
+const lPct=n=>Number.isFinite(n)?pct(n):'—';
+function leadershipSelectedRange(){
+ const today=dateIso(new Date()),period=el('leaderPeriod').value;
+ return leadershipRange(period,today,el('leaderFrom').value,el('leaderTo').value);
+}
+function leadershipCalc(){
+ const {from,to}=leadershipSelectedRange(),today=dateIso(new Date());
+ const goalCache=new Map();
+ const cachedGoal=(week,module,metric)=>{const key=week+'|'+normalizeName(module)+'|'+metric;
+  if(!goalCache.has(key))goalCache.set(key,leadershipMetricGoal(week,module,metric));return goalCache.get(key);};
+ const rulesFor=module=>key=>qualityRule(key,module,module?'module':'executive');
+ return analyzeLeadership({rows:leadershipRows(),from,to,today,weeklyGoal:cachedGoal,rulesFor,
+  permanentIncidents:[...incidentRecords.values()],includeSupervisors:el('leaderSupervisor').value==='yes',
+  minConversion:leadershipPrefs.minConversion,minProjectedCompletion:leadershipPrefs.minProjectedCompletion,
+  staleDays:leadershipPrefs.staleDays,actions:leadershipPrefs.actions,
+  projectionMode:leadershipPrefs.projectionMode,weekdayWeights:leadershipPrefs.weekdayWeights,
+  minQualityAlert:leadershipPrefs.minQualityAlert,alertTargets:leadershipPrefs.alertTargets,
+  minTargetProgress:leadershipPrefs.minTargetProgress,knownModules:leadershipKnownModules(),
+  headquartersGoal:(week,_module,metric)=>leadershipHeadquartersGoal(week,metric)});
+}
+function renderLeadership(){
+ if(!el('leadershipPage'))return;
+ let info;try{info=leadershipCalc();leadershipSnapshot=info;}catch(error){
+  leadershipSnapshot=null;el('leaderNotice').textContent='Revisa el período: '+error.message;return;
+ }
+ const {total,modules,people,alerts}=info;
+ el('leaderNotice').textContent=`${fmtDay(info.from)} a ${fmtDay(info.to)} · ${info.selectedRows} registros · ${modules.length} módulos configurados o históricos · ${info.withGoal} con objetivo calculable. Las cifras se actualizan al cargar registros manuales.`;
+ const card=(label,value,sub)=>`<div class="leadership-kpi"><span>${esc(label)}</span><b>${esc(String(value))}</b><small>${esc(sub)}</small></div>`;
+ const kpis=[['Registros',number.format(total.counts.records),'Registros del período'],['Ventas válidas',number.format(total.counts.sales),`${total.counts.regular} regulares · ${total.counts.guaranteed} garantizadas`],
+ ['Cumplimiento',lPct(total.completion),total.goal===null?'Objetivos incompletos':`Meta ${number.format(total.goal)} · ${info.totalGoalSource}`],['Calidad Total',lPct(total.quality),'Cuatro factores, máximo 100%'],['Alcance Global',lPct(total.global),'Cinco valores, sin tope'],['Programa Cero',total.counts.regular?lPct(100*total.counts.p0/total.counts.regular):'—',`P0 en ${total.counts.regular} regulares`],['Activaciones APP',total.counts.sales?lPct(100*total.counts.apps/total.counts.sales):'—',`${total.counts.apps} activaciones`],['Conversión',lPct(total.conversion),'Ventas válidas / registros'],['Incidencias abiertas',number.format(info.incidents),`${info.overdueActions.length} compromiso(s) vencido(s)`]];
+ el('leaderKpis').innerHTML=kpis.map(a=>card(...a)).join('');
+ const score=n=>n===null?'—':number.format(n);
+ el('leaderModuleRows').innerHTML=modules.map(m=>`<tr><td><button class="base-goal-inline" type="button" data-base-goal-type="module" data-base-goal-name="${esc(m.name)}">${esc(m.name)}</button></td><td>${m.counts.records}</td><td>${m.counts.sales}</td><td>${score(m.goal)}</td><td>${lPct(m.completion)}</td><td>${lPct(m.conversion)}</td><td>${lPct(m.quality)}</td><td>${lPct(m.global)}</td><td>${m.pendingIncidents}</td></tr>`).join('')||'<tr><td colspan="9">Sin módulos disponibles. Importa registros manuales.</td></tr>';
+ const targetRows=[];
+ for(const m of modules){for(const key of LEADERSHIP_METRICS){const t=m.targets[key];
+  if(!t)continue;
+  targetRows.push(`<tr><td><button class="base-goal-inline" type="button" data-base-goal-type="module" data-base-goal-name="${esc(m.name)}">${esc(m.name)}</button></td><td>${esc(LEADERSHIP_METRIC_LABELS[key])}</td><td>${t.value===null?'—':(t.unit==='percent'?lPct(t.value):number.format(t.value))}</td><td>${t.unit==='percent'?lPct(t.actual):number.format(t.actual)}</td><td>${lPct(t.progress)}</td><td>${esc(t.source)}</td></tr>`);
+ }}
+ el('leaderTargetsRows').innerHTML=targetRows.join('')||'<tr><td colspan="6">Sin objetivos disponibles.</td></tr>';
+ el('leaderPeopleRows').innerHTML=people.slice(0,leadershipPrefs.topPeople).map(p=>`<tr><td><button class="base-goal-inline" type="button" data-base-goal-type="executive" data-base-goal-name="${esc(p.name)}">${esc(p.name)}</button>${p.supervisor?' · SUP':''}</td><td>${esc(p.modules.join(', '))}</td><td>${p.counts.records}</td><td>${p.counts.sales}</td><td>${lPct(p.conversion)}</td><td>${lPct(p.contribution)}</td></tr>`).join('')||'<tr><td colspan="6">Sin colaboradores en el período seleccionado.</td></tr>';
+ const labels=[['completion','Cumplimiento'],['purchase','Primera compra'],['p0','Programa Cero'],['app','Activaciones APP']];
+ el('leaderQualityCards').innerHTML=labels.map(([key,label])=>`<div class="leadership-factor"><span>${label}</span><b>${lPct(total.factors[key])}</b><small>Alcance real ${lPct(total.actual[key])}</small></div>`).join('')+
+ `<div class="leadership-factor"><span>Calidad Total</span><b>${lPct(total.quality)}</b><small>Máximo 100%</small></div><div class="leadership-factor"><span>Alcance Global</span><b>${lPct(total.global)}</b><small>Sin límite superior</small></div>`;
+ const trend=info.trend.slice(-25),max=Math.max(1,...trend.map(r=>r.sales)),W=900,H=200,L=39,B=34,T=13,R=15,bw=(W-L-R)/Math.max(1,trend.length);
+ const bars=trend.map((r,i)=>{const h=r.sales/max*(H-B-T),x=L+i*bw+Math.max(2,bw*.12),y=H-B-h,w=Math.max(4,bw*.7);
+  return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${leadershipPrefs.color}" rx="2"><title>${r.date}: ${r.sales} ventas válidas</title></rect>${i%Math.max(1,Math.ceil(trend.length/8))===0||i===trend.length-1?`<text x="${x}" y="${H-12}" font-size="9" fill="#687d91">${r.date.slice(5)}</text>`:''}`;
+ }).join('');
+ el('leaderTrend').innerHTML=trend.length?`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Tendencia diaria de ventas válidas"><line x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}" stroke="#adc5d8"/><text x="${L}" y="${T+10}" fill="#60758a" font-size="11">${max}</text>${bars}</svg>`:'No existen fechas con registros en el período seleccionado.';
+ el('leaderProjectionCaption').textContent=leadershipPrefs.projectionMode==='weighted'?'Pronóstico ponderado por día de la semana':'Pronóstico lineal: días naturales';
+ el('leaderProjection').innerHTML=modules.map(m=>`<div class="leadership-projection"><strong>${esc(m.name)}</strong><b>${m.projected===null?'No aplica':number.format(m.projected)+' ventas'}</b><small>${m.projected===null?'Disponible al consultar la semana actual con objetivo configurado.':`Cumplimiento proyectado ${lPct(m.projectedCompletion)}. ${m.dailyNeeded===null?'':`Necesarias ${m.dailyNeeded} ventas/día restante.`}`}<br>Objetivo: ${m.goal===null?'sin configurar':number.format(m.goal)} · ${esc(m.goalSource)}</small></div>`).join('')||'<p class="leadership-footnote">Sin módulos para proyectar.</p>';
+ el('leaderAlerts').innerHTML=alerts.slice(0,40).map(a=>`<div class="leadership-alert ${a.level}"><span>${a.level==='high'?'!':a.level==='medium'?'⚠':'i'}</span><div><b>${esc(a.module)} · ${esc(a.category)}</b>${esc(a.message)}</div></div>`).join('')||'<p class="leadership-footnote">Sin señales activas para los umbrales configurados. Comprueba que los datos estén actualizados.</p>';
+ const modPick=el('leaderActionModule'),old=modPick.value;
+ modPick.innerHTML='<option value="">Todos / Jefatura</option>'+modules.map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('');
+ modPick.value=modules.some(m=>m.name===old)?old:'';
+ el('leaderActionRows').innerHTML=[...leadershipPrefs.actions].sort((a,b)=>(a.status==='done')-(b.status==='done')||(a.due||'9999').localeCompare(b.due||'9999')).map(a=>
+ `<tr><td title="${esc(a.note||'')}">${esc(a.description)}</td><td>${esc(a.module||'Jefatura')}</td><td>${esc(a.owner||'—')}</td><td><span class="leadership-signal ${a.due<info.today&&a.status!=='done'?'warn':''}">${esc(a.due||'—')}</span></td><td><select class="leadership-action-select" data-leader-status="${esc(a.id)}"><option value="pending" ${a.status==='pending'?'selected':''}>Pendiente</option><option value="inprogress" ${a.status==='inprogress'?'selected':''}>En curso</option><option value="done" ${a.status==='done'?'selected':''}>Concluido</option></select></td><td><div class="leadership-action-buttons"><button type="button" data-leader-note="${esc(a.id)}">Nota</button><button type="button" data-leader-delete="${esc(a.id)}">Eliminar</button></div></td></tr>`).join('')||'<tr><td colspan="6">Aún no se han registrado compromisos.</td></tr>';
+ for(const [id,shown] of [['leaderModulesSection',leadershipPrefs.showModules],['leaderTargetsSection',leadershipPrefs.showTargets],['leaderPeopleSection',leadershipPrefs.showPeople],['leaderQualitySection',leadershipPrefs.showQuality],['leaderTrendSection',leadershipPrefs.showTrend],['leaderProjectionSection',leadershipPrefs.showProjection],['leaderAlertsSection',leadershipPrefs.showAlerts],['leaderActionsSection',leadershipPrefs.showActions]])el(id).hidden=!shown;
+ applyLeadershipCollapse();
+}
+
+// V2.5.8 · Perfiles dinámicos, vigencias históricas y objetivos de análisis exclusivamente.
+function baseGoalList(){
+ const host=el('baseGoalsProfiles');if(!host)return;
+ const section=(type,names)=>`<div class="base-profile-section"><h4>${esc(BASE_TYPES[type])}</h4><div class="base-profile-choices">${names.map(n=>`<button class="base-profile-choice" type="button" data-base-goal-type="${type}" data-base-goal-name="${esc(n)}"><span>${esc(n)}</span><small>Configurar objetivos →</small></button>`).join('')||'<p class="settings-help">Sin perfiles detectados. Puedes crear uno manualmente.</p>'}</div></div>`;
+ host.innerHTML=section('headquarters',['Jefatura'])+section('module',baseModuleNames())+section('executive',baseExecutiveNames());
+}
+function baseGoalOpen(type,name){
+ if(!BASE_TYPES[type]||!name)return;
+ const modal=el('baseGoalOverlay');modal.dataset.type=type;modal.dataset.name=name;
+ el('baseGoalTitle').textContent=`${BASE_TYPES[type]} · ${name}`;
+ el('baseGoalEffective').value=mondayOf(dateIso(new Date()));
+ baseGoalLoadValues();modal.hidden=false;
+ el('baseGoalEffective').focus();
+}
+function baseGoalLoadValues(){
+ const modal=el('baseGoalOverlay'),type=modal.dataset.type,name=modal.dataset.name;
+ const week=mondayOf(el('baseGoalEffective').value||dateIso(new Date()));
+ el('baseGoalEffective').value=week;
+ const profile=baseGoals.profiles?.[(type==='headquarters'?'headquarters|JEFATURA':`${type}|${normalizeName(name)}`)];
+ const existing=profile?.versions?.find(v=>v.from===week);
+ for(const input of modal.querySelectorAll('[data-base-input]')){
+  const metric=input.dataset.baseInput;
+  const resolved=type==='headquarters'?headquartersGoal(baseGoals,week,metric,baseModuleNames()):effectiveBaseGoal(baseGoals,type,name,week,metric);
+  if(type==='headquarters'){
+   input.value=existing?.goals?.[metric]??'';
+   input.placeholder=resolved.value===null?'Automático: falta objetivo':`Automático/vigente: ${resolved.value}${isBasePercentage(metric)?'%':''}`;
+  }else{
+   input.value=existing?.goals?.[metric]??(resolved.value!==null?resolved.value:'');
+   input.placeholder=isBasePercentage(metric)?`Predeterminado: ${BASE_RATE_DEFAULTS[metric]}%`:'Sin objetivo';
+  }
+  input.title=existing&&Object.hasOwn(existing.goals,metric)?'Valor fijado en esta vigencia':resolved.source;
+ }
+ const count=profile?.versions?.length||0;
+ el('baseGoalHistory').textContent=`${count} vigencia(s) guardada(s). ${existing?'Editando la vigencia elegida.':'Nueva vigencia: los valores heredados pueden modificarse.'} Metas anteriores conservadas.`;
+ el('baseGoalStatus').textContent='';
+}
+function baseGoalSaveProfile(){
+ const modal=el('baseGoalOverlay'),type=modal.dataset.type,name=modal.dataset.name,from=el('baseGoalEffective').value;
+ const goals={};for(const input of modal.querySelectorAll('[data-base-input]')){
+  const text=input.value.trim();if(!text)continue;const value=Number(text);
+  if(!Number.isFinite(value)||value<0||(isBasePercentage(input.dataset.baseInput)?value>100:(value>1000000||!Number.isInteger(value)))){
+   el('baseGoalStatus').textContent='Trámites y Ventas: cantidades enteras; demás indicadores: porcentajes de 0 a 100.';input.focus();return;
+  }goals[input.dataset.baseInput]=value;
+ }
+ try{const updated=upsertBaseGoals(baseGoals,{type,name,from,goals});
+  localStorage.setItem(BASE_GOALS_KEY,JSON.stringify(updated));baseGoals=updated;
+  baseGoalList();refreshBaseGoalDependentViews();baseGoalLoadValues();
+  el('baseGoalStatus').textContent='Objetivos guardados. Vigencias anteriores intactas. Sincronización automática al iniciar sesión.';
+ }catch(error){el('baseGoalStatus').textContent=error.message;}
+}
+function refreshBaseGoalDependentViews(){
+ // La página activa se actualiza; no reconstruir 12 páginas al editar una meta.
+ if(activePage==='leadership')renderLeadership();
+ if(activePage==='history')renderHistory();
+ if(activePage==='moduleHistory')renderModuleHistory();
+ if(activePage==='achievements'){achShowGoals();renderAchievements();}
+ if(activePage==='weekly')renderWeekly();
+ if(activePage==='daily')renderDaily();
+ if(activePage==='accumulated')renderAccumulated();
+}
+function initBaseGoals(){
+ el('settingsBaseGoalsV258').addEventListener('toggle',()=>{if(el('settingsBaseGoalsV258').open)baseGoalList();});
+ const modal=el('baseGoalOverlay');
+ document.addEventListener('click',event=>{
+  const target=event.target.closest('[data-base-goal-type][data-base-goal-name]');
+  if(target){baseGoalOpen(target.dataset.baseGoalType,target.dataset.baseGoalName);return;}
+  if(event.target===modal||event.target.closest('#baseGoalClose'))modal.hidden=true;
+ });
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.hidden)modal.hidden=true;});
+ el('baseGoalEffective').addEventListener('change',baseGoalLoadValues);
+ el('baseGoalSave').addEventListener('click',baseGoalSaveProfile);
+ el('baseGoalAdd').addEventListener('click',()=>{
+  const type=el('baseGoalNewType').value,name=el('baseGoalNewName').value.trim();
+  if(!name){el('baseGoalsNotice').textContent='Escribe el nombre del módulo o colaborador.';return;}
+  el('baseGoalNewName').value='';el('baseGoalsNotice').textContent='';baseGoalOpen(type,name);
+ });
+ for(const [id,type,target] of [['histGoalProfile','executive','histExecutive'],['mhGoalProfile','module','mhExecutive']]){
+  el(id)?.addEventListener('click',()=>{const name=el(target).value;if(name)baseGoalOpen(type,name);});
+ }
+ el('leadGoalProfileHead')?.addEventListener('click',()=>baseGoalOpen('headquarters','Jefatura'));
+ el('achGoalProfile')?.addEventListener('click',()=>{const module=el('achModule')?.value; if(module&&module!=='*')baseGoalOpen('module',module);else baseGoalOpen('headquarters','Jefatura');});
+}
+function initLeadershipCollapse(){
+ const ids=['leaderSummarySection','leaderModulesSection','leaderTargetsSection','leaderPeopleSection','leaderQualitySection','leaderTrendSection','leaderProjectionSection','leaderAlertsSection','leaderActionsSection'];
+ for(const id of ids){const section=el(id),head=section?.querySelector('.leadership-block-head');if(!head)continue;
+  const body=document.createElement('div');body.className='leader-collapsible-body';
+  while(head.nextSibling)body.appendChild(head.nextSibling);
+  section.appendChild(body);
+  const btn=document.createElement('button');btn.type='button';btn.className='leader-collapse-toggle';btn.setAttribute('aria-controls',id+'Body');body.id=id+'Body';head.appendChild(btn);
+  btn.addEventListener('click',()=>{leadershipPrefs.collapsedSections[id]=!leadershipPrefs.collapsedSections[id];persistLeadership();applyLeadershipCollapse();});
+ }
+ el('leaderExpandAll').addEventListener('click',()=>{leadershipPrefs.collapsedSections={};persistLeadership();applyLeadershipCollapse();});
+ el('leaderCollapseAll').addEventListener('click',()=>{leadershipPrefs.collapsedSections=Object.fromEntries(ids.map(id=>[id,true]));persistLeadership();applyLeadershipCollapse();});
+ applyLeadershipCollapse();
+}
+function applyLeadershipCollapse(){
+ for(const section of el('leadershipPage').querySelectorAll('.leadership-block')){
+  const collapsed=leadershipPrefs.collapsedSections[section.id]===true;
+  const body=section.querySelector('.leader-collapsible-body');const btn=section.querySelector('.leader-collapse-toggle');
+  if(!body||!btn)continue;
+  body.hidden=collapsed;section.classList.toggle('leader-is-collapsed',collapsed);
+  btn.textContent=collapsed?'Expandir':'Contraer';btn.setAttribute('aria-expanded',String(!collapsed));
+ }
+}
+function leaderGoalModuleChanged(){
+ const module=el('lsGoalModule').value,week=mondayOf(el('lsGoalWeek').value||dateIso(new Date()));
+ el('lsGoalWeek').value=week;
+ const basic=leadershipPrefs.defaultGoals[leadershipModuleKey(module)]||{},selected=leadershipPrefs.weeklyGoals[leadershipWeeklyKey(week,module)]||{};
+ for(const input of el('settingsLeadershipGoalsV257').querySelectorAll('[data-leader-goal-metric]')){
+  const source=input.dataset.leaderGoalScope==='default'?basic:selected;input.value=source[input.dataset.leaderGoalMetric]??'';
+ }
+ el('lsGoalPreview').textContent=module?`Semana del ${fmtDay(week)} · Metas semanales específicas → metas base → ${leadershipPrefs.goalFallback==='existing'?'objetivos existentes':'sin meta si no se configuró'}.`:'Selecciona un módulo.';
+}
+function leaderGoalSettingsEditor(){
+ const list=leadershipKnownModules(),field=el('lsGoalModule'),old=field.value;
+ field.innerHTML='<option value="">Selecciona un módulo</option>'+list.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('');
+ field.value=list.includes(old)?old:(list[0]||'');
+ if(!el('lsGoalWeek').value)el('lsGoalWeek').value=mondayOf(dateIso(new Date()));
+ el('lsGoalFallback').value=leadershipPrefs.goalFallback;
+ el('lsProjectionMode').value=leadershipPrefs.projectionMode;
+ el('lsQualityAlert').value=leadershipPrefs.minQualityAlert;
+ el('lsTargetProgress').value=leadershipPrefs.minTargetProgress;
+ el('lsAlertTargets').value=leadershipPrefs.alertTargets?'yes':'no';
+ el('settingsLeadershipGoalsV257').querySelectorAll('[data-leader-weight]').forEach(input=>input.value=leadershipPrefs.weekdayWeights[Number(input.dataset.leaderWeight)]);
+ leaderGoalModuleChanged();
+}
+function leaderGoalSave(){
+ const module=el('lsGoalModule').value,week=el('lsGoalWeek').value,status=el('lsGoalStatus');
+ if(!module||!/^\d{4}-\d{2}-\d{2}$/.test(week)){status.textContent='Selecciona módulo y semana válidos.';return;}
+ const base={},specific={};
+ for(const input of el('settingsLeadershipGoalsV257').querySelectorAll('[data-leader-goal-metric]')){
+  const raw=input.value.trim();if(!raw)continue;const n=Number(raw);
+  if(!Number.isFinite(n)||n<0||n>1000000){status.textContent='Revisa los valores de objetivos (0 a 1,000,000).';input.focus();return;}
+  const into=input.dataset.leaderGoalScope==='default'?base:specific;into[input.dataset.leaderGoalMetric]=n;
+ }
+ const defaults={...leadershipPrefs.defaultGoals},weekly={...leadershipPrefs.weeklyGoals},modKey=leadershipModuleKey(module),weekKey=leadershipWeeklyKey(week,module);
+ if(Object.keys(base).length)defaults[modKey]=base;else delete defaults[modKey];
+ if(Object.keys(specific).length)weekly[weekKey]=specific;else delete weekly[weekKey];
+ leadershipPrefs=cleanLeadershipSettings({...leadershipPrefs,defaultGoals:defaults,weeklyGoals:weekly});
+ if(!persistLeadership())return;renderLeadership();status.textContent='Objetivos guardados en este navegador; se sincronizan cuando hay sesión.';
+}
+function initLeadershipGoalSettings(){
+ leaderGoalSettingsEditor();
+ el('lsGoalModule').addEventListener('change',leaderGoalModuleChanged);
+ el('lsGoalWeek').addEventListener('change',leaderGoalModuleChanged);
+ el('lsGoalFallback').addEventListener('change',leaderGoalModuleChanged);
+ el('lsGoalSave').addEventListener('click',leaderGoalSave);
+ for(const [id,type] of [['lsGoalClearWeek','week'],['lsGoalClearDefault','default']])el(id).addEventListener('click',()=>{
+  const mod=el('lsGoalModule').value;if(!mod)return;
+  el('settingsLeadershipGoalsV257').querySelectorAll(`[data-leader-goal-scope="${type}"]`).forEach(x=>x.value='');leaderGoalSave();
+ });
+ el('lsGoalConfigSave').addEventListener('click',()=>{
+  const inputs=[...el('settingsLeadershipGoalsV257').querySelectorAll('[data-leader-weight]')],weights=inputs.map(x=>Number(x.value));
+  const minimum=Number(el('lsQualityAlert').value),progress=Number(el('lsTargetProgress').value);
+  if(weights.some(n=>!Number.isFinite(n)||n<0||n>20)||!weights.some(n=>n>0)||!Number.isFinite(minimum)||minimum<0||minimum>200||!Number.isFinite(progress)||progress<0||progress>300){el('lsGoalStatus').textContent='Revisa los pesos y los umbrales. Debe existir al menos un día con peso positivo.';return;}
+  leadershipPrefs=cleanLeadershipSettings({...leadershipPrefs,weekdayWeights:weights,
+   projectionMode:el('lsProjectionMode').value,goalFallback:el('lsGoalFallback').value,
+   minQualityAlert:minimum,minTargetProgress:progress,alertTargets:el('lsAlertTargets').value==='yes'});
+  if(!persistLeadership())return;renderLeadership();el('lsGoalStatus').textContent='Proyección, fuente de metas y alertas guardadas.';
+ });
+ el('lsGoalHelp').addEventListener('click',()=>{alert('Proyección lineal = ventas válidas acumuladas hasta hoy / días naturales transcurridos × 7. Ponderada = ventas acumuladas hasta hoy / suma de pesos transcurridos × suma de los 7 pesos. El % proyectado se divide entre la meta semanal. Las metas específicas de Jefatura tienen prioridad sobre las metas base y estas sobre las fuentes existentes. Los objetivos de los demás indicadores son cantidades semanales de seguimiento, no cambian la calidad ni las comisiones.');});
+}
+function refreshLeadershipSettingsEditor(){
+ const prefs=leadershipPrefs;
+ for(const [id,key] of [['lsPeriod','period'],['lsConversion','minConversion'],['lsProjected','minProjectedCompletion'],['lsStale','staleDays'],['lsTopPeople','topPeople'],['lsTitle','exportTitle'],['lsSubtitle','exportSubtitle'],['lsColor','color'],['lsNote','exportNote']])el(id).value=prefs[key];
+ el('lsIncludeSupervisor').value=prefs.includeSupervisors?'yes':'no';
+ el('lsSections').querySelectorAll('[data-leader-setting]').forEach(ch=>ch.checked=prefs[ch.dataset.leaderSetting]);
+}
+function saveLeadershipSettings(){
+ const read=(id)=>Number(el(id).value);
+ const next=cleanLeadershipSettings({...leadershipPrefs,
+  period:el('lsPeriod').value,includeSupervisors:el('lsIncludeSupervisor').value==='yes',
+  minConversion:read('lsConversion'),minProjectedCompletion:read('lsProjected'),staleDays:read('lsStale'),topPeople:read('lsTopPeople'),
+  exportTitle:el('lsTitle').value,exportSubtitle:el('lsSubtitle').value,color:el('lsColor').value,exportNote:el('lsNote').value,
+  ...Object.fromEntries([...el('lsSections').querySelectorAll('[data-leader-setting]')].map(ch=>[ch.dataset.leaderSetting,ch.checked]))});
+ leadershipPrefs=next;
+ if(!persistLeadership())return;
+ el('leaderPeriod').value=next.period;el('leaderSupervisor').value=next.includeSupervisors?'yes':'no';
+ leaderPeriodToggled();renderLeadership();leaderGoalSettingsEditor();el('lsStatus').textContent='Dashboard guardado localmente'+(isAuthorized()?' y pendiente de sincronización automática.':'. Inicia sesión para sincronizar.');
+}
+function leaderPeriodToggled(){
+ const on=el('leaderPeriod').value==='custom';el('leaderFrom').disabled=!on;el('leaderTo').disabled=!on;
+ if(on&&(!el('leaderFrom').value||!el('leaderTo').value)){
+  const now=new Date(),end=dateIso(now);now.setDate(now.getDate()-29);
+  el('leaderFrom').value=dateIso(now);el('leaderTo').value=end;
+ }
+}
+function initLeadership(){
+ initLeadershipCollapse();initLeadershipGoalSettings();refreshLeadershipSettingsEditor();el('leaderPeriod').value=leadershipPrefs.period;el('leaderSupervisor').value=leadershipPrefs.includeSupervisors?'yes':'no';leaderPeriodToggled();
+ el('leaderPeriod').addEventListener('change',()=>{leaderPeriodToggled();renderLeadership();});
+ for(const id of ['leaderFrom','leaderTo','leaderSupervisor'])el(id).addEventListener('change',renderLeadership);
+ el('leadershipSettingsOpen').addEventListener('click',()=>{if(!el('settingsPanel').open)el('toggleSettings').click();el('settingsSectionsNav').querySelector('[data-settings-group="settingsLeadershipV256"]')?.click();});
+ el('lsSave').addEventListener('click',saveLeadershipSettings);
+ el('lsRestore').addEventListener('click',()=>{leadershipPrefs=cleanLeadershipSettings({...LEADERSHIP_DEFAULTS,actions:leadershipPrefs.actions});refreshLeadershipSettingsEditor();saveLeadershipSettings();});
+ el('leaderActionForm').addEventListener('submit',event=>{
+  event.preventDefault();const description=el('leaderActionText').value.trim(),due=el('leaderActionDue').value;
+  if(!description||!/^\d{4}-\d{2}-\d{2}$/.test(due))return;
+  if(leadershipPrefs.actions.length>=250){el('leaderActionStatus').textContent='Límite de 250 compromisos. Archiva/elimina algunos antes de continuar.';return;}
+  leadershipPrefs.actions.push({id:'a'+Date.now().toString(36)+Math.random().toString(36).slice(2,8),description,module:el('leaderActionModule').value,owner:el('leaderActionOwner').value.trim(),due,status:'pending',created:dateIso(new Date()),note:''});
+  persistLeadership();el('leaderActionText').value='';el('leaderActionStatus').textContent='Compromiso agregado. Se sincronizará en la cuenta con sesión.';renderLeadership();
+ });
+ el('leaderActionRows').addEventListener('change',event=>{
+  const input=event.target.closest('[data-leader-status]');if(!input)return;
+  const action=leadershipPrefs.actions.find(a=>a.id===input.dataset.leaderStatus);if(action){action.status=input.value;persistLeadership();renderLeadership();}
+ });
+ el('leaderActionRows').addEventListener('click',event=>{
+  const note=event.target.closest('[data-leader-note]'),del=event.target.closest('[data-leader-delete]');if(!note&&!del)return;
+  const action=leadershipPrefs.actions.find(a=>a.id===(note?.dataset.leaderNote||del.dataset.leaderDelete));if(!action)return;
+  if(note){const value=prompt('Comentarios y seguimiento del compromiso:',action.note||'');if(value===null)return;action.note=value.slice(0,350);}
+  if(del){if(!confirm('¿Eliminar definitivamente este compromiso de la cuenta?'))return;leadershipPrefs.actions=leadershipPrefs.actions.filter(a=>a.id!==action.id);}
+  persistLeadership();renderLeadership();
+ });
+ renderLeadership();
+}
+function buildLeadershipReport(){
+ const data=leadershipCalc(),markup=leadershipReportHtml({data,settings:leadershipPrefs});
+ el('reportHost').innerHTML=`<style id="reportCss">${LEADERSHIP_PRINT_CSS}</style><div id="printPage">${markup}</div>`;
+ return el('printPage');
+}
+async function exportLeadershipPng(){
+ const button=el('exportImage'),previous=button.textContent;button.disabled=true;
+ try{
+  const pages=leadershipPngPages({data:leadershipCalc(),settings:leadershipPrefs},{scale:2});
+  for(let i=0;i<pages.length;i++){
+   const blob=await new Promise(resolve=>pages[i].toBlob(resolve,'image/png'));
+   if(!blob)throw Error('No fue posible generar la página '+(i+1));
+   saveBlob(blob,`jefatura_${dateIso(new Date())}_${i+1}_de_${pages.length}.png`);
+  }
+ }catch(error){alert('No se pudo exportar PNG: '+error.message);}finally{button.disabled=false;button.textContent=previous;}
+}
 
 function renderGroupNav(){
  const holder=el('appGroupNav');if(!holder)return;
@@ -2605,7 +3058,7 @@ function initNavOrder(){
 function updateFloatingExport(){
   const isDaily=activePage==='daily',isVisit=activePage==='visits',isIncident=activePage==='incidents';
   el('dailyCopyWhatsApp').hidden=!isDaily;
-  el('floatCsv').hidden=isVisit||activePage==='history'||activePage==='moduleHistory';
+  el('floatCsv').hidden=isVisit||activePage==='history'||activePage==='moduleHistory'||activePage==='leadership';
   el('floatPdf').hidden=false;el('floatPng').hidden=false;
   el('floatingExportMenu').hidden=true;el('floatingExportToggle').setAttribute('aria-expanded','false');
   el('floatCsv').textContent=isIncident?'Exportar incidencias CSV':'Exportar CSV';
@@ -2622,6 +3075,238 @@ function initFloatingExport(){
   document.addEventListener('keydown',event=>{if(event.key==='Escape'){menu.hidden=true;toggle.setAttribute('aria-expanded','false');}});
   updateFloatingExport();
 }
+// V2.6.0 — filtros secundarios de todas las páginas en un único menú flotante.
+const FILTER_MOVES={
+ individual:['tableScope','tablePaymentFilter','tableIncFilter','tableAppFilter','tableColumnFilter','tableColumnValue','showNoCode'],
+ team:['teamSort'],daily:['dailyDateMode','includeSupervisorsDaily'],
+ accumulated:['includeSupervisorsAccumulated'],weekly:['includeSupervisorsWeekly'],
+ history:['histWeekday','histResetFilters'],moduleHistory:['mhWeekday','mhIncludeSupervisors','mhResetFilters'],
+ leadership:['leaderSupervisor'],allrecords:['allRecordsAdvanced','allRecordsSearch'],
+ achievements:['achAdvanced','achSearch','achIncludeSupervisors'],
+ supervisor:['supSearch'],incidents:['incSearch','incFilter']
+};
+const secondaryFilterSlots=new Map();
+function filterControlWrapper(id){
+ const node=el(id);if(!node)return null;
+ if(id==='allRecordsAdvanced'||id==='achAdvanced')return node;
+ if(id==='achIncludeSupervisors')return node.closest('.achievements-supervisor-control')||node.closest('label');
+ if(id==='supSearch')return node.closest('.sup-search-fold');
+ if(id==='allRecordsSearch')return node.closest('.folio-main-search');
+ return node.closest('.field')||node.closest('label')||(node.tagName==='BUTTON'?node:null);
+}
+function initFloatingFilters(){
+ // Los filtros de fechas son primarios aun en Registros manuales: conservarlos en pantalla.
+ const recordsPrimary=el('allRecordsPage')?.querySelector('.all-records-primary');
+ for(const id of ['allRecordsFrom','allRecordsTo']){
+  const field=el(id)?.closest('.field');if(field&&recordsPrimary)recordsPrimary.appendChild(field);
+ }
+ const body=el('floatingFiltersBody'),popup=el('floatingFiltersMenu'),toggle=el('floatingFiltersToggle');
+ for(const [page,ids] of Object.entries(FILTER_MOVES))for(const id of ids){
+  const element=filterControlWrapper(id);if(!element||secondaryFilterSlots.has(element))continue;
+  const host=document.createElement('div');host.className='floating-filter-slot';host.dataset.filterPage=page;
+  body.appendChild(host);host.appendChild(element);secondaryFilterSlots.set(element,host);
+  if(element.tagName==='DETAILS')element.open=true;
+ }
+ // Filtros visuales de la calculadora individual: el resto reside en Ajustes → Tabla de folios.
+ const individual=el('tableFilter')?.closest('.folio-main-search');
+ if(individual){const slot=document.createElement('div');slot.className='floating-filter-slot';slot.dataset.filterPage='individual';body.appendChild(slot);slot.appendChild(individual);}
+ function hide(){popup.hidden=true;toggle.setAttribute('aria-expanded','false');}
+ toggle.addEventListener('click',()=>{popup.hidden=!popup.hidden;toggle.setAttribute('aria-expanded',String(!popup.hidden));});
+ el('floatingFiltersClose').addEventListener('click',hide);
+ document.addEventListener('click',e=>{if(!el('floatingFilters').contains(e.target))hide();});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')hide();});
+ updateFloatingFilters();
+}
+function updateFloatingFilters(){
+ const popup=el('floatingFiltersMenu');if(!popup)return;
+ popup.hidden=true;el('floatingFiltersToggle').setAttribute('aria-expanded','false');
+ let count=0;for(const slot of el('floatingFiltersBody').children){
+  const enabled=slot.dataset.filterPage===activePage;slot.hidden=!enabled;if(enabled)count++;
+ }
+ el('floatingFilters').hidden=count===0;
+}
+// Las secciones que ya son <details> conservan sus controles. En las restantes se añade plegado.
+function initGlobalCollapses(){
+ const groups={
+  team:[['#teamSummary','Indicadores del equipo'],['.team-table-wrap','Tabla comparativa del equipo']],
+  daily:[['.daily-scroll','Resultados por módulo y ejecutivo']],
+  accumulated:[['.daily-scroll','Resultados acumulados']],
+  weekly:[['.weekly-variance-grid','Variación total'],['.weekly-comparison-scroll','Comparativo semanal de módulos']],
+  history:[['#histSummary','Indicadores consolidados'],['#histAverages','Promedios históricos'],['#histChartPanel','Gráfico de evolución'],['.history-detail','Histórico detallado']],
+  moduleHistory:[['#mhSummary','Indicadores consolidados'],['#mhAverages','Promedios históricos'],['#mhChartPanel','Gráfico de evolución'],['.history-detail','Histórico detallado']],
+  allrecords:[['.all-records-summary','Resumen de registros'],['.all-records-table-wrap','Tabla de registros']],
+  incidents:[['.inc-card:first-of-type','Registro o edición de incidencia'],['.inc-card:last-of-type','Historial y seguimiento']],
+  visits:[['#visitForm','Formulario de visita de coordinación']]
+ };
+ for(const [page,selectors] of Object.entries(groups)){
+  const root=el(({team:'teamPage',daily:'dailyPage',accumulated:'accumulatedPage',weekly:'weeklyPage',history:'historyPage',moduleHistory:'moduleHistoryPage',allrecords:'allRecordsPage',incidents:'incidencePage',visits:'visitPage'})[page]);
+  if(!root)continue;
+  for(const [selector,name] of selectors){
+   const element=root.querySelector(selector);if(!element||element.closest('details.global-collapse'))continue;
+   const container=document.createElement('details');container.className='global-collapse';container.open=true;
+   const summary=document.createElement('summary');summary.textContent=name;
+   const inner=document.createElement('div');inner.className='global-collapse-inner';
+   element.parentNode.insertBefore(container,element);container.append(summary,inner);inner.appendChild(element);
+  }
+ }
+}
+
+// V2.6.0 — ficha por registro, búsqueda global, edición reversible y edición múltiple.
+function recordFromUid(uid){return historyData().find(r=>r.uid===uid)||(imported.data?.rows||[]).find(r=>r.uid===uid)||null;}
+function recordDescription(r){return [r.folio||'Sin folio',r.executive||'Sin ejecutivo',r.module||'Sin módulo',r.fecha||''].join(' · ');}
+function refreshAfterRecordChange(){
+ combinedArchiveCache.clear();moduleProfileCache=null;
+ refreshArchiveData(true);refreshAuthorizedPages();
+ if(activePage==='team')renderTeam();
+ if(activePage==='daily')renderDaily();
+ if(activePage==='allrecords')renderAllRecords();
+ updateRecordSelectionBar();
+}
+function recordVisibleText(tr,record){
+ if(!tr)return [['Fecha',record.fecha],['Folio',record.folio],['Módulo',record.module],['Ejecutivo',record.executive],['Código',record.code],['Estado',record.status]].map(([a,b])=>`${a}: ${b||'—'}`).join('\n');
+ const table=tr.closest('table');const heads=[...(table?.querySelectorAll('thead tr:last-child th')||[])];
+ return [...tr.cells].map((td,index)=>{
+  if(td.classList.contains('record-select-cell'))return null;
+  const title=heads[index]?.textContent?.trim()||'Dato';
+  const checked=td.querySelector('input[type="checkbox"]');const value=checked?(checked.checked?'Sí':'No'):td.textContent.trim();
+  return title==='✓'?null:`${title}: ${value||'—'}`;
+ }).filter(Boolean).join('\n');
+}
+function updateRecordSelectionBar(){
+ const bar=el('bulkRecordBar');if(!bar)return;
+ bar.hidden=!selectedRecordUids.size;
+ el('bulkRecordCount').textContent=`${selectedRecordUids.size} registro(s) seleccionado(s)`;
+}
+function showRecordDeletedList(){
+ const entries=Object.entries(recordEdits).filter(([_,edit])=>edit.deleted).slice(-50).reverse();
+ el('recordDeletedList').innerHTML=entries.length?entries.map(([uid,entry])=>`<button class="btn small" type="button" data-restore-record="${esc(uid)}">Restaurar · ${esc(entry.description||uid)}</button>`).join(''):'<p class="muted">No hay registros eliminados.</p>';
+}
+function recordEditorMarkup(record){
+ const labels={folio:'Folio',fecha:'Fecha',module:'Módulo',executive:'Ejecutivo',code:'Código de barras',status:'Resultado del trámite',guaranteed:'Venta garantizada',dental:'Plan Dental',p0:'Programa Cero'};
+ return Object.keys(EDITABLE_RECORD_FIELDS).map(key=>{
+  const val=String(record[key]||'');
+  if(['guaranteed','dental','p0'].includes(key))return `<label>${labels[key]}<select data-record-edit="${key}"><option value="Si" ${isYes(val)?'selected':''}>Sí</option><option value="No" ${!isYes(val)?'selected':''}>No</option></select></label>`;
+  return `<label>${labels[key]}<input data-record-edit="${key}" type="${key==='fecha'?'date':'text'}" maxlength="400" value="${esc(val)}"></label>`;
+ }).join('');
+}
+function closeRecordAction(){el('recordActionOverlay').hidden=true;recordActionCurrent=null;recordBulkMode=false;}
+function openRecordAction(uid,tr=null){
+ const row=recordFromUid(uid);if(!row)return;
+ recordActionCurrent=uid;recordBulkMode=false;
+ el('recordActionTitle').textContent='Registro · '+(row.folio||'Sin folio');
+ el('recordActionContext').textContent=recordDescription(row);
+ el('recordActionData').innerHTML=[['Fecha',row.fecha],['Folio',row.folio],['Módulo',row.module],['Ejecutivo',row.executive],['Código',row.code],['Resultado',row.status],['Garantizada',isYes(row.guaranteed)?'Sí':'No'],['Dental',isYes(row.dental)?'Sí':'No'],['P0',isYes(row.p0)?'Sí':'No'],['APP',appEnabled(row)?'Sí':'No'],['Incidencia',selectedIncident(row)?'Sí':'No'],['Bono por dinámica',dynamicBonusMarked(row)?'Sí':'No']].map(([key,v])=>`<div><small>${esc(key)}</small>${esc(v||'—')}</div>`).join('');
+ recordActionVisibleText=recordVisibleText(tr,row);
+ el('recordEditFields').innerHTML=recordEditorMarkup(row);
+ el('recordEditFields').hidden=true;el('recordBulkFields').hidden=true;
+ el('recordActionEdit').hidden=false;el('recordActionSave').hidden=true;
+ el('recordActionCopy').hidden=false;el('recordActionIncident').hidden=false;el('recordActionDelete').hidden=false;
+ el('recordActionDelete').textContent='Eliminar registro';
+ el('recordActionStatus').textContent='La edición se conservará independientemente del archivo importado.';
+ showRecordDeletedList();el('recordActionOverlay').hidden=false;
+}
+function showBulkRecordEditor(){
+ if(!selectedRecordUids.size)return;
+ recordActionCurrent=null;recordBulkMode=true;
+ el('recordActionTitle').textContent=`Editar ${selectedRecordUids.size} registros`;
+ el('recordActionContext').textContent='Selecciona un campo y un valor que se aplicará a todos los registros marcados. Repite la operación para editar otros campos.';
+ el('recordActionData').innerHTML='';el('recordEditFields').hidden=true;
+ el('recordBulkFields').hidden=false;
+ const fields=[['status','Resultado del trámite'],['guaranteed','Garantizada'],['dental','Plan Dental'],['p0','Programa Cero'],['module','Módulo'],['executive','Ejecutivo'],['code','Código de barras'],['appToggle','Activación APP'],['bonusToggle','Bono por dinámica']];
+ el('recordBulkFields').innerHTML=`<label>Campo a modificar<select id="recordBulkField">${fields.map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label>Nuevo valor<input id="recordBulkValue" type="text" value="" placeholder="Escribe el nuevo valor"></label>`;
+ el('recordActionEdit').hidden=true;el('recordActionSave').hidden=false;el('recordActionCopy').hidden=true;el('recordActionIncident').hidden=true;el('recordActionDelete').hidden=true;
+ el('recordActionStatus').textContent='Para Garantizada, Dental, P0, APP y Bono por dinámica utiliza Sí o No.';
+ showRecordDeletedList();el('recordActionOverlay').hidden=false;
+}
+function saveRecordChange(){
+ if(recordBulkMode){
+  const field=el('recordBulkField').value,raw=el('recordBulkValue').value.trim();
+  if(!raw){el('recordActionStatus').textContent='Introduce el nuevo valor antes de guardar.';return;}
+  if(['guaranteed','dental','p0','appToggle','bonusToggle'].includes(field)&&!['SI','S','NO','N'].includes(normalize(raw))){el('recordActionStatus').textContent='Para este campo escribe Sí o No.';return;}
+  if(selectedRecordUids.size>500){el('recordActionStatus').textContent='Máximo 500 registros por operación.';return;}
+  for(const uid of selectedRecordUids){
+   const row=recordFromUid(uid);if(!row)continue;
+   if(field==='appToggle'){if(isYes(raw))imported.appDisabled.delete(uid);else imported.appDisabled.add(uid);continue;}
+   if(field==='bonusToggle'){if(isYes(raw))imported.dynamicBonuses.add(uid);else imported.dynamicBonuses.delete(uid);continue;}
+   const key=row.overrideKey||recordEditKey(row),prev=recordEdits[key]||{fields:{},deleted:false};
+   recordEdits[key]={...prev,fields:{...prev.fields,[field]:raw},description:recordDescription(row)};
+  }
+  saveFolioFlags();persistRecordEdits();selectedRecordUids.clear();closeRecordAction();refreshAfterRecordChange();return;
+ }
+ const row=recordFromUid(recordActionCurrent);if(!row)return;
+ try{
+  const fields=validateRecordFields(Object.fromEntries([...el('recordEditFields').querySelectorAll('[data-record-edit]')].map(x=>[x.dataset.recordEdit,x.value])));
+  const key=row.overrideKey||recordEditKey(row),prior=recordEdits[key]||{fields:{},deleted:false};
+  recordEdits[key]={...prior,fields:{...prior.fields,...fields},description:recordDescription(row)};
+  persistRecordEdits();closeRecordAction();refreshAfterRecordChange();
+ }catch(error){el('recordActionStatus').textContent=error?.message||'No se pudo guardar el registro.';}
+}
+function deleteRecordFromAction(){
+ const row=recordFromUid(recordActionCurrent);if(!row)return;
+ if(!confirm(`¿Ocultar el folio ${row.folio||'sin folio'} de todos los cálculos y reportes? Se conservará una opción para restaurarlo.`))return;
+ const key=row.overrideKey||recordEditKey(row),prev=recordEdits[key]||{fields:{}};
+ recordEdits[key]={...prev,deleted:true,description:recordDescription(row)};
+ persistRecordEdits();selectedRecordUids.delete(row.uid);closeRecordAction();refreshAfterRecordChange();
+}
+function openIncidentFromAction(){
+ const row=recordFromUid(recordActionCurrent);if(!row)return;
+ if(!row.folio){el('recordActionStatus').textContent='Primero asigna un folio para gestionar la incidencia.';return;}
+ closeRecordAction();switchPage('incidents');
+ const key=incidentFolioKey(row);
+ if(key&&incidentRecords.has(key))editIncident(key);
+ else{resetIncidentForm();el('incFolio').value=row.folio;el('incModule').value=row.module||'';el('incExecutive').value=row.executive||'';}
+ el('incFolio').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function initRecordManagement(){
+ const overlay=el('recordActionOverlay');
+ el('recordActionClose').addEventListener('click',closeRecordAction);
+ overlay.addEventListener('click',e=>{if(e.target===overlay)closeRecordAction();});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!overlay.hidden)closeRecordAction();});
+ el('recordActionEdit').addEventListener('click',()=>{el('recordEditFields').hidden=false;el('recordActionSave').hidden=false;el('recordActionEdit').hidden=true;});
+ el('recordActionSave').addEventListener('click',saveRecordChange);
+ el('recordActionDelete').addEventListener('click',deleteRecordFromAction);
+ el('recordActionCopy').addEventListener('click',async()=>{
+  if(await copyWhatsAppText(recordActionVisibleText))el('recordActionStatus').textContent='Datos visibles copiados al portapapeles.';
+  else el('recordActionStatus').textContent='El navegador bloqueó la copia; permite el portapapeles.';
+ });
+ el('recordActionIncident').addEventListener('click',openIncidentFromAction);
+ el('recordDeletedList').addEventListener('click',e=>{
+  const button=e.target.closest('[data-restore-record]');if(!button)return;
+  const uid=button.dataset.restoreRecord;if(!recordEdits[uid])return;
+  recordEdits[uid].deleted=false;persistRecordEdits();showRecordDeletedList();refreshAfterRecordChange();
+  el('recordActionStatus').textContent='Registro restaurado.';
+ });
+ el('bulkRecordEdit').addEventListener('click',showBulkRecordEditor);
+ el('bulkRecordClear').addEventListener('click',()=>{selectedRecordUids.clear();document.querySelectorAll('[data-record-select]').forEach(e=>{e.checked=false;});updateRecordSelectionBar();});
+ document.addEventListener('change',e=>{
+  const input=e.target.closest('[data-record-select]');if(!input)return;
+  if(input.checked)selectedRecordUids.add(input.dataset.recordSelect);else selectedRecordUids.delete(input.dataset.recordSelect);
+  updateRecordSelectionBar();
+ });
+ document.addEventListener('click',e=>{
+  const row=e.target.closest('tr[data-record-uid]');if(!row||e.target.closest('a,button,input,select,textarea,label'))return;
+  openRecordAction(row.dataset.recordUid,row);
+ });
+ const search=el('globalFolioSearch'),list=el('globalFolioResults');let debounce=0;
+ search.addEventListener('input',()=>{
+  clearTimeout(debounce);const q=normalize(search.value);if(q.length<2){list.hidden=true;list.innerHTML='';return;}
+  debounce=setTimeout(()=>{
+   const found=historyData().filter(r=>normalize(r.folio).includes(q)).slice(0,40);
+   const removed=Object.entries(recordEdits).filter(([_,v])=>v.deleted&&normalize(v.description).includes(q)).slice(0,15);
+   list.innerHTML=found.map(r=>`<button type="button" data-search-uid="${esc(r.uid)}">${esc(r.folio||'Sin folio')}<small>${esc([r.executive,r.module,r.fecha].filter(Boolean).join(' · '))}</small></button>`).join('')+
+    removed.map(([uid,v])=>`<button type="button" data-restore-search="${esc(uid)}">Restaurar · ${esc(v.description||uid)}</button>`).join('')||'<span class="muted">No se encontraron folios coincidentes.</span>';
+   list.hidden=false;
+  },220);
+ });
+ list.addEventListener('click',e=>{
+  const go=e.target.closest('[data-search-uid]');if(go){openRecordAction(go.dataset.searchUid);list.hidden=true;return;}
+  const restore=e.target.closest('[data-restore-search]');if(restore){
+   const uid=restore.dataset.restoreSearch;if(recordEdits[uid]){recordEdits[uid].deleted=false;persistRecordEdits();refreshAfterRecordChange();search.dispatchEvent(new Event('input'));}
+  }
+ });
+ document.addEventListener('click',e=>{if(!e.target.closest('.global-folio-search'))list.hidden=true;});
+}
+
 function mondayReminderKey(){return 'wmSamsMondayXlsV250:'+String(window.APP_CLOUD?.user?.id||'guest');}
 function initMondayReminder(){
   const modal=el('xlsMondayReminder'),dismiss=el('mondayDismiss');
@@ -2654,6 +3339,7 @@ function switchPage(page){
   el('incidencePage').hidden=activePage!=='incidents';
   el('historyPage').hidden=activePage!=='history';
   el('moduleHistoryPage').hidden=activePage!=='moduleHistory';
+  el('leadershipPage').hidden=activePage!=='leadership';
   activeGroup=pageNavigation.groupBy[activePage]||'analysis';
   applyNavOrder();
   for(const b of document.querySelectorAll('[data-page-tab]')){const yes=b.dataset.pageTab===activePage;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));}
@@ -2668,7 +3354,8 @@ function switchPage(page){
   if(activePage==='incidents')renderIncidencePage();
   if(activePage==='history'){populateHistoryFilters();renderHistory();}
   if(activePage==='moduleHistory'){populateModuleFilters();renderModuleHistory();}
-  updateFloatingExport();
+  if(activePage==='leadership')renderLeadership();
+  updateFloatingExport();updateFloatingFilters();
   if(el('settingsPanel').open){el('settingsPanel').open=false;el('toggleSettings').setAttribute('aria-expanded','false');}
 }
 for(const b of document.querySelectorAll('[data-page-tab]'))b.addEventListener('click',()=>switchPage(b.dataset.pageTab));
@@ -3487,6 +4174,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return el('printPage');
   }
   function buildReportRaw(){
+    if(activePage==='leadership')return buildLeadershipReport();
     if(activePage==='history')return buildHistoryReport();
     if(activePage==='moduleHistory')return buildModuleHistoryReport();
     if(activePage==='incidents')return buildIncidenceReport();
@@ -3721,6 +4409,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return Math.ceil(y);
   }
   async function exportPng(){
+    if(activePage==='leadership')return exportLeadershipPng();
     if(activePage==='history')return exportHistoryPng();
     if(activePage==='moduleHistory')return exportModuleHistoryPng();
     if(activePage==='visits')return window.VISITS?.exportPng();
@@ -3766,19 +4455,20 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   window.addEventListener('beforeprint',()=>{try{if(activePage!=='achievements'||cachedWeeklyAdminAssets())buildReport();}catch(error){console.warn('Reporte de impresión:',error);}});
   window.CALC_REPORT={buildReport,layout:uiLayout};
 
-  initAllRecordsPage();initAchievements();initWeeklyAdminSettings();initQualitySettings();initSupervisorCalculator();initIncidences();initHistory();initModuleHistory();initNavOrder();initFloatingExport();initMondayReminder();
+  initAllRecordsPage();initAchievements();initWeeklyAdminSettings();initQualitySettings();initBaseGoals();initSupervisorCalculator();initIncidences();initHistory();initModuleHistory();initLeadership();initNavOrder();initFloatingExport();initFloatingFilters();initRecordManagement();initGlobalCollapses();initMondayReminder();
   restore();setForm('base');setForm('sim');render();initializeWeeklyDates();refreshAuthorizedPages();switchPage(pageNavigation.home);initArchive();
   window.APP_CLOUD?.registerRefresh(async()=>{
     if(!isAuthorized())return;
     archive.reports=await archiveGetAll();archive.temporaryMode=false;
-    archiveSelectionRestore();loadFolioFlags();loadCommissionRates();
+    archiveSelectionRestore();loadFolioFlags();recordEdits=readRecordEdits();selectedRecordUids.clear();combinedArchiveCache.clear();loadCommissionRates();
     for(const key of Object.keys(teamGoals))delete teamGoals[key];Object.assign(teamGoals,loadTeamStore(TEAM_GOALS_STORAGE));
     qualityConfig=cleanQualityConfig(storedJson(QUALITY_STORAGE_V22));
+    leadershipPrefs=readLeadershipPrefs();baseGoals=readBaseGoals();baseGoalList();refreshLeadershipSettingsEditor();leaderGoalSettingsEditor();
     weeklyAdminPrefs=readWeeklyAdminPrefs();refreshWeeklyAdminSettingsEditor();historyPrefs=readHistoryPrefs();refreshHistorySettingsEditor();moduleHistoryPrefs=readModuleHistoryPrefs();refreshModuleHistorySettingsEditor();
     pageNavigation=loadNavSettings();activeGroup=pageNavigation.groupBy[activePage]||'analysis';applyNavOrder();renderNavOrderEditor();
     if(firstCloudNavigation){firstCloudNavigation=false;el('histPeriod').value=historyPrefs.defaultPeriod;el('histWeekday').value=historyPrefs.defaultWeekday==='today'?String(new Date().getDay()):historyPrefs.defaultWeekday;el('mhPeriod').value=moduleHistoryPrefs.defaultPeriod;el('mhWeekday').value=moduleHistoryPrefs.defaultWeekday==='today'?String(new Date().getDay()):moduleHistoryPrefs.defaultWeekday;el('mhIncludeSupervisors').value=moduleHistoryPrefs.includeSupervisors?'yes':'no';switchPage(pageNavigation.home);}
     dynamicBonusConfig=loadDynamicBonus();if(el('dynamicBonusAmount'))el('dynamicBonusAmount').value=dynamicBonusAmount();
-    refreshArchiveData(true);await refreshIncidents(true);refreshAuthorizedPages();render();window.VISITS?.refreshSources();
+    refreshArchiveData(true);await refreshIncidents(true);refreshAuthorizedPages();if(activePage==='leadership')renderLeadership();render();window.VISITS?.refreshSources();
   });
   // Carga anticipada de logotipos y firma para evitar esperas al exportar.
   preloadWeeklyAdminAssets().catch(err=>console.warn('Recursos semanales:',err));

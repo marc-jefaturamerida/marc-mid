@@ -20,7 +20,10 @@ const ALLOWED = new Set([
   'wmSamsNavOrderV250',
   'wmSamsWeeklyAdminReportV252',
   'wmSamsHistoricalIndividualV253',
-  'wmSamsHistoricalModuleV254'
+  'wmSamsHistoricalModuleV254',
+  'wmSamsBaseGoalsV258',
+  'wmSamsLeadershipV256',
+  'wmSamsRecordEditsV260'
 ]);
 const MAX_ENTRIES=12;
 const MAX_TOTAL_BYTES=2_200_000;

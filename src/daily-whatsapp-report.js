@@ -30,9 +30,7 @@ export function buildDailyWhatsAppReport({currentDate,previousDate,current,previ
   const isTodayVsYesterday=currentDate===todayIso&&previousDate===yesterdayIso;
   const heading=isTodayVsYesterday?'Reporte general de hoy versus ayer.':`Reporte general del ${fmtDate(currentDate)} versus ${fmtDate(previousDate)}.`;
   const rows=DAILY_WHATSAPP_LABELS.map(([key,label])=>({label,value:fmtCount(current[key]||0),delta:fmtDelta(current[key]||0,previous[key]||0)}));
-  rows.push({label:'Calidad',value:fmtPct(currentQuality),delta:fmtDelta(currentQuality,previousQuality,true)});
-  const labelWidth=8;
-  const valueWidth=Math.max(...rows.map(row=>row.value.length));
-  const lines=rows.map(row=>`${row.label.padEnd(labelWidth)}  ${row.value.padEnd(valueWidth)}  ${row.delta}`);
-  return `*${heading}*\n\n\`\`\`\n${lines.join('\n')}\n\`\`\``;
+  const qualityLine=`Calidad  ${fmtPct(currentQuality)}  ${fmtDelta(currentQuality,previousQuality,true)}`;
+  const lines=rows.map(row=>`${row.label}  ${row.value}  ${row.delta}`);
+  return `*${heading}*\n\n\`\`\`\n${lines.join('\n')}\n\`\`\`\n\n${qualityLine}`;
 }

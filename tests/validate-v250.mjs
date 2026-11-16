@@ -120,8 +120,8 @@ assert.equal(capped.net,Math.round((capped.afterPenalty-capped.recover+capped.dy
 // Version stamped uniformly in UI and generated reports.
 const html=fs.readFileSync('index.html','utf8');
 assert(!html.includes('Versión 2.4.2</footer>'));
-assert.equal((html.match(/Versión 2\.5\.5<\/footer>/g)||[]).length,5);
-assert(source.includes("APP_VERSION='2.5.5'"));
+assert.equal((html.match(/Versión 2\.6\.0<\/footer>/g)||[]).length,5);
+assert(source.includes("APP_VERSION='2.6.0'"));
 assert(source.includes('write(\'Versión \'+APP_VERSION'));
 assert(source.includes('data-sup-include-sales'));
 assert(source.includes('data-dynamic-bonus-id'));
@@ -141,7 +141,7 @@ assert(source.includes("from './supervisor-statement.js'"));
 assert(source.includes('supervisorStatementHtml(model)'));
 assert(source.includes('paintSupervisorStatement(ctx,true,supModel)'));
 for(const term of ['Estado de comisión · Supervisor','Nómina semanal','ALCANCE GLOBAL','Bono por dinámica','Folios propios','ss-pay','@page{size:A4 portrait'])assert(statement.includes(term),`No aparece elemento de diseño: ${term}`);
-assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'2.5.5');
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'2.6.0');
 console.log('OK: plantilla de supervisor y motores de exportación vinculados a los mismos cálculos.');
 
 // Contrato real de la exportación: una sola fuente de cifras para PDF y PNG.
@@ -182,12 +182,12 @@ assert(sample.startsWith('*Reporte general de hoy versus ayer.*'));
 assert(!sample.includes('_12/11/2026 vs. 11/11/2026_')); // fechas sin repetirse
 assert.equal((sample.match(/```/g)||[]).length,2);
 const table=sample.split('```')[1].trim().split('\n');
-assert.equal(table.length,7);
-assert(table.every(x=>x.slice(0,10).length===10),'Título fijo de 8 caracteres + 2 espacios');
+assert.equal(table.length,6);
+assert(table.every(x=>/^.{1,8}  \S+  \(/.test(x)),'Separación de exactamente dos espacios entre factor, valor y variación');
 assert(table[0].includes('20')&&table[0].includes('(+2)'));
 assert(table[2].includes('10')&&table[2].includes('(-3)'));
 assert(table[4].includes('(0)'));
-assert(table[6].includes('92.5%')&&table[6].includes('(+5.25 pp)'));
+assert(sample.split('```')[2].includes('Calidad  92.5%  (+5.25 pp)')); // calidad separada del monoespaciado
 assert(sample.includes('Garant.')&&sample.includes('P. Cero')&&sample.includes('Dental'));
 const other=buildDailyWhatsAppReport({
  currentDate:'2026-11-09',previousDate:'2026-11-05',todayIso:'2026-11-12',
@@ -245,7 +245,7 @@ assert(source.includes('incidentRecords.get(key)'),'reconciliación por folio');
 assert(source.includes('await migrateLegacyIncidents()'),'migración marcas previas');
 assert(source.includes('initMondayReminder()'),'recordatorio de lunes');
 assert(source.includes('switchPage(pageNavigation.home)'),'página principal configurable');
-assert(source.includes("DEFAULT_PAGE_ORDER=['daily'"),'comparativa diaria principal');
+assert(source.includes("DEFAULT_PAGE_ORDER=['leadership'"),'Dashboard de Jefatura como inicio predeterminado');
 assert(html.includes('id="incidencePage"')&&html.includes('id="incComment"')&&html.includes('id="incResolved"'));
 assert(html.includes('id="floatingExport"')&&html.includes('id="pageOrderList"'));
 assert(!html.includes('Versión 2.4.9</footer>'),'pies actualizados');
@@ -253,14 +253,14 @@ assert(cloud.includes('wmSamsNavOrderV250'),'sincronización de orden de página
 console.log('OK: incidencias independientes, comentarios históricos, sincronización, menú flotante y recordatorio de lunes.');
 
 // Comportamiento de la reconciliación: mismo folio en otro XLS, incluso con UID distinto.
-const ctxInc=vm.createContext({String,Set,Map,Array,Object,JSON,DEFAULT_PAGE_ORDER:['daily','individual','team','incidents'],
- incidentRecords:new Map(),imported:{flags:new Set(['antiguo'])},GROUP_DEFAULT:['analysis','commissions','administration','settings'],DEFAULT_GROUP_MAP:{daily:'analysis',individual:'commissions',team:'analysis',incidents:'administration'}});
+const ctxInc=vm.createContext({String,Set,Map,Array,Object,JSON,DEFAULT_PAGE_ORDER:['leadership','daily','individual','team','incidents'],
+ incidentRecords:new Map(),imported:{flags:new Set(['antiguo'])},GROUP_DEFAULT:['analysis','commissions','administration','settings'],DEFAULT_GROUP_MAP:{leadership:'analysis',daily:'analysis',individual:'commissions',team:'analysis',incidents:'administration'}});
 vm.runInContext(excerpt('function validNavSettings(', 'let pageNavigation='),ctxInc);
 vm.runInContext(excerpt('const normalizeIncidentFolio=', 'let incidentLoaded='),ctxInc);
 vm.runInContext(excerpt('const selectedIncident=', 'const appEnabled='),ctxInc);
 assert.equal(vm.runInContext('normalizeIncidentFolio(" 2063-7784 ")',ctxInc),'20637784');
-assert.equal(vm.runInContext('validNavSettings(null).home',ctxInc),'daily');
-assert.equal(vm.runInContext('validNavSettings({order:["incidents","incidents","xxx"],home:"xxx"}).order.length',ctxInc),4);
+assert.equal(vm.runInContext('validNavSettings(null).home',ctxInc),'leadership');
+assert.equal(vm.runInContext('validNavSettings({order:["incidents","incidents","xxx"],home:"xxx"}).order.length',ctxInc),5);
 ctxInc.incidentRecords.set('20637784',{folio_key:'20637784',active:true});
 ctxInc.row={folio:'2063-7784',uid:'nuevo-identificador'};
 assert.equal(vm.runInContext('selectedIncident(row)',ctxInc),true,'folio nuevo hereda marca permanente');

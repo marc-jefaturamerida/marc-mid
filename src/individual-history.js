@@ -88,14 +88,16 @@ export function makePeriods(rows,name,kind,weeklyGoal,settings,rules){
  return [...groups.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([key,group])=>{
   const c=tally(group),override=settings.periodGoals[overrideKey(name,kind,key)];
   const goal=override||basicGoal(name,kind,key,weeklyGoal,settings);
-  const q=qualityFor(c,goal,rules);
+  const periodRules=typeof rules==='function'?rules({kind,key,rows:group}):rules;
+  const q=qualityFor(c,goal,periodRules);
   return {key,kind,rows:group.length,modules:[...new Set(group.map(r=>r.module).filter(Boolean))],executives:[...new Set(group.map(r=>r.executive).filter(Boolean))],...c,goal,...q};
  });
 }
 export function summarizePeriods(periods,rules){
  const counter=periods.reduce((a,p)=>plus(a,p),blank());
  const goal=periods.reduce((sum,p)=>sum+p.goal,0),n=periods.length;
- const quality=qualityFor(counter,goal,rules);
+ const summaryRules=typeof rules==='function'?rules({kind:'summary',periods}):rules;
+ const quality=qualityFor(counter,goal,summaryRules);
  const averages=Object.fromEntries(Object.entries(counter).map(([k,v])=>[k,n?v/n:0]));
  return {periods:n,counts:counter,goal,...quality,averages};
 }

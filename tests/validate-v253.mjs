@@ -67,7 +67,7 @@ for(const orientation of ['portrait','landscape']){
  assert(sheet.every(x=>x.width===(orientation==='landscape'?2112:1632)));
  assert(sheet.every(x=>x.height===(orientation==='landscape'?1632:2112)));
 }
-for(const term of ['Versión 2.5.5','Histórico individual','histPeriod','hsSave','appGroupNav'])assert(fs.readFileSync('index.html','utf8').includes(term),term);
+for(const term of ['Versión 2.6.0','Histórico individual','histPeriod','hsSave','appGroupNav'])assert(fs.readFileSync('index.html','utf8').includes(term),term);
 for(const key of ['src/cloud-boot.js','netlify/functions/settings.js'])assert(fs.readFileSync(key,'utf8').includes(HISTORY_KEY),key);
 assert(fs.readFileSync('src/legacy-app.js','utf8').includes("if(activePage==='history')return buildHistoryReport()"));
 assert(fs.readFileSync('src/legacy-app.js','utf8').includes("if(activePage==='history')return exportHistoryPng()"));

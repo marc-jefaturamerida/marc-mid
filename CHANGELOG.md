@@ -1,3 +1,136 @@
+# INVEX V2.6.0 — Menús de filtros, gestión de registros y edición múltiple
+
+**Base:** V2.5.9 completa. No se cambian las fórmulas de comisión, calidad, proyecciones, vigencias de objetivos ni la estructura PostgreSQL.
+
+## Cambios de interfaz
+
+- Barra superior: buscador universal de folios junto a **Cargar XLS**; se retira el botón Ajustes de la cabecera (la categoría Configuración sigue disponible).
+- Menú flotante **Filtros** independiente del menú Exportar. Los selectores de fecha, módulo y ejecutivo siguen visibles; se trasladan controles secundarios originales a un panel por página, conservando sus eventos y filtros aplicados.
+- Apartados plegables en tablas, históricos, comparativos, incidencias y visitas, sin alterar las secciones `details` que ya podían contraerse.
+- Jefatura → «Objetivos operativos y su origen»: tabla de seis columnas (Módulo, Indicador, Objetivo, Alcance logrado, % cumplimiento, Origen del objetivo).
+- Comparativa diaria → WhatsApp: seis factores con dos espacios entre cada valor dentro del bloque monoespaciado; Calidad en párrafo aparte fuera de ese bloque.
+
+## Nueva gestión de registros
+
+- Clic/tap en fila de ventas → ficha con **Editar**, **Copiar datos visibles**, **Eliminar** reversible y **Crear/ir a Gestión de incidencia**.
+- Selección múltiple con casillas en Registros manuales, registros de Calculadora individual y Logros semanales; barra flotante para edición masiva de un campo a la vez, máximo 500 registros.
+- Correcciones **no destructivas** por folio (`recordEditKey`); en registros sin folio, por huella UID. El XLS original no se altera y las correcciones reaparecen cuando vuelve a cargarse el folio.
+- Nueva clave de Ajustes `wmSamsRecordEditsV260`, sincronizada por `src/cloud-boot.js` y autorizada por `netlify/functions/settings.js`. Sin migración SQL.
+- Los registros ocultados se excluyen de cálculos y reportes. Restaurar es posible en la ficha o en el buscador global.
+- Casillas originales de APP, incidencia permanente y dinámica siguen funcionando.
+
+## Archivos clave y contrato técnico
+
+- `src/legacy-app.js`: `FILTER_MOVES`, `initFloatingFilters`, `initGlobalCollapses`, `initRecordManagement`, `recordEditKey`, `refreshAfterRecordChange`; se deben mantener referencias originales de los elementos de filtro, sin clonar controles.
+- `src/record-overrides.js`: módulo puro y mapa de campos que admite edición. `overlayRecord` se aplica al combinar los datos originales, después de deduplicar.
+- `src/daily-whatsapp-report.js`: separación exacta de dos espacios y Calidad fuera del monoespaciado.
+- `index.html`: menús, overlays, tabla de objetivos y CSS de controles nuevos.
+- `src/cloud-boot.js` / `netlify/functions/settings.js`: incluir exactamente la clave `wmSamsRecordEditsV260`.
+- `tests/validate-v260.mjs`: cobertura nueva. Ejecutar `npm run check && npm test`.
+- `MANUAL_USUARIO_INVEX_V260.md` / `public/MANUAL_INVEX_V260.pdf`: guía completa y pruebas de aceptación.
+
+## Riesgos y límites
+
+- La identidad de edición por folio presupone unicidad de folios. Folios duplicados comparten corrección.
+- Las correcciones no reescriben archivos; el borrado es lógico. Con datos sin folio o con cambios radicales de origen, la huella puede diferir después de reimportar.
+- La clave de ajustes remotos admite como máximo el tamaño permitido por Netlify; para uso masivo a escala puede necesitarse tabla SQL dedicada más adelante.
+- La validación actual ejecutó las pruebas de fórmula y sintaxis; navegación en Chromium, sincronización real entre dispositivos y compilación en Netlify deben comprobarse tras publicar.
+
+---
+
+# INVEX V2.5.9 — Objetivos porcentuales y tarjetas compactas
+
+**Base:** V2.5.8. Se conserva el proyecto Netlify/GitHub y las fórmulas de comisiones.
+
+- Objetivos base: solo **Trámites** (`records`) y **Ventas totales** (`sales`) son cantidades semanales enteras. **Regulares, Garantizadas, Dental, P0, APP, Primera compra y Calidad Total** son porcentajes en `[0,100]` con precisión decimal.
+- Predeterminados: Regulares 100%, Garantizadas 100%, Dental 90%, P0 30%, APP 90%, Primera compra 90%, Calidad Total 90%. Trámites y Ventas no tienen meta predeterminada en cantidad. P0 siempre se mide sobre ventas regulares; el resto de porcentajes de productos se mide sobre ventas válidas.
+- **Importante:** Regulares y Garantizadas son categorías excluyentes. Por defecto ambas tienen objetivo 100% por solicitud; no son simultáneamente alcanzables salvo casos de cero o denominadores distintos. Son editables por perfil.
+- Consolidación de Jefatura: suma de cantidades; porcentajes ponderados por los objetivos de ventas de los módulos; si faltan ponderaciones y las tasas son distintas se informa meta incompleta. Un objetivo manual de Jefatura conserva prioridad.
+- Dashboard de Jefatura: tabla de objetivos muestra unidades correctas y % de logro por tasa. Se incluye Calidad Total. El cálculo operativo de calidad utiliza metas porcentuales vigentes de Primera compra, P0 y APP. Los históricos por período toman esas tasas y conservan las vigencias. Las comisiones NO se modifican.
+- **Migración sin ambigüedad:** esquema de `wmSamsBaseGoalsV258` pasa de `version:1` a `version:2` en `src/base-goals.js`, preservando únicamente metas antiguas de Trámites y Ventas. Las cantidades antiguas de complementos no se interpretan como porcentajes. Se conserva la clave de sincronización; no requiere migración SQL.
+- UI: editor de perfiles con unidad y límite adecuado; editor antiguo de Jefatura reducido a Trámites y Ventas; 9 KPI del Resumen general en 2 filas de 5/4 columnas, con desplazamiento horizontal en móvil.
+- Manual: `MANUAL_USUARIO_INVEX_V259.md`, `public/MANUAL_INVEX_V259.pdf`. Validaciones añadidas en `tests/validate-v259.mjs`.
+
+---
+
+# INVEX V2.5.8 — Objetivos base persistentes y optimización
+
+**Base:** proyecto completo V2.5.7. **Fecha:** 15 de noviembre de 2026. Se respetan todas las páginas y reglas de cálculo de comisiones anteriores.
+
+## Arquitectura nueva
+
+- **Objetivos base:** nueva sección de Ajustes con botones separados para Jefatura, módulos y ejecutivos. Perfiles dinámicos detectados desde los registros o guardados previamente, con creación manual de módulos/ejecutivos. Sin lista fija de módulos.
+- **Ocho metas en cantidades por perfil:** Ventas, Registros, Regulares, Garantizadas, Dental, P0, APP y Primera Compra. Cada versión comienza en un lunes ISO. Los datos anteriores permanecen consultables y el mismo lunes puede editarse sin modificar otras vigencias.
+- **Jefatura:** suma automáticamente los objetivos vigentes de todos los módulos conocidos; una meta propia de Jefatura sustituye la suma únicamente para el indicador afectado. No se muestra un consolidado parcial si un módulo carece de objetivo.
+- **Fuente de objetivos en análisis:** Objetivos base tiene prioridad en Dashboard de Jefatura, Históricos y análisis semanales/diarios. Se mantienen ajustes previos y metas manuales de períodos como respaldo/excepción. Los objetivos de calidad siguen siendo porcentajes requeridos independientes.
+- **Comisiones sin cambios:** `teamGoals`, objetivos de Supervisor, tarifas y bonos siguen operando independientemente; Objetivos base NO alimenta los motores de pago.
+- **Accesos rápidos:** nombres clicables de módulos y colaboradores en tablas de análisis y botones junto a filtros históricos. Editor en modal con fecha de inicio.
+- **Persistencia:** `wmSamsBaseGoalsV258` en `dashboard_settings` existente y respaldo en localStorage; se añade a lista permitida en `netlify/functions/settings.js` y `src/cloud-boot.js`. No se requiere migración SQL, los perfiles sobreviven a la eliminación de XLS.
+- **Rendimiento:** caché de archivos normalizados por identidad de referencias, caché de metas dentro de consultas, agrupación de Jefatura en una sola pasada, repintado de páginas activas; sin eliminar datos ni gráficos.
+
+## Contratos y archivos para futuras modificaciones
+
+- Motor puro `src/base-goals.js`: `cleanBaseGoals`, `upsertBaseGoals`, `effectiveBaseGoal`, `headquartersGoal`, `knownBaseProfiles`, `mondayISO`. Claves `module|NORMALIZADO`, `executive|NORMALIZADO`, `headquarters|JEFATURA`; `versions` por lunes con `goals` de ocho métricas.
+- UI/consumidores `src/legacy-app.js`; consolidación `src/leadership-dashboard.js` con `headquartersGoal` inyectado (firma `(week,module,metric)`). Registros históricos `src/individual-history.js` y `src/module-history.js` usan un callback `weeklyGoal` inyectado por el controlador.
+- Manifiestos de sincronización: `src/cloud-boot.js` y `netlify/functions/settings.js`, ambos incluyen `wmSamsBaseGoalsV258`.
+- Manual `MANUAL_USUARIO_INVEX_V258.md` y `public/MANUAL_INVEX_V258.pdf`. Paquete `package.json` versión `2.5.8`.
+- Tests: todas las versiones de `tests/validate-v250.mjs` a `tests/validate-v258.mjs`, sin migración PostgreSQL.
+
+## Validación y pendientes
+
+`npm run check` y `npm test` pasaron, incluidos escenarios de cambios históricos, consolidado incompleto, sustitución manual de Jefatura y lista dinámica de cuatro módulos. **Pendiente verificar** compilación de producción con dependencias, navegación visual en móvil y sincronización real de Netlify. Ver manual §§ 19–21 para procedimientos y datos técnicos.
+
+---
+
+# INVEX V2.5.7 — Objetivos de Jefatura, proyecciones y manual
+
+**Base:** proyecto completo V2.5.6. No se modifican las fórmulas de comisiones ni la base de incidencias.
+
+## Cambios V2.5.7
+
+- **Jefatura → objetivos y procedencia:** nueva tabla con ocho indicadores por módulo: Ventas, Registros, Regulares, Garantizadas, Dental, P0, APP y Primera Compra. Muestra meta, realizado, porcentaje de logro y origen.
+- **Ajustes → Objetivos y proyecciones de Jefatura:** metas base por módulo y excepciones por semana (lunes a domingo); tienen prioridad sobre las metas heredadas. Puedes optar por heredar objetivos existentes o exigir metas explícitas de Jefatura. Las metas adicionales son cantidades operativas de seguimiento, no cambian las comisiones.
+- **Proyección configurable:** lineal (siete días de igual peso) o ponderada con pesos editables de lunes a domingo. Utiliza únicamente ventas de fechas hasta el día de consulta; sigue siendo una estimación y no considera jornadas trabajadas.
+- **Control de alertas:** mínimo de calidad, alertas opcionales por objetivos operativos y umbral de avance, además de conversión, antigüedad de datos y proyección ya existentes.
+- **Secciones plegables:** Resumen general, Módulos, Objetivos, Personal, Calidad, Tendencia, Proyección, Alertas y Gestión, con botones de abrir/cerrar individual, expandir todas y contraer todas. Se guarda la preferencia por cuenta.
+- **Manual de usuario:** `MANUAL_USUARIO_INVEX_V257.md` (editable) y `public/MANUAL_INVEX_V257.pdf` (PDF carta de nueve páginas); acceso directo **Manual del proyecto** desde la barra superior.
+- **Exportación Jefatura:** agrega una tabla de objetivos y sus fuentes; permite incluirla/ocultarla desde Ajustes → Dashboard de Jefatura. El PDF/PNG conserva la paginación existente.
+
+## Objetivos y proyección, en breve
+
+1. Objetivo **semanal explícito** de Jefatura para el módulo y semana.
+2. Objetivo **base de Jefatura** del módulo.
+3. Si la herencia está habilitada: Logros semanales → Calidad del módulo → Supervisor → suma de metas individuales detectadas.
+4. Si falta una meta necesaria, se muestra `—`; las cifras observadas siguen visibles.
+
+`Lineal = ventas válidas acumuladas hasta hoy / días naturales transcurridos × 7`
+
+`Ponderada = ventas acumuladas hasta hoy × (suma de pesos de los siete días / suma de pesos transcurridos)`
+
+`Proyección % = ventas proyectadas / objetivo semanal × 100`
+
+Todas las metas operativas son cantidades semanales. El avance de días/meses se prorratea sobre siete días naturales por semana. La calidad sigue usando los porcentajes requeridos del Ajuste de calidad preexistente.
+
+## Publicación
+
+Extrae **todo** el ZIP en la raíz del repositorio. Ejecuta `npm run check`, `npm test`, `npm install` y `npm run build` en un entorno con acceso a dependencias, y publica con Git. El manual PDF se ubica en `public/` y Vite lo expone como `/MANUAL_INVEX_V257.pdf`.
+
+No se requiere nueva migración PostgreSQL: se reutiliza la clave existente `wmSamsLeadershipV256` de ajustes por cuenta. Verifica la sesión, la procedencia de metas, un override semanal, el colapsado y PDF/PNG en la aplicación publicada.
+
+**Validación local:** `npm run check` y `npm test` pasaron; el navegador local está bloqueado por el entorno de ejecución, así que la prueba completa de la interfaz y el build de producción en Netlify requieren verificación en la cuenta publicada.
+
+---
+
+## V2.5.6 · 15 de noviembre de 2026 · Dashboard de Jefatura
+
+- Nueva página de jefatura en Análisis y resultados, con filtros de período y ventas de supervisores.
+- KPI operativos, consolidado con objetivos por módulo y calidades recalculadas sin promediar porcentajes.
+- Productividad, tendencia, proyección semanal de ritmo lineal, alertas configurables y compromisos.
+- Configuración y compromisos sincronizables por cuenta mediante `wmSamsLeadershipV256` en Netlify Settings, sin migración SQL.
+- Exportaciones PDF tamaño Carta y PNG paginado desde el menú flotante; sin CSV.
+- Migración del inicio predeterminado a Dashboard de Jefatura para usuarios con navegación heredada por defecto.
+- Pruebas adicionales para metas ausentes, folios incidentados, calidad al 60%, módulo y consolidado, proyecciones y persistencia.
+
 ## 2.5.5 · Fecha por archivo y redacción de exportaciones
 - Solicitud de fecha obligatoria y cancelable para cada archivo nuevo antes de almacenarlo; nombre AAAA-MM-DD en la cuenta y la lista.
 - Netlify acepta fechas como nombre visible y los nombres con extensión de versiones anteriores.
