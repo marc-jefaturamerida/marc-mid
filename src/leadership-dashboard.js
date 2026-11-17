@@ -13,7 +13,9 @@ export const LEADERSHIP_DEFAULTS=Object.freeze({
  // Metas semanales absolutas por módulo y semana; sin tocar metas de comisiones.
  defaultGoals:{},weeklyGoals:{},goalFallback:'existing',
  projectionMode:'linear',weekdayWeights:[1,1,1,1,1,1,1],
- minQualityAlert:60,alertTargets:false,minTargetProgress:60,collapsedSections:{}
+ minQualityAlert:60,alertTargets:false,minTargetProgress:60,
+ qualityAlertThresholds:{completion:60,purchase:60,p0:60,app:60},
+ targetAlertThresholds:{records:60,dental:60,p0:60,apps:60,purchase:60},collapsedSections:{}
 });
 const positive=(v,d,max)=>Number.isFinite(Number(v))&&Number(v)>=0&&Number(v)<=max?Number(v):d;
 export function cleanLeadershipSettings(x){
@@ -42,7 +44,9 @@ export function cleanLeadershipSettings(x){
   projectionMode:['linear','weighted'].includes(v.projectionMode)?v.projectionMode:'linear',
   weekdayWeights:Array.isArray(v.weekdayWeights)&&v.weekdayWeights.length===7&&v.weekdayWeights.every(n=>Number.isFinite(Number(n))&&Number(n)>=0&&Number(n)<=20)&&v.weekdayWeights.some(n=>Number(n)>0)?v.weekdayWeights.map(Number):[1,1,1,1,1,1,1],
   minQualityAlert:positive(v.minQualityAlert,60,200),alertTargets:v.alertTargets===true,
-  minTargetProgress:positive(v.minTargetProgress,60,300),collapsedSections:collapsed,
+  minTargetProgress:positive(v.minTargetProgress,60,300),
+  qualityAlertThresholds:Object.fromEntries(['completion','purchase','p0','app'].map(key=>[key,positive(v.qualityAlertThresholds?.[key],positive(v.minQualityAlert,60,200),300)])),
+  targetAlertThresholds:Object.fromEntries(['records','dental','p0','apps','purchase'].map(key=>[key,positive(v.targetAlertThresholds?.[key],positive(v.minTargetProgress,60,300),300)])),collapsedSections:collapsed,
   period:['today','week','month','custom'].includes(v.period)?v.period:'week',
   ...Object.fromEntries(['includeSupervisors','showTrend','showPeople','showQuality','showAlerts','showActions','showModules','showProjection','showTargets'].map(k=>[k,typeof v[k]==='boolean'?v[k]:LEADERSHIP_DEFAULTS[k]])),
   minConversion:positive(v.minConversion,20,100),minProjectedCompletion:positive(v.minProjectedCompletion,100,300),
@@ -178,7 +182,7 @@ function evaluate(rows,goal,rules){
  */
 export function analyzeLeadership({rows=[],from,to,today,weeklyGoal,rulesFor,permanentIncidents=[],includeSupervisors=true,
  minConversion=20,minProjectedCompletion=100,staleDays=2,actions=[],knownModules=[],
- projectionMode='linear',weekdayWeights=[1,1,1,1,1,1,1],minQualityAlert=60,alertTargets=false,minTargetProgress=60,headquartersGoal=null}){
+ projectionMode='linear',weekdayWeights=[1,1,1,1,1,1,1],minQualityAlert=60,alertTargets=false,minTargetProgress=60,qualityAlertThresholds=null,targetAlertThresholds=null,headquartersGoal=null}){
  const selected=[],byModule=new Map(),latestByModule=new Map();
  const allModules=new Map();
  for(const r of rows){
@@ -229,10 +233,10 @@ export function analyzeLeadership({rows=[],from,to,today,weeklyGoal,rulesFor,per
    addAlert('high','proyección',m.name,`Proyección ${m.projectedCompletion.toFixed(1)}% del objetivo semanal.`);
   if(m.counts.records>0&&m.conversion!==null&&m.conversion<minConversion)
    addAlert('medium','conversión',m.name,`Conversión ${m.conversion.toFixed(1)}%, inferior al umbral ${minConversion}%.`);
-  for(const k of ['completion','purchase','p0','app'])if(m.counts.records>0&&m.goal!==null&&m.factors[k]!==null&&m.factors[k]<minQualityAlert)
+  for(const k of ['completion','purchase','p0','app'])if(m.counts.records>0&&m.goal!==null&&m.factors[k]!==null&&m.factors[k]<(qualityAlertThresholds?.[k]??minQualityAlert))
    addAlert('medium','calidad',m.name,`Calidad de ${({completion:'Cumplimiento',purchase:'Primera compra',p0:'Programa Cero',app:'APP'})[k]}: ${m.factors[k].toFixed(1)}%.`);
   if(alertTargets&&m.counts.records>0&&to<=today){for(const key of ['records','dental','p0','apps','purchase']){
-   const t=m.targets[key];if(t.progress!==null&&t.progress<minTargetProgress)addAlert('medium','objetivo',m.name,`${LEADERSHIP_METRIC_LABELS[key]}: ${t.progress.toFixed(1)}% de la meta operativa.`);
+   const t=m.targets[key];if(t.progress!==null&&t.progress<(targetAlertThresholds?.[key]??minTargetProgress))addAlert('medium','objetivo',m.name,`${LEADERSHIP_METRIC_LABELS[key]}: ${t.progress.toFixed(1)}% de la meta operativa (mínimo ${targetAlertThresholds?.[key]??minTargetProgress}%).`);
   }}
   if(m.pendingIncidents)addAlert('medium','incidencias',m.name,`${m.pendingIncidents} incidencia(s) activa(s) sin resolver.`);
   if(m.counts.records===0)addAlert('info','datos',m.name,'No hay registros en el período; verificar si la carga está completa antes de evaluar productividad.');

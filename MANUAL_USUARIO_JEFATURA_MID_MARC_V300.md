@@ -676,3 +676,47 @@ Desde cualquier página abre **Menú → Configuración**. Ya no saldrás de la 
 Al pulsar **Guardar y volver a la página**, los formularios con guardado pendiente se validan y guardan; si hay error, la ventana permanece abierta y muestra el problema. Si se guardó correctamente, se cierra y se mantiene exactamente la página que estabas consultando. También puedes usar un botón Guardar propio de un apartado. Los cambios de algunos controles se almacenan al modificarlos, como ya ocurría antes.
 
 La edición de textos de reportes se limita a la página desde la que abriste la ventana. Para cambiar la organización general, los títulos del menú o los ajustes de otras páginas, utiliza Configuraciones generales. No se crea una base de datos nueva ni cambia el cálculo de comisiones.
+
+
+## 31. V3.0 — Filtros ampliados, alertas individuales y copia de reportes
+
+### 31.1 Dashboard Jefatura: filtros en menú flotante
+
+Desde **Dashboard de Jefatura → Menú → Filtros** puedes elegir:
+
+- **Módulo:** limita los resultados consolidados y los objetivos al módulo elegido. Para el total filtrado se usa la meta de ese módulo, no la suma completa de Jefatura.
+- **Ejecutivo:** limita la tabla **Productividad del equipo** a ese colaborador; los resultados globales y objetivos del módulo NO se modifican para evitar comparar su producción con la meta global de manera incorrecta.
+- **Prioridad de alertas:** Alta, Media, Informativa o todas.
+- **Categoría de alertas:** Proyección, Conversión, Calidad, Objetivos, Incidencias, Datos o Actualización.
+- **Incluir supervisores:** conserva su comportamiento previo. **Restablecer filtros** elimina los filtros de módulo, ejecutivo y alertas (no altera la semana seleccionada).
+
+La semana de trabajo sigue siendo lunes–domingo. Los filtros de prioridad/categoría solo modifican las alertas visibles. El filtro de ejecutivo solo modifica el cuadro de productividad. El módulo sí modifica el consolidado y las metas mostradas. Los filtros no borran ni reescriben registros.
+
+### 31.2 Configuración: porcentajes mínimos de alerta
+
+Abre **Menú → Configuración** en Dashboard Jefatura y expande **Porcentajes mínimos de alerta por categoría**. Especifica el mínimo (%) de cada factor de calidad: Cumplimiento, Primera compra, Programa Cero y Activación APP. Para metas operativas puedes configurar independientemente Trámites, Plan Dental, Programa Cero, APP y Primera compra; activa **Alerta por metas operativas** para que se evalúen esos mínimos. Conversión mínima y cumplimiento proyectado mínimo continúan teniendo controles propios en la misma ventana.
+
+Cada porcentaje admite de 0 a 300 y se considera alerta cuando el valor real es inferior al mínimo guardado. Los umbrales antiguos se toman como valores iniciales al migrar preferencias previas. **Guardar y volver a la página** aplica los cambios y cierra la ventana sin salir de Jefatura. Estos umbrales solo afectan las señales de seguimiento; no modifican las fórmulas de comisiones.
+
+Las alertas por incidencias se activan cuando hay incidencias pendientes, por ausencia de registros cuando el módulo no tiene carga y por actualización cuando han transcurrido los días configurados: esas tres no se basan en un porcentaje.
+
+### 31.3 Copiar reportes desde incidencias y actualizaciones
+
+Abre la ficha de una incidencia o solicitud de actualización y pulsa **Copiar reporte**. El texto contiene los datos de identificación, estado, fechas y comentarios históricos. En solicitudes resueltas agrega los valores aplicados. La aplicación muestra confirmación si el navegador permitió copiar. Pega el texto en WhatsApp, correo o tu medio de seguimiento.
+
+### 31.4 Logros semanales: folios comisionables
+
+Selecciona la semana, el módulo y otros filtros deseados en **Logros semanales**. Abre **Menú → Exportar → Copiar folios comisionables**. Se copian únicamente los registros filtrados que la aplicación clasifica **Comisionable** en su validación de pago (código y tipo de venta válido, sin estatus no pagable ni incidencia excluyente). Si no existe ningún folio comisionable con esos filtros se muestra un aviso, sin copiar un reporte vacío.
+
+Formato de ejemplo:
+
+```text
+Paseo Montejo
+09/11/2026, 12345678
+10/11/2026, 23456789
+
+Aviación
+11/11/2026, 34567890
+```
+
+Cuando se seleccionan todos los módulos, el reporte agrupa los folios por módulo. Se evitan renglones duplicados que tengan idénticos módulo, fecha y folio. La selección de filtros **No pagable** o **Sin código** normalmente produce un reporte vacío, porque la exportación respeta los filtros actuales. No afecta las comisiones ni actualiza el XLS.

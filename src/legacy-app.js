@@ -1,4 +1,5 @@
 import {createPageSettingsModal} from './page-settings-modal.js';
+import {formatIncidentReport,formatCommissionableFolios} from './report-copy.js';
 import {downloadPdfCanvases,pdfSafeName} from './pdf-download.js';
 import {initSettingsTransfer} from './settings-transfer.js';
 import {analyzeImportPreview} from './import-preview.js';
@@ -605,6 +606,10 @@ function initIncidences(){
   el('incDetailOverlay').addEventListener('click',e=>{if(e.target===el('incDetailOverlay'))el('incDetailOverlay').hidden=true;});
   el('incDetailEdit').addEventListener('click',()=>editIncident(incidentDetailKey));
   el('incDetailDelete').addEventListener('click',()=>{void deleteIncidentFromDetail();});
+  el('incDetailCopy').addEventListener('click',async()=>{
+   const report=formatIncidentReport(incidentRecords.get(incidentDetailKey));
+   el('incDetailStatus').textContent=report&&await copyWhatsAppText(report)?'Reporte de incidencia copiado.':'No se pudo copiar. Comprueba los permisos del portapapeles.';
+  });
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!el('incDetailOverlay').hidden)el('incDetailOverlay').hidden=true;});
   el('incRefresh').addEventListener('click',()=>{void refreshIncidents(false);});
   el('incSearch').addEventListener('input',()=>{incidentPageIndex=1;renderIncidencePage();});
@@ -2792,27 +2797,46 @@ function leadershipSelectedRange(){
  const endDate=dateFromIso(start);endDate.setDate(endDate.getDate()+6);
  return {from:start,to:dateIso(endDate)};
 }
+function populateLeadershipExtraFilters(){
+ const rows=historyData();
+ const options=(id,values,caption)=>{
+  const node=el(id),old=node.value;
+  const choices=[...new Set(values.map(x=>String(x||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  node.innerHTML='<option value="">'+esc(caption)+'</option>'+choices.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
+  node.value=choices.find(x=>normalize(x)===normalize(old))||'';
+ };
+ options('leaderFilterModule',leadershipKnownModules(),'Todos los módulos');
+ const mod=el('leaderFilterModule').value;
+ options('leaderFilterExecutive',rows.filter(r=>!mod||normalize(r.module)===normalize(mod)).map(r=>r.executive),'Todos los ejecutivos');
+}
 function leadershipCalc(){
  const {from,to}=leadershipSelectedRange(),today=dateIso(new Date());
+ const moduleFilter=el('leaderFilterModule')?.value||'';
  const goalCache=new Map();
  const cachedGoal=(week,module,metric)=>{const key=week+'|'+normalizeName(module)+'|'+metric;
   if(!goalCache.has(key))goalCache.set(key,leadershipMetricGoal(week,module,metric));return goalCache.get(key);};
  const rulesFor=module=>key=>qualityRule(key,module,module?'module':'executive');
- return analyzeLeadership({rows:leadershipRows(),from,to,today,weeklyGoal:cachedGoal,rulesFor,
-  permanentIncidents:[...incidentRecords.values()],includeSupervisors:el('leaderSupervisor').value==='yes',
+ return analyzeLeadership({rows:leadershipRows().filter(r=>!moduleFilter||normalize(r.module)===normalize(moduleFilter)),from,to,today,weeklyGoal:cachedGoal,rulesFor,
+  permanentIncidents:[...incidentRecords.values()].filter(x=>!moduleFilter||normalize(x.module)===normalize(moduleFilter)),includeSupervisors:el('leaderSupervisor').value==='yes',
   minConversion:leadershipPrefs.minConversion,minProjectedCompletion:leadershipPrefs.minProjectedCompletion,
-  staleDays:leadershipPrefs.staleDays,actions:leadershipPrefs.actions,
+  staleDays:leadershipPrefs.staleDays,actions:leadershipPrefs.actions.filter(a=>!moduleFilter||!a.module||normalize(a.module)===normalize(moduleFilter)),
   projectionMode:leadershipPrefs.projectionMode,weekdayWeights:leadershipPrefs.weekdayWeights,
-  minQualityAlert:leadershipPrefs.minQualityAlert,alertTargets:leadershipPrefs.alertTargets,
-  minTargetProgress:leadershipPrefs.minTargetProgress,knownModules:leadershipKnownModules(),
-  headquartersGoal:(week,_module,metric)=>leadershipHeadquartersGoal(week,metric)});
+  minQualityAlert:leadershipPrefs.minQualityAlert,qualityAlertThresholds:leadershipPrefs.qualityAlertThresholds,
+  targetAlertThresholds:leadershipPrefs.targetAlertThresholds,alertTargets:leadershipPrefs.alertTargets,
+  minTargetProgress:leadershipPrefs.minTargetProgress,knownModules:moduleFilter?[moduleFilter]:leadershipKnownModules(),
+  headquartersGoal:(week,_module,metric)=>moduleFilter?cachedGoal(week,moduleFilter,metric):leadershipHeadquartersGoal(week,metric)});
 }
 function renderLeadership(){
- if(!el('leadershipPage'))return;populateLeaderWeeks();
+ if(!el('leadershipPage'))return;populateLeaderWeeks();populateLeadershipExtraFilters();
  let info;try{info=leadershipCalc();leadershipSnapshot=info;}catch(error){
   leadershipSnapshot=null;el('leaderNotice').textContent='Revisa el período: '+error.message;return;
  }
- const {total,modules,people,alerts}=info;
+ const {total,modules}=info;
+ const executiveFilter=el('leaderFilterExecutive').value;
+ const people=executiveFilter?info.people.filter(p=>normalize(p.name)===normalize(executiveFilter)):info.people;
+ const priority=el('leaderFilterPriority').value,category=el('leaderFilterAlertCategory').value;
+ const alerts=info.alerts.filter(a=>(!priority||a.level===priority)&&(!category||a.category===category));
+ leadershipSnapshot={...info,alerts,people};
  el('leaderNotice').textContent=`${fmtDay(info.from)} a ${fmtDay(info.to)} · ${info.selectedRows} registros · ${modules.length} módulos configurados o históricos · ${info.withGoal} con objetivo calculable. Las cifras se actualizan al cargar registros manuales.`;
  const card=(label,value,sub)=>`<div class="leadership-kpi"><span>${esc(label)}</span><b>${esc(String(value))}</b><small>${esc(sub)}</small></div>`;
  const kpis=[['Registros',number.format(total.counts.records),'Registros del período'],['Ventas válidas',number.format(total.counts.sales),`${total.counts.regular} regulares · ${total.counts.guaranteed} garantizadas`],
@@ -3008,7 +3032,7 @@ function initLeadershipGoalSettings(){
   leadershipPrefs=cleanLeadershipSettings({...leadershipPrefs,weekdayWeights:weights,
    projectionMode:el('lsProjectionMode').value,goalFallback:el('lsGoalFallback').value,
    minQualityAlert:minimum,minTargetProgress:progress,alertTargets:el('lsAlertTargets').value==='yes'});
-  if(!persistLeadership())return;renderLeadership();el('lsGoalStatus').textContent='Proyección, fuente de metas y alertas guardadas.';if(el('settingsPanel').open)toggleSettings(false);
+  if(!persistLeadership())return;el('lsAlertTargetsPage').value=leadershipPrefs.alertTargets?'yes':'no';renderLeadership();el('lsGoalStatus').textContent='Proyección, fuente de metas y alertas guardadas.';if(el('settingsPanel').open)toggleSettings(false);
  });
  el('lsGoalHelp').addEventListener('click',()=>{alert('Proyección lineal = ventas válidas acumuladas hasta hoy / días naturales transcurridos × 7. Ponderada = ventas acumuladas hasta hoy / suma de pesos transcurridos × suma de los 7 pesos. El % proyectado se divide entre la meta semanal. Las metas específicas de Jefatura tienen prioridad sobre las metas base y estas sobre las fuentes existentes. Los objetivos de los demás indicadores son cantidades semanales de seguimiento, no cambian la calidad ni las comisiones.');});
 }
@@ -3016,17 +3040,28 @@ function refreshLeadershipSettingsEditor(){
  const prefs=leadershipPrefs;
  for(const [id,key] of [['lsPeriod','period'],['lsConversion','minConversion'],['lsProjected','minProjectedCompletion'],['lsStale','staleDays'],['lsTopPeople','topPeople'],['lsTitle','exportTitle'],['lsSubtitle','exportSubtitle'],['lsColor','color'],['lsNote','exportNote']])el(id).value=id==='lsPeriod'?'week':prefs[key];
  el('lsIncludeSupervisor').value=prefs.includeSupervisors?'yes':'no';
+ el('lsAlertTargetsPage').value=prefs.alertTargets?'yes':'no';
  el('lsSections').querySelectorAll('[data-leader-setting]').forEach(ch=>ch.checked=prefs[ch.dataset.leaderSetting]);
+ el('settingsLeadershipV256').querySelectorAll('[data-leader-quality-threshold]').forEach(input=>input.value=prefs.qualityAlertThresholds[input.dataset.leaderQualityThreshold]);
+ el('settingsLeadershipV256').querySelectorAll('[data-leader-target-threshold]').forEach(input=>input.value=prefs.targetAlertThresholds[input.dataset.leaderTargetThreshold]);
 }
 function saveLeadershipSettings(){
  const read=(id)=>Number(el(id).value);
+ const thresholdInputs=[...el('settingsLeadershipV256').querySelectorAll('[data-leader-quality-threshold],[data-leader-target-threshold]')];
+ if(thresholdInputs.some(input=>!input.value.trim()||!Number.isFinite(Number(input.value))||Number(input.value)<0||Number(input.value)>300)){
+  el('lsStatus').textContent='Error: revisa los porcentajes mínimos de alerta (0 a 300).';return;
+ }
+ const qualityAlertThresholds=Object.fromEntries(thresholdInputs.filter(x=>x.dataset.leaderQualityThreshold).map(x=>[x.dataset.leaderQualityThreshold,Number(x.value)]));
+ const targetAlertThresholds=Object.fromEntries(thresholdInputs.filter(x=>x.dataset.leaderTargetThreshold).map(x=>[x.dataset.leaderTargetThreshold,Number(x.value)]));
  const next=cleanLeadershipSettings({...leadershipPrefs,
   period:'week',includeSupervisors:el('lsIncludeSupervisor').value==='yes',
   minConversion:read('lsConversion'),minProjectedCompletion:read('lsProjected'),staleDays:read('lsStale'),topPeople:read('lsTopPeople'),
+  qualityAlertThresholds,targetAlertThresholds,alertTargets:el('lsAlertTargetsPage').value==='yes',
   exportTitle:el('lsTitle').value,exportSubtitle:el('lsSubtitle').value,color:el('lsColor').value,exportNote:el('lsNote').value,
   ...Object.fromEntries([...el('lsSections').querySelectorAll('[data-leader-setting]')].map(ch=>[ch.dataset.leaderSetting,ch.checked]))});
  leadershipPrefs=next;
  if(!persistLeadership())return;
+ el('lsAlertTargets').value=next.alertTargets?'yes':'no';
  el('leaderPeriod').value='week';el('leaderSupervisor').value=next.includeSupervisors?'yes':'no';
  leaderPeriodToggled();renderLeadership();leaderGoalSettingsEditor();el('lsStatus').textContent='Dashboard guardado localmente'+(isAuthorized()?' y pendiente de sincronización automática.':'. Inicia sesión para sincronizar.');
 }
@@ -3039,6 +3074,9 @@ function initLeadership(){
  initLeadershipCollapse();initLeadershipGoalSettings();refreshLeadershipSettingsEditor();el('leaderPeriod').value='week';el('leaderSupervisor').value=leadershipPrefs.includeSupervisors?'yes':'no';leaderPeriodToggled();
  populateLeaderWeeks();el('leaderWeek').addEventListener('change',()=>{leaderPeriodToggled();renderLeadership();});
  el('leaderSupervisor').addEventListener('change',renderLeadership);
+ for(const id of ['leaderFilterModule','leaderFilterExecutive','leaderFilterPriority','leaderFilterAlertCategory'])
+  el(id).addEventListener('change',()=>{if(id==='leaderFilterModule')el('leaderFilterExecutive').value='';renderLeadership();});
+ el('leaderFilterReset').addEventListener('click',()=>{for(const id of ['leaderFilterModule','leaderFilterExecutive','leaderFilterPriority','leaderFilterAlertCategory'])el(id).value='';renderLeadership();});
  el('leadershipSettingsOpen').addEventListener('click',()=>pageSettingsController?.open('leadership','settingsLeadershipV256'));
  el('lsSave').addEventListener('click',()=>{saveLeadershipSettings();if(!el('lsStatus').textContent.startsWith('Error'))toggleSettings(false);});
  el('lsRestore').addEventListener('click',()=>{leadershipPrefs=cleanLeadershipSettings({...LEADERSHIP_DEFAULTS,actions:leadershipPrefs.actions});refreshLeadershipSettingsEditor();saveLeadershipSettings();});
@@ -3209,6 +3247,7 @@ function initNavOrder(){
 function updateFloatingExport(){
  const isDaily=activePage==='daily',isVisit=activePage==='visits',isIncident=activePage==='incidents';
  el('dailyCopyWhatsApp').hidden=!isDaily;
+ el('achCopyCommissionable').hidden=activePage!=='achievements';
  el('floatCsv').hidden=isVisit||activePage==='history'||activePage==='moduleHistory'||activePage==='leadership';
  el('floatPdf').hidden=false;el('floatPng').hidden=false;
  el('floatingExportMenu').hidden=true;
@@ -3220,6 +3259,13 @@ function initFloatingExport(){
  action('floatPdf',()=>el('print').click());
  action('floatPng',()=>el(activePage==='visits'?'visitPng':'exportImage').click());
  action('floatCsv',()=>activePage==='incidents'?exportIncidentCsv():el('export').click());
+ action('achCopyCommissionable',async()=>{
+  const report=formatCommissionableFolios(achFilteredRecords().filter(payable));
+  if(!report){alert('No hay folios comisionables con los filtros actuales de Logros semanales.');return;}
+  const ok=await copyWhatsAppText(report);
+  if(!ok)alert('No se pudo copiar el reporte. Comprueba los permisos del portapapeles.');
+  else alert('Reporte de folios comisionables copiado al portapapeles.');
+ });
  el('dailyCopyWhatsApp').addEventListener('click',close);
  updateFloatingExport();
 }
@@ -3229,7 +3275,7 @@ const FILTER_MOVES={
  team:['teamSort'],daily:['dailyDateMode','includeSupervisorsDaily'],
  accumulated:['includeSupervisorsAccumulated'],weekly:['includeSupervisorsWeekly'],
  history:['histWeekday','histResetFilters'],moduleHistory:['mhWeekday','mhIncludeSupervisors','mhResetFilters'],
- leadership:['leaderSupervisor'],allrecords:['allRecordsAdvanced','allRecordsSearch'],
+ leadership:['leaderSupervisor','leaderFilterModule','leaderFilterExecutive','leaderFilterPriority','leaderFilterAlertCategory','leaderFilterReset'],allrecords:['allRecordsAdvanced','allRecordsSearch'],
  achievements:['achAdvanced','achSearch','achIncludeSupervisors'],
  supervisor:['supSearch'],incidents:['incSearch','incFilter'],reminders:[]
 };
@@ -4744,7 +4790,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   window.addEventListener('beforeprint',()=>{try{if(activePage!=='achievements'||cachedWeeklyAdminAssets())buildReport();}catch(error){console.warn('Reporte de impresión:',error);}});
   window.CALC_REPORT={buildReport,layout:uiLayout};
 
-  updatesManager=initUpdates({cloud:window.APP_CLOUD,
+  updatesManager=initUpdates({cloud:window.APP_CLOUD,copyText:copyWhatsAppText,
    getRow:key=>historyData().find(row=>(row.overrideKey||recordEditKey(row))===key)||null,
    getFields:originalUpdateFields,
    getKey:row=>row.overrideKey||recordEditKey(row),

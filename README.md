@@ -48,3 +48,13 @@ En Administración → Actualizaciones gestiona solicitudes asociadas a registro
 
 ### Configuración contextual de cada página (V3.0)
 Desde el botón flotante **Menú → Configuración** se abre una ventana sobre la página actual, con sus formularios correspondientes. **Guardar y volver a la página** guarda los cambios pendientes y cierra la ventana sin cambiar de página. Las opciones generales siguen existiendo en Configuraciones, para administrarlas cuando se necesite. Algunos controles ya se guardan en el momento de modificarlos. Las páginas sin ajustes específicos muestran un aviso en vez de controles de otras páginas.
+
+
+## Ajustes recientes V3.0 — filtros, alertas y reportes de texto
+
+- Menú flotante de Jefatura: módulo, ejecutivo (productividad), categoría y prioridad de alertas, más restablecimiento.
+- Configuración contextual de Jefatura: umbrales porcentuales por factor y meta operativa, guardado en los ajustes de la cuenta.
+- Incidencias y Actualizaciones: botón Copiar reporte desde la ficha de detalle.
+- Logros semanales: **Menú → Exportar → Copiar folios comisionables** en formato `Nombre del módulo` seguido de `fecha, folio`, usando los mismos criterios de validación de pago.
+- Componentes nuevos: `src/report-copy.js`, `public/assets/jm-v301.css`, `tests/validate-v301.mjs` y `tests/validate-clipboard-v301.mjs`.
+- Sin cambios en `netlify/functions`, SQL ni fórmulas de pago. No requiere una nueva migración.

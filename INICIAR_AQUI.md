@@ -37,3 +37,8 @@ En cada página pulsa **☰ Menú → Exportar → Descargar PDF**. El archivo s
 
 
 **Menú de configuración:** desde cualquier página, pulsa **Menú → Configuración**. Se abrirá una ventana con opciones relacionadas con esa página; selecciona **Guardar y volver a la página** para cerrar. No se modifica la base de datos ni hace falta migración adicional.
+
+
+### Mejoras del menú V3.0 (actualización)
+
+Dashboard de Jefatura cuenta con filtros ampliados y porcentajes mínimos individuales de alerta en Menú → Configuración. Incidencias y Actualizaciones tienen botón Copiar reporte en sus detalles. Logros semanales ofrece Menú → Exportar → Copiar folios comisionables. Consulta el apartado 31 del manual para conocer el alcance de cada filtro y los formatos de texto.

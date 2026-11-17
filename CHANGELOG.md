@@ -1,3 +1,13 @@
+## V3.0 · Ajuste de filtros, alertas y portapapeles (17 de noviembre de 2026)
+
+- **Dashboard de Jefatura:** Menú → Filtros incorpora módulo (afecta consolidado y objetivos del módulo), ejecutivo (acota exclusivamente la tabla de productividad, sin falsear las metas consolidadas), prioridad y categoría de alerta. Se añadió «Restablecer filtros». Se mantiene la semana completa de lunes a domingo.
+- **Alertas de Jefatura:** Menú → Configuración permite modificar el mínimo porcentual independiente de Cumplimiento, Primera compra, Programa Cero, Activación APP y de los cinco indicadores de metas operativas (Trámites, Plan Dental, Programa Cero, APP y Primera compra). Conversión y proyección mantienen sus umbrales propios existentes. Alertas por objetivos se pueden activar/desactivar desde esa misma ventana. En ausencia de nuevas preferencias se recuperan los porcentajes históricos como valores de partida; no se modifican las tarifas ni los cálculos.
+- **Incidencias:** la ficha de detalle incorpora «Copiar reporte» con folio, módulo, ejecutivo, estados, fechas e historial de comentarios.
+- **Actualizaciones:** la ficha de detalle incorpora «Copiar reporte» con folio, datos, campos solicitados, comentarios, estado, fechas y valores aplicados cuando existan. Compatible con valores JSON en distintas representaciones.
+- **Logros semanales:** Menú → Exportar agrega «Copiar folios comisionables». Copia exclusivamente los folios de los registros visibles por los filtros actuales que satisfacen la función de pago `payable()` de la aplicación. Agrupa por módulo con líneas «DD/MM/AAAA, folio» y elimina duplicados idénticos por módulo/fecha/folio. No modifica las validaciones originales de pago.
+- **Compatibilidad:** implementación sobre el proyecto GitHub/Netlify V3.0, conserva PostgreSQL, XLS históricos y fórmulas. Sin migraciones SQL nuevas.
+- **Pruebas:** tests de formatos y umbrales y suite anterior; revisar en Netlify las copias con permiso de portapapeles y la vista móvil del menú flotante.
+
 ## V3.0 — Ajustes contextuales por página (17 de noviembre de 2026)
 
 - **Configuración** del menú flotante abre una ventana sobre la página activa; ya no navega a Configuraciones generales.

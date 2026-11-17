@@ -1,12 +1,13 @@
 // Jefatura Mid Marc V2.7.1 · Gestión por cuenta de solicitudes de corrección de registros.
 import {shouldShowUpdateReminder,updateFieldNames,normalizeRequestedValues} from './update-request-rules.js';
+import {formatUpdateReport} from './report-copy.js';
 const $=id=>document.getElementById(id);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const localDay=value=>{const d=new Date(value);return Number.isNaN(d.valueOf())?'':`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
 const fmt=value=>{if(!value)return '—';const date=new Date(value);return Number.isNaN(date.valueOf())?'—':date.toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'});};
 const listNames=value=>Object.keys(typeof value==='string'?JSON.parse(value):value||{});
 const commentsOf=value=>Array.isArray(value)?value:[];
-export function initUpdates({cloud,getRow,getFields,getKey,applyAndSync,afterChange,openPage}){
+export function initUpdates({cloud,getRow,getFields,getKey,applyAndSync,afterChange,openPage,copyText}){
  let rows=[],trash=[],current=null,currentRow=null,mode='',initialReminderChecked=false;
  const active=()=>rows.filter(r=>r.status==='pending'&&!r.deleted_at);
  const pendingByKey=new Map();
@@ -97,6 +98,8 @@ export function initUpdates({cloud,getRow,getFields,getKey,applyAndSync,afterCha
   $('updDetailActions').innerHTML=r.deleted_at?`<button class="btn primary" type="button" data-upd-action="restore">Restaurar solicitud</button>`:
    r.status==='pending'?`<button class="btn" type="button" data-upd-action="edit">Editar</button><button class="btn danger" type="button" data-upd-action="delete">Eliminar</button><button class="btn primary" type="button" data-upd-action="resolve">Ya se actualizó</button>`:
    `<button class="btn danger" type="button" data-upd-action="delete">Enviar a papelera</button>`;
+  $('updDetailActions').insertAdjacentHTML('beforeend','<button class="btn" type="button" data-upd-action="copy">Copiar reporte</button>');
+  $('updDetailCopyStatus').textContent='';
   show('detail');
  }
  function resolveEditor(){
@@ -126,6 +129,12 @@ export function initUpdates({cloud,getRow,getFields,getKey,applyAndSync,afterCha
  }
  async function action(name){
   if(!current)return;
+  if(name==='copy'){
+   const text=formatUpdateReport(current);
+   const ok=typeof copyText==='function'&&await copyText(text);
+   $('updDetailCopyStatus').textContent=ok?'Reporte de actualización copiado al portapapeles.':'No se pudo copiar. Comprueba los permisos del portapapeles.';
+   return;
+  }
   if(name==='edit'){
    openRequest(currentRow,current,true);return;
   }
