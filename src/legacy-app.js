@@ -1,7 +1,8 @@
 import {initSettingsTransfer} from './settings-transfer.js';
 import {analyzeImportPreview} from './import-preview.js';
 import {initReminders} from './reminders.js';
-import {RECORD_EDITS_KEY,cleanRecordEdits,overlayRecord,validateRecordFields,EDITABLE_RECORD_FIELDS} from './record-overrides.js';
+import {initUpdates} from './updates-ui.js';
+import {RECORD_EDITS_KEY,cleanRecordEdits,overlayRecord,validateRecordFields,validateRawRecordFields,EDITABLE_RECORD_FIELDS} from './record-overrides.js';
 import {TEAM_REGISTRY_KEY,cleanTeamRegistry,registryEntry,registryRowEligible,registryNames,registryUpdate,registryGoalAt} from './team-registry.js';
 import {BASE_GOALS_KEY,BASE_METRICS,BASE_TYPES,BASE_RATE_DEFAULTS,isBasePercentage,cleanBaseGoals,upsertBaseGoals,effectiveBaseGoal,headquartersGoal,knownBaseProfiles,mondayISO,normalizeName} from './base-goals.js';
 import {LEADERSHIP_KEY,LEADERSHIP_DEFAULTS,cleanLeadershipSettings,leadershipRange,analyzeLeadership,LEADERSHIP_METRICS,LEADERSHIP_METRIC_LABELS,leadershipTargetGoal,leadershipModuleKey,leadershipWeeklyKey} from './leadership-dashboard.js';
@@ -50,7 +51,7 @@ import {WEEKLY_ADMIN_DEFAULTS,WEEKLY_ADMIN_STORAGE,cleanWeeklyAdminSettings,prel
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='2.7.0';
+  const APP_VERSION='2.7.1';
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -104,11 +105,11 @@ const teamGoals=loadTeamStore(TEAM_GOALS_STORAGE),teamRecoveries=loadTeamStore(T
 function readWeeklyAdminPrefs(){try{return cleanWeeklyAdminSettings(JSON.parse(localStorage.getItem(WEEKLY_ADMIN_STORAGE)||'null'));}catch(_){return cleanWeeklyAdminSettings(null);}}
 let weeklyAdminPrefs=readWeeklyAdminPrefs();
 const PAGE_NAV_KEY='wmSamsNavOrderV250';
-const DEFAULT_PAGE_ORDER=['leadership','daily','history','moduleHistory','individual','team','supervisor','incidents','reminders','allrecords','achievements','accumulated','weekly','visits'];
+const DEFAULT_PAGE_ORDER=['leadership','daily','history','moduleHistory','individual','team','supervisor','incidents','updates','reminders','allrecords','achievements','accumulated','weekly','visits'];
 const GROUP_LABELS={analysis:'Análisis y resultados',commissions:'Comisiones',administration:'Administración',settings:'Configuración'};
 const GROUP_DEFAULT=['analysis','commissions','administration','settings'];
-const DEFAULT_GROUP_MAP={leadership:'analysis',daily:'analysis',history:'analysis',moduleHistory:'analysis',team:'analysis',achievements:'analysis',accumulated:'analysis',weekly:'analysis',individual:'commissions',supervisor:'commissions',allrecords:'administration',incidents:'administration',reminders:'administration',visits:'administration'};
-const PAGE_LABELS={leadership:'Dashboard de Jefatura',daily:'Comparativa diaria',individual:'Calculadora individual',team:'Comparativo de ejecutivos',supervisor:'Calculadora supervisor',incidents:'Gestión de incidencias',reminders:'Recordatorios',allrecords:'Registros manuales',achievements:'Logros semanales',accumulated:'Acumulado general',weekly:'Comparativa semanal',visits:'Visitas de coordinación',history:'Histórico individual',moduleHistory:'Histórico por módulo'};
+const DEFAULT_GROUP_MAP={leadership:'analysis',daily:'analysis',history:'analysis',moduleHistory:'analysis',team:'analysis',achievements:'analysis',accumulated:'analysis',weekly:'analysis',individual:'commissions',supervisor:'commissions',allrecords:'administration',incidents:'administration',updates:'administration',reminders:'administration',visits:'administration'};
+const PAGE_LABELS={leadership:'Dashboard de Jefatura',daily:'Comparativa diaria',individual:'Calculadora individual',team:'Comparativo de ejecutivos',supervisor:'Calculadora supervisor',incidents:'Gestión de incidencias',updates:'Actualizaciones',reminders:'Recordatorios',allrecords:'Registros manuales',achievements:'Logros semanales',accumulated:'Acumulado general',weekly:'Comparativa semanal',visits:'Visitas de coordinación',history:'Histórico individual',moduleHistory:'Histórico por módulo'};
 function validNavSettings(value){
  const arr=Array.isArray(value?.order)?value.order:[],unique=[...new Set(arr.filter(k=>DEFAULT_PAGE_ORDER.includes(k)))];
  const order=[...unique,...DEFAULT_PAGE_ORDER.filter(k=>!unique.includes(k))];
@@ -160,6 +161,7 @@ function baseExecutiveNames(){return knownBaseProfiles(baseGoals,'executive',[
  ]);}
 
 
+let updatesManager=null;
 let activePage=pageNavigation.home;
 let activeGroup=pageNavigation.groupBy[activePage]||'analysis';
 let firstCloudNavigation=true;
@@ -802,7 +804,7 @@ async function initArchive(){
     refreshArchiveData(true);window.VISITS?.refreshSources();
     await refreshIncidents(true);
   }catch(err){archive.ready=false;renderArchiveList();statusBox('No se pudo conectar al historial en línea: '+esc(err.message||String(err))+'. Comprueba la conexión, la sesión y Netlify Database.','error');}
-  finally{if(!incidentLoaded)await refreshIncidents(true);}
+  finally{if(!incidentLoaded)await refreshIncidents(true);await updatesManager?.refresh(true);}
 }
 // Columnas configurables y filtros visuales (no alteran las métricas por sí mismos).
 function columnLabel(c){return c.key==='dynamicBonus'?'Bono adicional':c.key==='incident'?'Incidencia':c.key==='app'?'APP':c.key==='payment'?'Validación de pago':c.name;}
@@ -1000,11 +1002,11 @@ function renderAllRecords(){
   el('allRecordsCount').textContent=`${number.format(count)} / ${number.format(total)} registros`;
   el('allRecordsActiveFilters').textContent=allRecordsActiveFilterCount()?`${allRecordsActiveFilterCount()} filtro(s) activo(s)`:'Ningún filtro adicional';
   el('allRecordsSummary').innerHTML=`<span>${number.format(count)} visibles</span><span>${rows.filter(hasCode).length} con código</span><span>${rows.filter(selectedIncident).length} incidencias</span><span>${rows.filter(appEnabled).length} APP activas</span>`;
-  el('allRecordsHead').innerHTML='<tr><th class="record-select-header" title="Selección múltiple">✓</th>'+cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')+'</tr>';
+  el('allRecordsHead').innerHTML='<tr><th class="record-select-header" title="Selección múltiple">✓</th>'+cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')+'<th>Pendiente de actualizar</th></tr>';
   host.innerHTML=visible.length?visible.map(r=>{
     const classes=[selectedIncident(r)?'flagged':'',excluded(r)?'unpayable':'',!appEnabled(r)?'app-disabled':''].filter(Boolean).join(' ');
-    return `<tr data-record-uid="${esc(r.uid)}" class="${classes}"><td class="record-select-cell"><input type="checkbox" data-record-select="${esc(r.uid)}" aria-label="Seleccionar folio ${esc(r.folio)}" ${selectedRecordUids.has(r.uid)?'checked':''}></td>`+cols.map(c=>`<td>${tableCellMarkup(r,c)}</td>`).join('')+'</tr>';
-  }).join(''):`<tr><td class="empty-table" colspan="${Math.max(1,cols.length+1)}">${total?'No hay registros que coincidan con estos filtros.':'No hay registros cargados.'}</td></tr>`;
+    return `<tr data-record-uid="${esc(r.uid)}" class="${classes}"><td class="record-select-cell"><input type="checkbox" data-record-select="${esc(r.uid)}" aria-label="Seleccionar folio ${esc(r.folio)}" ${selectedRecordUids.has(r.uid)?'checked':''}></td>`+cols.map(c=>`<td>${tableCellMarkup(r,c)}</td>`).join('')+`<td>${updatesManager?.pendingForRow(r)?'<span class="upd-record-flag">Sí</span>':'No'}</td></tr>`;
+  }).join(''):`<tr><td class="empty-table" colspan="${Math.max(1,cols.length+2)}">${total?'No hay registros que coincidan con estos filtros.':'No hay registros cargados.'}</td></tr>`;
   el('allRecordsPageStatus').textContent=count?`Filas ${number.format(start+1)}–${number.format(Math.min(start+allRecordsView.pageSize,count))} de ${number.format(count)} · Página ${allRecordsView.page} de ${pages}`:`0 registros · Página 1 de 1`;
   el('allRecordsPrev').disabled=allRecordsView.page<=1;
   el('allRecordsNext').disabled=allRecordsView.page>=pages;
@@ -1057,10 +1059,10 @@ function renderRecords(){
   const activeApps=current.filter(r=>payable(r)&&appEnabled(r)).length;
   el('recordsCount').textContent=`${current.length} registros del ejecutivo`;
   el('recordCounters').innerHTML=`<span>${visible.length} filas visibles</span><span>${current.filter(hasCode).length} con Código (selección)</span><span>${activeApps} APP válidas</span><span>${flaggedCurrent} incidencias marcadas</span><span>${nonPay} ventas no pagables</span>`;
-  el('recordsHead').innerHTML='<tr><th class="record-select-header">✓</th>'+cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')+'</tr>';
+  el('recordsHead').innerHTML='<tr><th class="record-select-header">✓</th>'+cols.map(c=>`<th>${esc(columnLabel(c))}</th>`).join('')+'<th>Pendiente de actualizar</th></tr>';
   el('recordsBody').innerHTML=visible.length?visible.map(r=>{
     const classes=[selectedIncident(r)?'flagged':'',excluded(r)?'unpayable':'',!appEnabled(r)?'app-disabled':''].filter(Boolean).join(' ');
-    return `<tr data-record-uid="${esc(r.uid)}" class="${classes}"><td class="record-select-cell"><input type="checkbox" data-record-select="${esc(r.uid)}" aria-label="Seleccionar folio ${esc(r.folio)}" ${selectedRecordUids.has(r.uid)?'checked':''}></td>`+cols.map(c=>`<td>${tableCellMarkup(r,c)}</td>`).join('')+'</tr>';
+    return `<tr data-record-uid="${esc(r.uid)}" class="${classes}"><td class="record-select-cell"><input type="checkbox" data-record-select="${esc(r.uid)}" aria-label="Seleccionar folio ${esc(r.folio)}" ${selectedRecordUids.has(r.uid)?'checked':''}></td>`+cols.map(c=>`<td>${tableCellMarkup(r,c)}</td>`).join('')+`<td>${updatesManager?.pendingForRow(r)?'<span class="upd-record-flag">Sí</span>':'No'}</td></tr>`;
   }).join(''):`<tr><td colspan="${Math.max(1,cols.length)}" class="empty-table">No hay filas que coincidan con los filtros.</td></tr>`;
   // La impresión siempre corresponde al ejecutivo/semana, aunque en pantalla se active el alcance «Todo el archivo».
   const printRows=applyTableFilters(current);
@@ -3288,6 +3290,33 @@ function initGlobalCollapses(){
 // V2.6.0 — ficha por registro, búsqueda global, edición reversible y edición múltiple.
 function recordFromUid(uid){return historyData().find(r=>r.uid===uid)||(imported.data?.rows||[]).find(r=>r.uid===uid)||null;}
 function recordDescription(r){return [r.folio||'Sin folio',r.executive||'Sin ejecutivo',r.module||'Sin módulo',r.fecha||''].join(' · ');}
+function originalUpdateFields(row){
+ const reports=archive.temporaryMode?archive.tempReports:archive.reports;
+ const headers=(reports.length?combinedArchiveData(reports):imported.data)?.headers||[];
+ return headers.map((name,index)=>({name,value:String(row.raw?.[index]??''),choices:['Módulo','Ejecutivo'].includes(XLS_CANONICAL_BY_ALIAS.get(normalize(name)))?activeCatalogNames(XLS_CANONICAL_BY_ALIAS.get(normalize(name))==='Módulo'?'modules':'executives'):null})).filter(item=>item.name);
+}
+async function applyUpdateValuesAndSync(row,values){
+ if(!navigator.onLine)throw Error('Conéctate a internet para confirmar una actualización.');
+ const fields=originalUpdateFields(row),valid=validateRawRecordFields(values,fields.map(x=>x.name));
+ for(const [name,value] of Object.entries(valid)){
+  const found=fields.find(f=>f.name===name);
+  if(found?.choices&&value!==found.value&&!found.choices.some(n=>normalizeName(n)===normalizeName(value)))throw Error('Selecciona un elemento activo del catálogo para '+name+'.');
+  if(XLS_CANONICAL_BY_ALIAS.get(normalize(name))==='Fecha'&&value&&!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error('Escribe la fecha en formato AAAA-MM-DD.');
+ }
+ const key=row.overrideKey||recordEditKey(row),previous=recordEdits[key]||{fields:{},rawFields:{},deleted:false};
+ const coreKeys={'Folio':'folio','Fecha':'fecha','Módulo':'module','Ejecutivo':'executive','Código':'code','Estatus':'status','Garantizada':'guaranteed','Salud Dental':'dental','Programa Cero':'p0'};
+ const coreFields={...previous.fields};
+ for(const [name,value] of Object.entries(valid)){
+  const keyName=coreKeys[XLS_CANONICAL_BY_ALIAS.get(normalize(name))];
+  if(keyName)coreFields[keyName]=value;
+ }
+ recordEdits[key]={...previous,fields:coreFields,rawFields:{...previous.rawFields,...valid},description:recordDescription(row)};
+ persistRecordEdits();
+ await window.APP_CLOUD.flush();
+ if(window.APP_CLOUD.pendingCount)throw Error('Las correcciones siguen pendientes de sincronización; NO se marcó como resuelta. Revisa la conexión o el conflicto y vuelve a intentar.');
+ refreshAfterRecordChange();
+}
+
 function refreshAfterRecordChange(){
  combinedArchiveCache.clear();moduleProfileCache=null;
  refreshArchiveData(true);refreshAuthorizedPages();
@@ -3330,12 +3359,12 @@ function openRecordAction(uid,tr=null){
  recordActionCurrent=uid;recordBulkMode=false;
  el('recordActionTitle').textContent='Registro · '+(row.folio||'Sin folio');
  el('recordActionContext').textContent=recordDescription(row);
- el('recordActionData').innerHTML=[['Fecha',row.fecha],['Folio',row.folio],['Módulo',row.module],['Ejecutivo',row.executive],['Código',row.code],['Resultado',row.status],['Garantizada',isYes(row.guaranteed)?'Sí':'No'],['Dental',isYes(row.dental)?'Sí':'No'],['P0',isYes(row.p0)?'Sí':'No'],['APP',appEnabled(row)?'Sí':'No'],['Incidencia',selectedIncident(row)?'Sí':'No'],['Bono por dinámica',dynamicBonusMarked(row)?'Sí':'No']].map(([key,v])=>`<div><small>${esc(key)}</small>${esc(v||'—')}</div>`).join('');
+ el('recordActionData').innerHTML=[['Fecha',row.fecha],['Folio',row.folio],['Módulo',row.module],['Ejecutivo',row.executive],['Código',row.code],['Resultado',row.status],['Garantizada',isYes(row.guaranteed)?'Sí':'No'],['Dental',isYes(row.dental)?'Sí':'No'],['P0',isYes(row.p0)?'Sí':'No'],['APP',appEnabled(row)?'Sí':'No'],['Incidencia',selectedIncident(row)?'Sí':'No'],['Bono por dinámica',dynamicBonusMarked(row)?'Sí':'No'],['Pendiente de actualizar',updatesManager?.pendingForRow(row)?'Sí':'No']].map(([key,v])=>`<div><small>${esc(key)}</small>${esc(v||'—')}</div>`).join('');
  recordActionVisibleText=recordVisibleText(tr,row);
  el('recordEditFields').innerHTML=recordEditorMarkup(row);
  el('recordEditFields').hidden=true;el('recordBulkFields').hidden=true;
  el('recordActionEdit').hidden=false;el('recordActionSave').hidden=true;
- el('recordActionCopy').hidden=false;el('recordActionIncident').hidden=false;el('recordActionDelete').hidden=false;
+ el('recordActionCopy').hidden=false;el('recordActionIncident').hidden=false;el('recordActionUpdate').hidden=false;el('recordActionDelete').hidden=false;
  el('recordActionDelete').textContent='Eliminar registro';
  el('recordActionStatus').textContent='La edición se conservará independientemente del archivo importado.';
  showRecordDeletedList();el('recordActionOverlay').hidden=false;
@@ -3351,7 +3380,7 @@ function showBulkRecordEditor(){
  el('recordBulkFields').innerHTML=`<label>Campo a modificar<select id="recordBulkField">${fields.map(([id,label])=>`<option value="${id}">${label}</option>`).join('')}</select></label><label>Nuevo valor<span id="recordBulkValueHost"></span></label>`;
  function updateBulkValue(){const field=el('recordBulkField').value,available=activeCatalogNames(field==='module'?'modules':'executives');el('recordBulkValueHost').innerHTML=(field==='module'||field==='executive')?`<select id="recordBulkValue"><option value="">Selecciona una opción activa</option>${available.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select>`:`<input id="recordBulkValue" type="text" placeholder="Escribe el nuevo valor">`;}
  el('recordBulkField').addEventListener('change',updateBulkValue);updateBulkValue();
- el('recordActionEdit').hidden=true;el('recordActionSave').hidden=false;el('recordActionCopy').hidden=true;el('recordActionIncident').hidden=true;el('recordActionDelete').hidden=true;
+ el('recordActionEdit').hidden=true;el('recordActionSave').hidden=false;el('recordActionCopy').hidden=true;el('recordActionIncident').hidden=true;el('recordActionUpdate').hidden=true;el('recordActionDelete').hidden=true;
  el('recordActionStatus').textContent='Para Garantizada, Dental, P0, APP y Bono por dinámica utiliza Sí o No.';
  showRecordDeletedList();el('recordActionOverlay').hidden=false;
 }
@@ -3408,6 +3437,7 @@ function initRecordManagement(){
   else el('recordActionStatus').textContent='El navegador bloqueó la copia; permite el portapapeles.';
  });
  el('recordActionIncident').addEventListener('click',openIncidentFromAction);
+ el('recordActionUpdate').addEventListener('click',()=>{const row=recordFromUid(recordActionCurrent);if(!row)return;closeRecordAction();updatesManager?.openForRow(row);});
  el('recordDeletedList').addEventListener('click',e=>{
   const button=e.target.closest('[data-restore-record]');if(!button)return;
   const uid=button.dataset.restoreRecord;if(!recordEdits[uid])return;
@@ -3466,6 +3496,10 @@ function initMondayReminder(){
 function switchPage(page){
   activePage=DEFAULT_PAGE_ORDER.includes(page)?page:pageNavigation.home;
   document.body.dataset.page=activePage;
+  // Las secciones y filtros de la calculadora solo pertenecen a su propia página.
+  // Ocultar explícitamente evita que reaparezcan al añadir otras pestañas.
+  el('sectionsContainer').hidden=activePage!=='individual';
+  el('quickFilters').hidden=activePage!=='individual';
   el('teamPage').hidden=activePage!=='team';
   el('dailyPage').hidden=activePage!=='daily';
   el('accumulatedPage').hidden=activePage!=='accumulated';
@@ -3475,6 +3509,7 @@ function switchPage(page){
   el('achievementsPage').hidden=activePage!=='achievements';
   el('supPage').hidden=activePage!=='supervisor';
   el('incidencePage').hidden=activePage!=='incidents';
+  el('updatesPage').hidden=activePage!=='updates';
   el('remindersPage').hidden=activePage!=='reminders';
   el('historyPage').hidden=activePage!=='history';
   el('moduleHistoryPage').hidden=activePage!=='moduleHistory';
@@ -3491,6 +3526,7 @@ function switchPage(page){
   if(activePage==='achievements'){populateAchFilters();renderAchievements();}
   if(activePage==='supervisor'){populateSupervisorCalculatorFilters();renderSupervisorCalculator();}
   if(activePage==='incidents')renderIncidencePage();
+  if(activePage==='updates')updatesManager?.render();
   if(activePage==='history'){populateHistoryFilters();renderHistory();}
   if(activePage==='moduleHistory'){populateModuleFilters();renderModuleHistory();}
   if(activePage==='leadership')renderLeadership();
@@ -4634,6 +4670,14 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   window.addEventListener('beforeprint',()=>{try{if(activePage!=='achievements'||cachedWeeklyAdminAssets())buildReport();}catch(error){console.warn('Reporte de impresión:',error);}});
   window.CALC_REPORT={buildReport,layout:uiLayout};
 
+  updatesManager=initUpdates({cloud:window.APP_CLOUD,
+   getRow:key=>historyData().find(row=>(row.overrideKey||recordEditKey(row))===key)||null,
+   getFields:originalUpdateFields,
+   getKey:row=>row.overrideKey||recordEditKey(row),
+   applyAndSync:applyUpdateValuesAndSync,
+   afterChange:()=>{if(imported.data)renderRecords();if(activePage==='allrecords')renderAllRecords();},
+   openPage:switchPage
+  });
   initReminders();initSettingsTransfer();
   initAllRecordsPage();initAchievements();initTeamRegistry();initWeeklyAdminSettings();initQualitySettings();initBaseGoals();initSupervisorCalculator();initIncidences();initHistory();initModuleHistory();initLeadership();initNavOrder();initFloatingExport();initFloatingFilters();initRecordManagement();initGlobalCollapses();initMondayReminder();
   restore();setForm('base');setForm('sim');render();initializeWeeklyDates();refreshAuthorizedPages();switchPage(pageNavigation.home);initArchive();
@@ -4648,7 +4692,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     pageNavigation=loadNavSettings();activeGroup=pageNavigation.groupBy[activePage]||pageNavigation.groupOrder[0];applyNavOrder();renderNavOrderEditor();window.INVEX_REMINDERS?.refresh();
     if(firstCloudNavigation){firstCloudNavigation=false;el('histPeriod').value=historyPrefs.defaultPeriod;el('histWeekday').value=historyPrefs.defaultWeekday==='today'?String(new Date().getDay()):historyPrefs.defaultWeekday;el('mhPeriod').value=moduleHistoryPrefs.defaultPeriod;el('mhWeekday').value=moduleHistoryPrefs.defaultWeekday==='today'?String(new Date().getDay()):moduleHistoryPrefs.defaultWeekday;el('mhIncludeSupervisors').value=moduleHistoryPrefs.includeSupervisors?'yes':'no';switchPage(pageNavigation.home);}
     dynamicBonusConfig=loadDynamicBonus();if(el('dynamicBonusAmount'))el('dynamicBonusAmount').value=dynamicBonusAmount();
-    refreshArchiveData(true);await refreshIncidents(true);refreshAuthorizedPages();if(activePage==='leadership')renderLeadership();render();window.VISITS?.refreshSources();
+    refreshArchiveData(true);await refreshIncidents(true);await updatesManager?.refresh(true);refreshAuthorizedPages();if(activePage==='leadership')renderLeadership();render();window.VISITS?.refreshSources();
   });
   // Carga anticipada de logotipos y firma para evitar esperas al exportar.
   preloadWeeklyAdminAssets().catch(err=>console.warn('Recursos semanales:',err));

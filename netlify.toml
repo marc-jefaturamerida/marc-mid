@@ -17,6 +17,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/updates"
+  to = "/.netlify/functions/updates"
+  status = 200
+
+[[redirects]]
   from = "/api/audit"
   to = "/.netlify/functions/audit"
   status = 200

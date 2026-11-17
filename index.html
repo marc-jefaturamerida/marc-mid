@@ -5,8 +5,9 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="light" name="color-scheme"/>
-<title>Jefatura Mid Marc V2.7</title>
+<title>Jefatura Mid Marc V2.7.1</title>
 <link rel="stylesheet" href="/assets/jm-v27.css"/>
+<link rel="stylesheet" href="/assets/jm-updates-v271.css"/>
 <style>
     :root{--blue:#184d86;--blue-deep:#112f56;--blue-soft:#eaf3fb;--ink:#17273b;--sub:#607187;--line:#d9e2ec;--bg:#f4f7fb;--white:#fff;--green:#147e60;--red:#bc4545;--orange:#b96b21;--shadow:0 12px 35px rgba(23,54,92,.08)}
     *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}button,input{font:inherit}button{cursor:pointer}a{color:inherit}.shell{max-width:1390px;margin:auto;padding:28px 30px 55px}.topbar{display:flex;align-items:flex-start;gap:20px;justify-content:space-between;margin-bottom:22px}.eyebrow{font-size:11px;letter-spacing:2.4px;text-transform:uppercase;color:var(--blue);font-weight:800;margin-bottom:5px}.topbar h1{font-size:clamp(24px,2.8vw,34px);letter-spacing:-.85px;line-height:1.17;margin:0 0 7px;color:var(--blue-deep)}.subtext{color:var(--sub);margin:0;max-width:780px}.toolbar{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}.btn{border:1px solid var(--line);background:white;color:var(--blue-deep);padding:10px 13px;border-radius:9px;font-weight:750;transition:background .15s,transform .15s;white-space:nowrap}.btn:hover{background:#ebf2f9}.btn:active{transform:scale(.98)}.btn.primary{background:var(--blue);border-color:var(--blue);color:white}.btn.primary:hover{background:#103e71}.btn.soft{background:#e9f2fc;border-color:#d7e6f6}.btn.small{padding:7px 10px;font-size:12px}.btn:disabled{opacity:.45;cursor:not-allowed}
@@ -955,7 +956,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 
 
 
-<button class="btn" id="cloudLoginButton" type="button">Ingresar con correo</button><button class="btn" id="cloudSyncButton" type="button" hidden>↻ Sincronizar</button><button id="jmResolveConflict" class="btn" type="button" hidden>Resolver conflicto de ajustes</button><span class="cloud-session-label" id="cloudSessionLabel" aria-live="polite" title="La nube se consulta al iniciar sesión, al regresar tras una pausa y al sincronizar manualmente">Sin sesión · XLS temporales</span><button class="btn primary" id="chooseXls" type="button">Cargar XLS</button><div class="global-folio-search"><label class="visually-hidden" for="globalFolioSearch">Buscar folio en los registros históricos</label><input id="globalFolioSearch" type="search" autocomplete="off" placeholder="⌕  Buscar folio…" aria-label="Buscar folio en todo el historial"/><div id="globalFolioResults" class="global-folio-results" hidden role="listbox"></div></div><button class="btn" id="print" type="button">Imprimir / PDF</button><button class="btn" id="exportImage" type="button">Exportar PNG</button><button class="btn" id="export" type="button">Exportar CSV</button><a class="btn" href="/MANUAL_JEFATURA_MID_MARC_V27.pdf" target="_blank" rel="noopener" title="Manual completo en PDF">Manual del proyecto</a><button aria-controls="settingsPanel" aria-expanded="false" class="btn" id="toggleSettings" hidden type="button">⚙ Ajustes</button><input accept=".xls,.xlsx,.csv,.tsv" aria-label="Seleccionar reportes XLS" multiple hidden="" id="xlsInput" type="file"/></div>
+<button class="btn" id="cloudLoginButton" type="button">Ingresar con correo</button><button class="btn" id="cloudSyncButton" type="button" hidden>↻ Sincronizar</button><button id="jmResolveConflict" class="btn" type="button" hidden>Resolver conflicto de ajustes</button><span class="cloud-session-label" id="cloudSessionLabel" aria-live="polite" title="La nube se consulta al iniciar sesión, al regresar tras una pausa y al sincronizar manualmente">Sin sesión · XLS temporales</span><button class="btn primary" id="chooseXls" type="button">Cargar XLS</button><div class="global-folio-search"><label class="visually-hidden" for="globalFolioSearch">Buscar folio en los registros históricos</label><input id="globalFolioSearch" type="search" autocomplete="off" placeholder="⌕  Buscar folio…" aria-label="Buscar folio en todo el historial"/><div id="globalFolioResults" class="global-folio-results" hidden role="listbox"></div></div><button class="btn" id="print" type="button">Imprimir / PDF</button><button class="btn" id="exportImage" type="button">Exportar PNG</button><button class="btn" id="export" type="button">Exportar CSV</button><a class="btn" href="/MANUAL_JEFATURA_MID_MARC_V271.pdf" target="_blank" rel="noopener" title="Manual completo en PDF">Manual del proyecto</a><button aria-controls="settingsPanel" aria-expanded="false" class="btn" id="toggleSettings" hidden type="button">⚙ Ajustes</button><input accept=".xls,.xlsx,.csv,.tsv" aria-label="Seleccionar reportes XLS" multiple hidden="" id="xlsInput" type="file"/></div>
 </header>
 <nav class="app-groups" id="appGroupNav" aria-label="Secciones principales"></nav>
 <nav class="app-navigation" role="tablist" aria-label="Vistas de comisiones">
@@ -969,6 +970,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="achievementsPage" data-page-tab="achievements">Logros semanales</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="supPage" data-page-tab="supervisor">Calculadora supervisor</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="incidencePage" data-page-tab="incidents">Gestión de incidencias</button>
+  <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="updatesPage" data-page-tab="updates">Actualizaciones</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="remindersPage" data-page-tab="reminders">Recordatorios</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="leadershipPage" data-page-tab="leadership">Dashboard de Jefatura</button>
   <button class="app-tab" type="button" role="tab" aria-selected="false" aria-controls="historyPage" data-page-tab="history">Histórico individual</button>
@@ -1431,7 +1433,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="all-records-help">Las columnas se muestran según <strong>Ajustes → Tabla de folios</strong>. Incidencia y APP permanecen a la vista para validarlas. Desliza horizontalmente para ver más columnas.</div>
   <div class="table-wrap all-records-table-wrap"><table id="allRecordsTable" class="record-table all-records-table"><thead id="allRecordsHead"></thead><tbody id="allRecordsBody"><tr><td>Importa un XLS para mostrar registros.</td></tr></tbody></table></div>
   <div class="all-records-pagination"><span id="allRecordsPageStatus">0 registros</span><div class="all-records-page-actions"><label for="allRecordsPageSize">Filas por página</label><select id="allRecordsPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" type="button" id="allRecordsPrev">Anterior</button><button class="btn small" type="button" id="allRecordsNext">Siguiente</button></div></div>
-  <footer class="foot">Consulta de registros manuales · Versión 2.7</footer>
+  <footer class="foot">Consulta de registros manuales · Versión 2.7.1</footer>
 </section>
 
 
@@ -1457,7 +1459,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
     </div></details>
   </div>
   <p class="sup-footnote">Cálculo informativo. Configura el bono base en Ajustes → 12; los bonos adicionales comienzan en $1,000, $1,500 y $2,000, editables y no acumulables. Guarda los ajustes para sincronizarlos con Netlify; consultar semanas y supervisores no genera escrituras.</p>
-  <footer class="foot">Calculadora de supervisor · Versión 2.7</footer>
+  <footer class="foot">Calculadora de supervisor · Versión 2.7.1</footer>
 </section>
 <section id="achievementsPage" class="achievements-page" hidden aria-label="Logros semanales por módulo">
   <div class="achievements-hero">
@@ -1531,10 +1533,24 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
       <div class="achievements-pager"><span id="achRecordStatus">0 registros</span><div class="achievements-pager-options"><label for="achPageSize">Filas</label><select id="achPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" id="achPrev" type="button">Anterior</button><button class="btn small" id="achNext" type="button">Siguiente</button></div></div>
     </div>
   </details>
-  <footer class="foot">Logros semanales · Versión 2.7</footer>
+  <footer class="foot">Logros semanales · Versión 2.7.1</footer>
 </section>
 
 
+<section id="updatesPage" class="updates-page" hidden aria-label="Gestión de solicitudes de actualización">
+ <header class="updates-hero"><div><div class="eyebrow">ADMINISTRACIÓN · SOLICITUDES</div><h2>Actualizaciones</h2><p>Solicitudes de corrección de registros originales. Cada cuenta conserva sus propios pendientes, fechas, comentarios y resoluciones.</p></div><div><div id="updatesCount" class="upd-count">0 solicitudes pendientes</div><button id="updatesRefresh" class="btn small" type="button" style="margin-top:8px">↻ Actualizar listado</button></div></header>
+ <div class="updates-filters" aria-label="Filtros principales de las solicitudes">
+  <label>Folio<input id="updFilterFolio" type="search" placeholder="Buscar folio"></label>
+  <label>Módulo<select id="updFilterModule"><option value="">Todos los módulos</option></select></label>
+  <label>Ejecutivo<select id="updFilterExecutive"><option value="">Todos los ejecutivos</option></select></label>
+  <label>Estado<select id="updFilterState"><option value="pending" selected>Pendiente de actualizar</option><option value="resolved">Actualizada</option><option value="">Todas</option><option value="trash">Papelera</option></select></label>
+  <label>Fecha de creación desde<input id="updFilterFrom" type="date"></label>
+  <label>Fecha de creación hasta<input id="updFilterTo" type="date"></label>
+  <label class="upd-search-wide">Búsqueda general<input id="updFilterSearch" type="search" placeholder="Folio, comentario, columna…"></label>
+  <button type="button" class="btn small" id="updResetFilters">Limpiar filtros</button>
+ </div>
+ <div class="updates-list"><div class="upd-status" id="updatesStatus" role="status">Inicia sesión para consultar las solicitudes.</div><div class="updates-scroll"><table class="updates-table"><thead><tr><th>Folio</th><th>Módulo</th><th>Ejecutivo</th><th>Campos solicitados</th><th>Fecha de creación</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="updRows"><tr><td colspan="7">Sin solicitudes</td></tr></tbody></table></div><p class="upd-status" id="updatesVisibleCount"></p></div>
+</section>
 <section class="reminders-page" id="remindersPage" hidden aria-label="Recordatorios emergentes de la aplicación">
  <header class="reminders-hero"><div><div class="eyebrow">AVISOS DENTRO DEL DASHBOARD</div><h2>Recordatorios</h2><p>Configura avisos emergentes y repetición. Solo se muestran mientras mantienes abierta la aplicación.</p></div><button class="btn primary" type="button" id="remNew">Crear recordatorio</button></header>
  <div class="reminders-list" id="remRows"></div><p class="settings-help" id="remStatus" role="status"></p>
@@ -1566,14 +1582,14 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 2.7</footer>
+  <footer class="foot">Acuse de coordinación · Versión 2.7.1</footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 2.7</footer>
+<footer class="foot">Final de la presentacion · Versión 2.7.1</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 
@@ -1586,7 +1602,15 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 
 <div id="incDetailOverlay" class="invex-modal-overlay" hidden role="presentation"><div class="invex-modal inc-detail-modal" role="dialog" aria-modal="true" aria-labelledby="incDetailTitle"><div class="invex-modal-head"><h2 id="incDetailTitle">Detalle de incidencia</h2><button class="btn small" type="button" id="incDetailClose">Cerrar ✕</button></div><div id="incDetailBody"></div><div class="invex-modal-actions"><button class="btn primary" id="incDetailEdit" type="button">Editar</button><button class="btn danger" id="incDetailDelete" type="button">Eliminar</button></div><p id="incDetailStatus" class="settings-help" role="status"></p></div></div>
 <div id="bulkRecordBar" class="bulk-record-bar" hidden><span id="bulkRecordCount">0 registros seleccionados</span><button class="btn primary small" id="bulkRecordEdit" type="button">Editar seleccionados</button><button class="btn small" id="bulkRecordClear" type="button">Limpiar</button></div>
-<div id="recordActionOverlay" class="record-action-overlay" hidden role="presentation"><section class="record-action-dialog" role="dialog" aria-modal="true" aria-labelledby="recordActionTitle"><div class="record-action-head"><h2 id="recordActionTitle">Detalle del registro</h2><button class="btn small" id="recordActionClose" type="button">Cerrar ✕</button></div><p class="muted" id="recordActionContext"></p><div class="record-action-data" id="recordActionData"></div><div id="recordEditFields" class="record-edit-fields" hidden></div><div id="recordBulkFields" class="record-edit-fields" hidden></div><div class="record-action-buttons" id="recordActionButtons"><button class="btn" type="button" id="recordActionEdit">Editar</button><button class="btn primary" type="button" id="recordActionSave" hidden>Guardar cambios</button><button class="btn" type="button" id="recordActionCopy">Copiar datos visibles</button><button class="btn" type="button" id="recordActionIncident">Crear / ir a Gestión de incidencia</button><button class="btn" type="button" id="recordActionDelete">Eliminar</button></div><p role="status" id="recordActionStatus" class="settings-help"></p><details class="record-action-deleted"><summary>Registros eliminados · Restaurar</summary><div id="recordDeletedList"></div></details></section></div>
+<div id="updModal" class="upd-overlay" hidden role="presentation"><section class="upd-dialog" role="dialog" aria-modal="true" aria-labelledby="updModalHeading">
+ <div class="upd-head"><h2 id="updModalHeading">Solicitar actualización</h2><button class="btn small" id="updModalClose" type="button">Cerrar ✕</button></div>
+ <div data-upd-panel="editor" hidden class="upd-form"><p class="upd-status" id="updEditorContext"></p><p class="upd-status" id="updEditorHint"></p><strong>Campos del registro original</strong><div id="updEditorFields" class="upd-checkbox-grid"></div><label>Comentarios<textarea id="updEditorComment" rows="3" maxlength="2000" placeholder="Describe los cambios solicitados"></textarea></label><div class="upd-actions"><button class="btn primary" id="updEditorSave" type="button">Guardar solicitud</button></div></div>
+ <div data-upd-panel="detail" hidden><div id="updDetailBody"></div><div class="upd-actions" id="updDetailActions"></div></div>
+ <div data-upd-panel="resolve" hidden class="upd-form"><p class="upd-status" id="updResolveInfo"></p><div class="upd-field-resolve" id="updResolveFields"></div><div class="upd-actions"><button class="btn primary" id="updResolveSave" type="button">Guardar cambios y marcar actualizada</button></div></div>
+ <p role="status" class="upd-status" id="updModalStatus"></p>
+</section></div>
+<div id="updReminder" class="upd-overlay" hidden role="presentation"><section class="upd-dialog upd-alert" role="alertdialog" aria-modal="true" aria-labelledby="updReminderHeading"><div class="eyebrow">SOLICITUDES SIN RESOLVER</div><h2 id="updReminderHeading">Recordatorio de actualizaciones</h2><p id="updReminderText"></p><div class="upd-actions"><button type="button" id="updReminderGo" class="btn primary">Ver solicitudes</button><button type="button" id="updReminderClose" class="btn">Entendido</button></div></section></div>
+<div id="recordActionOverlay" class="record-action-overlay" hidden role="presentation"><section class="record-action-dialog" role="dialog" aria-modal="true" aria-labelledby="recordActionTitle"><div class="record-action-head"><h2 id="recordActionTitle">Detalle del registro</h2><button class="btn small" id="recordActionClose" type="button">Cerrar ✕</button></div><p class="muted" id="recordActionContext"></p><div class="record-action-data" id="recordActionData"></div><div id="recordEditFields" class="record-edit-fields" hidden></div><div id="recordBulkFields" class="record-edit-fields" hidden></div><div class="record-action-buttons" id="recordActionButtons"><button class="btn" type="button" id="recordActionEdit">Editar</button><button class="btn primary" type="button" id="recordActionSave" hidden>Guardar cambios</button><button class="btn" type="button" id="recordActionCopy">Copiar datos visibles</button><button class="btn" type="button" id="recordActionIncident">Crear / ir a Gestión de incidencia</button><button class="btn primary" type="button" id="recordActionUpdate">Solicitar actualización</button><button class="btn" type="button" id="recordActionDelete">Eliminar</button></div><p role="status" id="recordActionStatus" class="settings-help"></p><details class="record-action-deleted"><summary>Registros eliminados · Restaurar</summary><div id="recordDeletedList"></div></details></section></div>
 <div id="importPreviewOverlay" class="invex-modal-overlay" hidden role="presentation"><section class="invex-modal jm-import-preview" role="dialog" aria-modal="true" aria-label="Vista previa de importación"><h2>Revisar antes de importar</h2><div id="importPreviewBody"></div><div class="invex-modal-actions"><button type="button" class="btn" id="importPreviewCancel">Cancelar importación</button><button type="button" class="btn primary" id="importPreviewConfirm">Continuar con este archivo</button></div></section></div>
 <div id="importDateDialog" class="import-date-dialog" role="dialog" aria-modal="true" aria-labelledby="importDateHeading" hidden>
   <form id="importDateForm" class="import-date-card">

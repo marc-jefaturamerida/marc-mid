@@ -1,4 +1,4 @@
-# Jefatura Mid Marc V2.7.0
+# Jefatura Mid Marc V2.7.1
 
 Proyecto completo de seguimiento operativo y simulación de comisiones para GitHub + Netlify. Actualizado desde la V2.6.1 con el mismo motor de cálculo.
 
@@ -9,8 +9,9 @@ Proyecto completo de seguimiento operativo y simulación de comisiones para GitH
 - `src/team-registry.js`, `src/base-goals.js`: catálogo, alias, estados y objetivos por vigencia.
 - `src/cloud-boot.js` y `netlify/functions/settings.js`: revisiones de sincronización y prevención de sobrescrituras.
 - `netlify/functions/incidents.js`, `netlify/functions/audit.js` y migración V2.7: incidencias recuperables y auditoría.
-- `MANUAL_USUARIO_JEFATURA_MID_MARC_V27.md` y `public/MANUAL_JEFATURA_MID_MARC_V27.pdf`: documentación vigente.
-- `tests`: regresiones antiguas + nuevas verificaciones V2.7.
+- `MANUAL_USUARIO_JEFATURA_MID_MARC_V271.md` y `public/MANUAL_JEFATURA_MID_MARC_V271.pdf`: documentación vigente.
+- `netlify/functions/updates.js`, `src/updates-ui.js`, `src/update-request-rules.js` y migración V2.7.1: solicitudes por registro, filtro, historial, resolución y recordatorios lunes a miércoles.
+- `tests`: regresiones antiguas + nuevas verificaciones V2.7.1.
 
 ## Instalación
 
@@ -21,10 +22,14 @@ npm test
 npm run build
 ```
 
-Publicar `dist` con Netlify. Mantener Netlify Identity y PostgreSQL, comprobar migración `20261116080000_jefatura_v27_audit_trash.sql`. **No eliminar la base de datos ni reemplazar XLS históricos.**
+Publicar `dist` con Netlify. Mantener Netlify Identity y PostgreSQL, comprobar migraciones `20261116080000_jefatura_v27_audit_trash.sql` y `20261116190000_jefatura_v271_record_updates.sql`. **No eliminar la base de datos ni reemplazar XLS históricos.**
 
 ## Funciones y precauciones
 
 El catálogo y las metas se guardan por cuenta como JSON estructurado en la tabla `dashboard_settings` existente (no se ha creado una tabla normalizada independiente de ejecutivos). La información histórica de cuentas anteriores se conserva. Las metas operativas no sustituyen objetivos de pago ni tarifas. Los recordatorios emergentes funcionan con la app abierta. Restaurar una incidencia la deja inactiva para evitar excluir ventas inesperadamente.
 
 **Validación:** `npm run check` y `npm test` completados correctamente. `npm run build` y funcionamiento real de Netlify Identity/PostgreSQL no verificados aquí (instalación de dependencias agotó el tiempo disponible). Haz despliegue de prueba y consulta el manual antes de sustituir producción.
+
+## Actualizaciones V2.7.1
+
+En Administración → Actualizaciones gestiona solicitudes asociadas a registros. Una cuenta mantiene una solicitud pendiente por registro; al solicitar nuevamente se agregan campos. Los cambios reales del XLS se reflejan mediante correcciones guardadas en la nube y posteriormente la solicitud queda resuelta. La tabla PostgreSQL `dashboard_update_requests` conserva fechas, comentarios, resoluciones y papelera incluso si el XLS no está activo. Los avisos se muestran en la apertura del navegador lunes, martes y miércoles si hay pendientes.

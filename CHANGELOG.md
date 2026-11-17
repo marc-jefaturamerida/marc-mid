@@ -1,5 +1,20 @@
 # CHANGELOG — Jefatura Mid Marc
 
+## V2.7.1 — 16 de noviembre de 2026
+
+- **Corrección de navegación:** «Actualizaciones» ya no muestra los cuatro apartados de la Calculadora Individual («Resumen global», «Escenarios base y simulación», «Tarifario y reglas aplicadas» y «Desglose comparativo de comisiones»). Se aísla su contenedor y los filtros rápidos tanto por CSS como por navegación JavaScript. Se añade prueba de regresión; no se cambia la lógica de comisiones ni de las solicitudes.
+
+- Administración: nueva página **Actualizaciones** con filtros superiores por folio, módulo, ejecutivo, estado, fecha desde/hasta y búsqueda general.
+- Ficha de registros: botón **Solicitar actualización** y estado calculado **Pendiente de actualizar**.
+- Solicitudes por cuenta en PostgreSQL, con una pendiente por registro, selección de columnas originales, comentarios acumulables y fecha de alta permanente.
+- Modal de detalles con acciones de editar, enviar a papelera, restaurar y **Ya se actualizó**.
+- Resolución con captura de valores definitivos y guardado como corrección no destructiva del registro antes de cambiar el estado a resuelta; el XLS original no se reescribe.
+- Recordatorio emergente en cada apertura de la aplicación los lunes, martes y miércoles cuando existan pendientes; no se envían notificaciones externas.
+- `netlify/functions/updates.js`, `src/updates-ui.js`, `src/update-request-rules.js`, `src/record-overrides.js` y migración `20261116190000_jefatura_v271_record_updates.sql`; sin cambios deliberados en los motores de comisiones.
+- Batería automatizada de regresión y prueba propia `tests/validate-v271.mjs`; sintaxis y pruebas completadas. **Build y pruebas reales con Netlify Database pendientes de validar en despliegue.**
+
+---
+
 ## V2.7.0 — 16 de noviembre de 2026
 
 - Nombre visible, metadatos y documentación actualizados a **Jefatura Mid Marc**. Sin cambios en el motor de comisiones ni sus escalones.

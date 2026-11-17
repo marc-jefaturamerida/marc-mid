@@ -245,6 +245,11 @@ async function listIncidents(){if(!user)return [];const data=await api('incident
 async function listTrash(){if(!user)return [];const data=await api('incidents?deleted=1');return data.incidents||[];}
 async function restoreIncident(folio){if(!user)throw Error('Inicia sesión.');return api('incidents',{method:'POST',body:JSON.stringify({folio,action:'restore'})});}
 async function listAudit(){if(!user)return [];const data=await api('audit');return data.events||[];}
+async function listUpdates(deleted=false){if(!user)return [];const data=await api('updates'+(deleted?'?deleted=1':''));return data.requests||[];}
+async function createUpdate(data){if(!user)throw Error('Inicia sesión para solicitar una actualización.');return (await api('updates',{method:'POST',body:JSON.stringify(data)})).request;}
+async function changeUpdate(data){if(!user)throw Error('Inicia sesión.');return (await api('updates',{method:'PUT',body:JSON.stringify(data)})).request;}
+async function trashUpdate(id,revision){if(!user)throw Error('Inicia sesión.');return (await api('updates',{method:'DELETE',body:JSON.stringify({id,revision})})).request;}
+async function restoreUpdate(id,revision){if(!user)throw Error('Inicia sesión.');return (await api('updates',{method:'POST',body:JSON.stringify({action:'restore',id,revision})})).request;}
 async function deleteIncident(folio){if(!user)throw Error('Inicia sesión para eliminar incidencias.');return api('incidents',{method:'DELETE',body:JSON.stringify({folio})});}
 async function putIncident(payload){if(!user)throw Error('Inicia sesión para guardar incidencias.');const data=await api('incidents',{method:'PUT',body:JSON.stringify(payload)});if(data.incident?.folio_key){incidenceVersions.set(data.incident.folio_key,Date.parse(data.incident.updated_at||'')||0);incidentsChecked=true;}return data.incident;}
 async function expireSession(){
@@ -310,6 +315,7 @@ window.APP_CLOUD={
   get user(){return user;},
   openLogin,logout:signOut,listFiles,putFile,deleteFile,clearFiles,listIncidents,putIncident,deleteIncident,
   registerRefresh:fn=>{refresher=fn;},flush,listTrash,restoreIncident,listAudit,
+  listUpdates,createUpdate,changeUpdate,trashUpdate,restoreUpdate,
   get pendingCount(){return pending.size;}
 };
 setupModal();

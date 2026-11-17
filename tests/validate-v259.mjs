@@ -62,6 +62,6 @@ assert(html.includes('grid-template-columns:repeat(5,minmax(0,1fr))'));
 assert(html.includes('grid-template-columns:repeat(5,minmax(110px,1fr))'));
 assert(app.includes('t.unit===\'percent\'?lPct(t.actual)'));
 assert(print.includes("t.unit==='percent'?percentage(t.actual)"));
-assert(fs.existsSync('MANUAL_USUARIO_JEFATURA_MID_MARC_V27.md')); // Manual vigente: las versiones anteriores solo permanecen en el CHANGELOG.
-assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'2.7.0');
+assert(fs.existsSync('MANUAL_USUARIO_JEFATURA_MID_MARC_V271.md')); // Manual vigente: las versiones anteriores solo permanecen en el CHANGELOG.
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'2.7.1');
 console.log('V2.6.1: percentages, denominators, migration, Jefatura weighted rates, histories, HTML and two-row KPIs: OK');
