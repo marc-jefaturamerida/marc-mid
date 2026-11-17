@@ -1,3 +1,30 @@
+## V3.0 — Ajustes contextuales por página (17 de noviembre de 2026)
+
+- **Configuración** del menú flotante abre una ventana sobre la página activa; ya no navega a Configuraciones generales.
+- Cada ventana incorpora los formularios existentes aplicables a esa página (Jefatura, Logros semanales, calculadoras, históricos, visitas y reportes) sin duplicar IDs, preferencias ni fórmulas.
+- **Guardar y volver a la página** utiliza las validaciones y guardados originales, cierra la ventana y conserva la página seleccionada. Los botones de guardar propios también cierran después de guardar con éxito; ante validación fallida se mantiene abierta.
+- Accesos directos «Configurar dashboard», «Configurar análisis» e «Histórico por módulo» usan la misma ventana contextual.
+- En el editor de textos del informe se selecciona automáticamente la página de origen y se ocultan los controles para editar los textos de otras páginas.
+- Para Actualizaciones y Recordatorios, que no cuentan con ajustes exclusivos independientes de sus filtros y fichas, la ventana informa esa condición sin mostrar secciones ajenas.
+- Ventana adaptada a móviles y restauración del foco al cerrarla. No requiere migración SQL y no altera las reglas de comisión ni los datos históricos.
+
+# Jefatura Mid Marc — CHANGELOG
+
+## V3.0 · 17 de noviembre de 2026 · GitHub y Netlify
+
+**Base:** Jefatura Mid Marc V2.7.1 corregida de navegación (edición Netlify); NO derivada de la edición Wi-Fi/SQLite.
+
+- **Portada:** Dashboard de Jefatura es ahora la página inicial para configuraciones antiguas; se conserva la posibilidad de escoger y guardar otra principal en la sección 21. Migración de preferencias `layoutVersion: 3`, sin borrar historiales.
+- **Filtro de Jefatura:** selector exclusivo de semana laboral completa de lunes a domingo; conserva inclusión de supervisores; eliminado el selector de período Hoy/Mes/Rango de la vista.
+- **Logros semanales:** retirada la sección visible de captura manual «Objetivos semanales: cantidades y porcentajes». Los objetivos se resuelven desde los perfiles base de módulo o Jefatura con vigencia, sin recurrir a metas antiguas ni a valores por defecto no configurados; los valores manuales históricos se retienen en la clave original como respaldo.
+- **Menú unificado:** único botón flotante «☰ Menú» por página con Filtros, Configuración y Exportar. Se conserva el alcance de los filtros secundarios; se elimina el segundo botón flotante.
+- **Exportación PDF:** generación y descarga directa de documento PDF con nombre automático (título de página, filtro módulo/ejecutivo si aplica, fecha/semana de consulta), mediante generación cliente de páginas carta. El navegador decide carpeta de descargas; no se guarda en Netlify. `src/pdf-download.js` incorpora generador PDF sin nueva dependencia npm. Se preservan PNG y CSV.
+- **Compatibilidad:** no se cambian los motores de tarifas, bonos, calidad o comisión. Datos XLS, incidencias, visitas, solicitudes y ajustes permanecen en Netlify PostgreSQL/Identity. No se añaden migraciones SQL.
+- **Documentación:** manual V3.0 y archivo INICIAR_AQUI actualizados; manuales anteriores retirados del paquete.
+- **Verificación:** `npm run check` y `npm test` superados, incluida batería V3.0 y prueba de PDF binario. `npm install`/`npm run build` no verificados porque el registro npm no estuvo accesible; navegador automatizado bloqueado para servidor local.
+
+---
+
 # CHANGELOG — Jefatura Mid Marc
 
 ## V2.7.1 — 16 de noviembre de 2026

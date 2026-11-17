@@ -9,7 +9,7 @@ const server=fs.readFileSync('netlify/functions/updates.js','utf8');
 const sql=fs.readFileSync('netlify/database/migrations/20261116190000_jefatura_v271_record_updates.sql','utf8');
 const route=fs.readFileSync('netlify.toml','utf8');
 const ui=fs.readFileSync('src/updates-ui.js','utf8');
-assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'2.7.1');
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.0');
 for(const id of ['updatesPage','updRows','updFilterFolio','updFilterModule','updFilterExecutive','updFilterState','updFilterFrom','updFilterTo','updFilterSearch','updModal','updEditorFields','updEditorComment','updResolveFields','updReminder','recordActionUpdate'])assert(html.includes('id="'+id+'"'),id);
 assert(html.includes('data-page-tab="updates"'));
 // Regresión de navegación: Actualizaciones no puede mostrar las tarjetas de la calculadora.
@@ -58,4 +58,4 @@ assert.equal(updated.module,'Pensiones');
 assert.equal(row.module,'Paseo Montejo');
 assert.equal(row.raw[0],'111');
 assert(legacy.includes("window.CALC_ENGINE={calculate,tiers:TIER}"));
-console.log('V2.7.1: solicitudes, campos originales, estados, papelera, historial, avisos y motores de cálculo sin sustituciones: OK');
+console.log('V3.0: solicitudes, campos originales, estados, papelera, historial, avisos y motores de cálculo sin sustituciones: OK');

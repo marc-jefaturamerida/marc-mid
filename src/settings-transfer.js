@@ -10,7 +10,7 @@ export const TRANSFER_KEYS=Object.freeze([
  'wmSamsLeadershipV256','wmSamsRecordEditsV260','wmSamsTeamRegistryV261','wmSamsRemindersV261'
 ]);
 const allowed=new Set(TRANSFER_KEYS);
-export function exportSettings(store=localStorage){const entries={};for(const key of TRANSFER_KEYS){const value=store.getItem(key);if(value!==null&&value!=='')entries[key]=value;}return {format:'INVEX_SETTINGS',version:'2.7.1',exportedAt:new Date().toISOString(),entries};}
+export function exportSettings(store=localStorage){const entries={};for(const key of TRANSFER_KEYS){const value=store.getItem(key);if(value!==null&&value!=='')entries[key]=value;}return {format:'INVEX_SETTINGS',version:'3.0',exportedAt:new Date().toISOString(),entries};}
 export function validateSettingsImport(data){
  if(data?.format!=='INVEX_SETTINGS'||!data.entries||typeof data.entries!=='object'||Array.isArray(data.entries))throw Error('El archivo no es un respaldo válido de configuraciones INVEX.');
  const found=Object.entries(data.entries);if(found.length>TRANSFER_KEYS.length)throw Error('El archivo contiene más campos de los permitidos.');
@@ -26,7 +26,7 @@ export function initSettingsTransfer(){
  const $=id=>document.getElementById(id),status=$('settingsTransferStatus');if(!status)return;
  $('settingsExportBtn').addEventListener('click',()=>{
   const result=exportSettings(),blob=new Blob([JSON.stringify(result,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download='Jefatura_Mid_Marc_configuraciones_v271_'+new Date().toISOString().slice(0,10)+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  a.href=url;a.download='Jefatura_Mid_Marc_configuraciones_v300_'+new Date().toISOString().slice(0,10)+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   status.textContent=Object.keys(result.entries).length+' categorías exportadas. No incluye XLS, incidencias, contraseñas ni tokens.';
  });
  $('settingsImportBtn').addEventListener('click',()=>$('settingsImportFile').click());

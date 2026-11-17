@@ -5,7 +5,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="light" name="color-scheme"/>
-<title>Jefatura Mid Marc V2.7.1</title>
+<title>Jefatura Mid Marc V3.0</title>
 <link rel="stylesheet" href="/assets/jm-v27.css"/>
 <link rel="stylesheet" href="/assets/jm-updates-v271.css"/>
 <style>
@@ -956,7 +956,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 
 
 
-<button class="btn" id="cloudLoginButton" type="button">Ingresar con correo</button><button class="btn" id="cloudSyncButton" type="button" hidden>↻ Sincronizar</button><button id="jmResolveConflict" class="btn" type="button" hidden>Resolver conflicto de ajustes</button><span class="cloud-session-label" id="cloudSessionLabel" aria-live="polite" title="La nube se consulta al iniciar sesión, al regresar tras una pausa y al sincronizar manualmente">Sin sesión · XLS temporales</span><button class="btn primary" id="chooseXls" type="button">Cargar XLS</button><div class="global-folio-search"><label class="visually-hidden" for="globalFolioSearch">Buscar folio en los registros históricos</label><input id="globalFolioSearch" type="search" autocomplete="off" placeholder="⌕  Buscar folio…" aria-label="Buscar folio en todo el historial"/><div id="globalFolioResults" class="global-folio-results" hidden role="listbox"></div></div><button class="btn" id="print" type="button">Imprimir / PDF</button><button class="btn" id="exportImage" type="button">Exportar PNG</button><button class="btn" id="export" type="button">Exportar CSV</button><a class="btn" href="/MANUAL_JEFATURA_MID_MARC_V271.pdf" target="_blank" rel="noopener" title="Manual completo en PDF">Manual del proyecto</a><button aria-controls="settingsPanel" aria-expanded="false" class="btn" id="toggleSettings" hidden type="button">⚙ Ajustes</button><input accept=".xls,.xlsx,.csv,.tsv" aria-label="Seleccionar reportes XLS" multiple hidden="" id="xlsInput" type="file"/></div>
+<button class="btn" id="cloudLoginButton" type="button">Ingresar con correo</button><button class="btn" id="cloudSyncButton" type="button" hidden>↻ Sincronizar</button><button id="jmResolveConflict" class="btn" type="button" hidden>Resolver conflicto de ajustes</button><span class="cloud-session-label" id="cloudSessionLabel" aria-live="polite" title="La nube se consulta al iniciar sesión, al regresar tras una pausa y al sincronizar manualmente">Sin sesión · XLS temporales</span><button class="btn primary" id="chooseXls" type="button">Cargar XLS</button><div class="global-folio-search"><label class="visually-hidden" for="globalFolioSearch">Buscar folio en los registros históricos</label><input id="globalFolioSearch" type="search" autocomplete="off" placeholder="⌕  Buscar folio…" aria-label="Buscar folio en todo el historial"/><div id="globalFolioResults" class="global-folio-results" hidden role="listbox"></div></div><button class="btn" id="print" type="button">Descargar PDF</button><button class="btn" id="exportImage" type="button">Exportar PNG</button><button class="btn" id="export" type="button">Exportar CSV</button><a class="btn" href="/MANUAL_JEFATURA_MID_MARC_V300.pdf" target="_blank" rel="noopener" title="Manual completo en PDF">Manual del proyecto</a><button aria-controls="settingsPanel" aria-expanded="false" class="btn" id="toggleSettings" hidden type="button">⚙ Ajustes</button><input accept=".xls,.xlsx,.csv,.tsv" aria-label="Seleccionar reportes XLS" multiple hidden="" id="xlsInput" type="file"/></div>
 </header>
 <nav class="app-groups" id="appGroupNav" aria-label="Secciones principales"></nav>
 <nav class="app-navigation" role="tablist" aria-label="Vistas de comisiones">
@@ -993,7 +993,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 </section>
 <section id="leadershipPage" class="leadership-page" hidden aria-labelledby="leadershipHeading">
  <header class="leadership-heading"><div><div class="eyebrow">INVEX · MARC · CONTROL DE JEFATURA</div><h2 id="leadershipHeading">Dashboard de Jefatura</h2><p>Resultados operativos de los módulos, productividad, calidad, proyección y seguimiento. Fuente: registros manuales disponibles.</p></div><button class="btn small" id="leadGoalProfileHead" type="button">Objetivos de Jefatura</button><button id="leadershipSettingsOpen" type="button">Configurar dashboard</button></header>
- <div class="leadership-filter card"><div class="leadership-filter-fields"><label>Período<select id="leaderPeriod"><option value="today">Hoy</option><option value="week">Semana actual</option><option value="month">Mes actual</option><option value="custom">Rango personalizado</option></select></label><label>Desde<input type="date" id="leaderFrom" disabled /></label><label>Hasta<input type="date" id="leaderTo" disabled /></label><label>Incluir supervisores<select id="leaderSupervisor"><option value="yes">Sí, en la operación</option><option value="no">No</option></select></label></div><p id="leaderNotice" class="leadership-notice" role="status"></p></div>
+ <div class="leadership-filter card"><div class="leadership-filter-fields"><label>Semana de trabajo (lunes a domingo)<select id="leaderWeek"><option value="">Semana actual</option></select></label><label>Incluir supervisores<select id="leaderSupervisor"><option value="yes">Sí, en la operación</option><option value="no">No</option></select></label><input type="hidden" id="leaderPeriod" value="week"/><input type="hidden" id="leaderFrom"/><input type="hidden" id="leaderTo"/></div><p id="leaderNotice" class="leadership-notice" role="status"></p></div>
  <section id="leaderSummarySection" class="card leadership-block"><div class="leadership-block-head"><h3>Resumen general</h3><span>Indicadores consolidados de Jefatura</span></div><div id="leaderKpis" class="leadership-kpis"></div></section>
  <div class="leadership-top-actions"><button id="leaderExpandAll" type="button" class="btn small">Expandir todas</button><button id="leaderCollapseAll" type="button" class="btn small">Contraer todas</button></div>
  <div class="leadership-jump" aria-label="Apartados del Dashboard"><a href="#leaderSummarySection">Resumen</a><a href="#leaderModulesSection">Módulos</a><a href="#leaderTargetsSection">Objetivos</a><a href="#leaderPeopleSection">Personal</a><a href="#leaderQualitySection">Calidad</a><a href="#leaderTrendSection">Tendencia</a><a href="#leaderProjectionSection">Proyección</a><a href="#leaderAlertsSection">Alertas</a><a href="#leaderActionsSection">Gestión</a></div>
@@ -1151,7 +1151,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 <p class="settings-help" id="msStatus" role="status">Sin cambios pendientes.</p></div></details>
 <details class="settings-group" id="settingsLeadershipV256"><summary class="settings-group-title"><span>Dashboard de Jefatura · Panel, alertas y reportes</span></summary><div class="settings-group-body">
 <p class="settings-help">Personaliza los indicadores visibles, umbrales operativos y reportes. No modifica las fórmulas de comisiones. Los compromisos se guardan en las preferencias de tu cuenta.</p>
-<div class="history-settings-grid"><label>Vista inicial<select id="lsPeriod"><option value="today">Hoy</option><option value="week">Semana actual</option><option value="month">Mes actual</option><option value="custom">Rango personalizado</option></select></label><label>Ventas de supervisores<select id="lsIncludeSupervisor"><option value="yes">Incluir en indicadores</option><option value="no">Excluir</option></select></label><label>Conversión mínima para alerta (%)<input id="lsConversion" type="number" min="0" max="100" step="0.1"/></label><label>Cumplimiento proyectado mínimo (%)<input id="lsProjected" type="number" min="0" max="300" step="0.1"/></label><label>Días sin registros para alerta de actualización<input id="lsStale" type="number" min="0" max="30" step="1"/></label><label>Colaboradores visibles<input id="lsTopPeople" type="number" min="3" max="60" step="1"/></label><label>Título de exportación<input id="lsTitle" type="text" maxlength="150"/></label><label>Subtítulo de exportación<input id="lsSubtitle" type="text" maxlength="220"/></label><label>Color principal<input id="lsColor" type="color"/></label><label class="history-settings-wide">Nota del reporte<textarea id="lsNote" rows="3" maxlength="500"></textarea></label></div>
+<div class="history-settings-grid"><label>Período del dashboard<select id="lsPeriod"><option value="week">Semana de trabajo (lunes a domingo)</option></select></label><label>Ventas de supervisores<select id="lsIncludeSupervisor"><option value="yes">Incluir en indicadores</option><option value="no">Excluir</option></select></label><label>Conversión mínima para alerta (%)<input id="lsConversion" type="number" min="0" max="100" step="0.1"/></label><label>Cumplimiento proyectado mínimo (%)<input id="lsProjected" type="number" min="0" max="300" step="0.1"/></label><label>Días sin registros para alerta de actualización<input id="lsStale" type="number" min="0" max="30" step="1"/></label><label>Colaboradores visibles<input id="lsTopPeople" type="number" min="3" max="60" step="1"/></label><label>Título de exportación<input id="lsTitle" type="text" maxlength="150"/></label><label>Subtítulo de exportación<input id="lsSubtitle" type="text" maxlength="220"/></label><label>Color principal<input id="lsColor" type="color"/></label><label class="history-settings-wide">Nota del reporte<textarea id="lsNote" rows="3" maxlength="500"></textarea></label></div>
 <p class="settings-help"><strong>Apartados visibles en dashboard y exportación</strong></p>
 <div class="history-metric-choices" id="lsSections"><label><input type="checkbox" data-leader-setting="showModules"/> Comparativo de módulos</label><label><input type="checkbox" data-leader-setting="showTargets"/> Objetivos y origen</label><label><input type="checkbox" data-leader-setting="showPeople"/> Productividad</label><label><input type="checkbox" data-leader-setting="showQuality"/> Calidad</label><label><input type="checkbox" data-leader-setting="showTrend"/> Tendencias</label><label><input type="checkbox" data-leader-setting="showProjection"/> Proyección</label><label><input type="checkbox" data-leader-setting="showAlerts"/> Alertas</label><label><input type="checkbox" data-leader-setting="showActions"/> Compromisos</label></div>
 <div class="settings-row-actions"><button type="button" class="btn primary small" id="lsSave">Guardar Dashboard</button><button type="button" class="btn small" id="lsRestore">Restaurar parámetros (sin borrar compromisos)</button></div><p class="settings-help" role="status" id="lsStatus"></p></div></details>
@@ -1433,7 +1433,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="all-records-help">Las columnas se muestran según <strong>Ajustes → Tabla de folios</strong>. Incidencia y APP permanecen a la vista para validarlas. Desliza horizontalmente para ver más columnas.</div>
   <div class="table-wrap all-records-table-wrap"><table id="allRecordsTable" class="record-table all-records-table"><thead id="allRecordsHead"></thead><tbody id="allRecordsBody"><tr><td>Importa un XLS para mostrar registros.</td></tr></tbody></table></div>
   <div class="all-records-pagination"><span id="allRecordsPageStatus">0 registros</span><div class="all-records-page-actions"><label for="allRecordsPageSize">Filas por página</label><select id="allRecordsPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" type="button" id="allRecordsPrev">Anterior</button><button class="btn small" type="button" id="allRecordsNext">Siguiente</button></div></div>
-  <footer class="foot">Consulta de registros manuales · Versión 2.7.1</footer>
+  <footer class="foot">Consulta de registros manuales · Versión 3.0</footer>
 </section>
 
 
@@ -1459,7 +1459,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
     </div></details>
   </div>
   <p class="sup-footnote">Cálculo informativo. Configura el bono base en Ajustes → 12; los bonos adicionales comienzan en $1,000, $1,500 y $2,000, editables y no acumulables. Guarda los ajustes para sincronizarlos con Netlify; consultar semanas y supervisores no genera escrituras.</p>
-  <footer class="foot">Calculadora de supervisor · Versión 2.7.1</footer>
+  <footer class="foot">Calculadora de supervisor · Versión 3.0</footer>
 </section>
 <section id="achievementsPage" class="achievements-page" hidden aria-label="Logros semanales por módulo">
   <div class="achievements-hero">
@@ -1473,22 +1473,11 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
     <button type="button" class="btn small" id="achGoalProfile">Objetivos del módulo / Jefatura</button>
 
   </div>
-  <details class="achievements-section achievements-fold achievements-goal-section" id="achGoalsSection" open>
-    <summary>Objetivos semanales: cantidades y porcentajes <label class="ach-print-toggle" title="Incluir esta sección en PDF y PNG"><input type="checkbox" data-ach-print="goals" checked> Imprimir</label></summary>
-    <div class="achievements-fold-body">
-      <p>Registros y Ventas: captura el objetivo en <strong>cantidades</strong>. Para Plan Dental, Plan Cero, Primera compra y APP: captura el <strong>porcentaje requerido</strong> (no una cantidad). La calidad de cada factor compara el porcentaje alcanzado contra el requerido y respeta los límites de Ajustes.</p>
-      <div class="achievements-goals-grid" id="achGoalsFields">
-        <div class="field"><label for="achGoalRecords">Registros</label><input type="number" inputmode="numeric" min="1" step="1" id="achGoalRecords" placeholder="Sin meta"></div>
-        <div class="field"><label for="achGoalSales">Ventas (Cumplimiento)</label><input type="number" inputmode="numeric" min="1" step="1" id="achGoalSales" placeholder="Sin meta"></div>
-        <div class="field"><label for="achGoalDental">Plan Dental · % requerido</label><input type="number" inputmode="numeric" min="0.01" max="100" step="0.01" id="achGoalDental" placeholder="Ej. 95"></div>
-        <div class="field"><label for="achGoalP0">Plan Cero · % requerido</label><input type="number" inputmode="numeric" min="0.01" max="100" step="0.01" id="achGoalP0" placeholder="Ej. 30"></div>
-        <div class="field"><label for="achGoalPurchase">Primera compra · % requerido</label><input type="number" inputmode="numeric" min="0.01" max="100" step="0.01" id="achGoalPurchase" placeholder="Ej. 95"></div>
-        <div class="field"><label for="achGoalApp">Activaciones APP · % requerido</label><input type="number" inputmode="numeric" min="0.01" max="100" step="0.01" id="achGoalApp" placeholder="Ej. 95"></div>
-      </div>
-      <div class="achievements-goals-toolbar"><button type="button" class="btn primary small" id="achSaveGoals">Guardar objetivos</button><span id="achGoalsStatus" class="muted" aria-live="polite">Define los objetivos para calcular los porcentajes.</span></div>
-      <p class="achievements-goals-footnote">Las metas se guardan por semana y módulo. Los porcentajes requeridos usan como base: P0 / regulares; Dental, APP y Primera compra / ventas con código. Calidad Total es el promedio de cuatro calidades y Alcance Global agrega Calidad Total como quinto valor. Sin sesión se conservan en este navegador; con sesión se sincronizan al pulsar Guardar objetivos.</p>
-    </div>
-  </details>
+  <!-- V3.0: objetivos semanales anteriores archivados únicamente en almacenamiento; sin editor duplicado. -->
+  <div id="achGoalsSection" hidden aria-hidden="true"><div id="achGoalsFields">
+    <input type="hidden" id="achGoalRecords"/><input type="hidden" id="achGoalSales"/><input type="hidden" id="achGoalDental"/>
+    <input type="hidden" id="achGoalP0"/><input type="hidden" id="achGoalPurchase"/><input type="hidden" id="achGoalApp"/>
+  </div><span id="achGoalsStatus"></span><button id="achSaveGoals" type="button" hidden>Respaldo</button></div>
   <details class="achievements-section achievements-fold achievements-filter-section" id="achAdvanced">
     <summary>Filtros avanzados de registros <span id="achFilterBadge" class="achievements-badge">· Contraídos por defecto</span><label class="ach-print-toggle" title="Incluir esta sección en PDF y PNG"><input type="checkbox" data-ach-print="filters" > Imprimir</label></summary>
     <div class="achievements-fold-body"><p>Los filtros avanzados, la búsqueda, la semana, el módulo y la inclusión de supervisores también modifican los indicadores. Los folios con incidencia siguen visibles, pero no suman en los resultados. La exportación de esta página utiliza el formato administrativo configurable en Ajustes → 15.</p>
@@ -1533,7 +1522,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
       <div class="achievements-pager"><span id="achRecordStatus">0 registros</span><div class="achievements-pager-options"><label for="achPageSize">Filas</label><select id="achPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" id="achPrev" type="button">Anterior</button><button class="btn small" id="achNext" type="button">Siguiente</button></div></div>
     </div>
   </details>
-  <footer class="foot">Logros semanales · Versión 2.7.1</footer>
+  <footer class="foot">Logros semanales · Versión 3.0</footer>
 </section>
 
 
@@ -1582,24 +1571,51 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 2.7.1</footer>
+  <footer class="foot">Acuse de coordinación · Versión 3.0</footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 2.7.1</footer>
+<footer class="foot">Final de la presentacion · Versión 3.0</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/cloud-boot.js"></script>
 
 
-<div class="floating-filters" id="floatingFilters"><div class="floating-filters-menu" id="floatingFiltersMenu" hidden><div class="floating-filters-head"><strong>Filtros adicionales</strong><button id="floatingFiltersClose" type="button" aria-label="Cerrar filtros">✕</button></div><div id="floatingFiltersBody" class="floating-filters-body"></div><p class="floating-filter-foot">Los filtros se aplican a la página seleccionada.</p></div><button class="floating-filter-main" id="floatingFiltersToggle" type="button" aria-expanded="false" aria-controls="floatingFiltersMenu">Filtros ⚙</button></div>
-<div class="floating-export" id="floatingExport"><div class="floating-export-menu" id="floatingExportMenu" hidden aria-label="Exportar página actual">
-  <button type="button" id="floatPdf">Imprimir / PDF</button><button type="button" id="floatPng">Exportar PNG</button><button type="button" id="floatCsv">Exportar CSV</button>
-  <button class="daily-copy-whatsapp" id="dailyCopyWhatsApp" type="button" title="Copiar comparación diaria para WhatsApp" aria-label="Copiar comparativo diario para WhatsApp" hidden disabled>Copiar para WhatsApp</button>
-</div><button class="floating-export-main" id="floatingExportToggle" type="button" aria-expanded="false" aria-controls="floatingExportMenu">Exportar ▴</button></div>
+<div class="floating-filters jm-tools" id="floatingFilters">
+ <div class="floating-filters-menu" id="floatingFiltersMenu" hidden role="dialog" aria-label="Herramientas de esta página">
+  <div class="floating-filters-head"><strong>Herramientas de página</strong><button id="floatingFiltersClose" type="button" aria-label="Cerrar menú">✕</button></div>
+  <div class="jm-tools-choices"><button id="jmToolsFilters" type="button">Filtros</button><button id="jmToolsSettings" type="button">Configuración</button><button id="jmToolsExport" type="button">Exportar</button></div>
+  <section id="jmToolsFilterPanel" hidden><div id="floatingFiltersBody" class="floating-filters-body"></div><p class="floating-filter-foot" id="jmToolsFilterMessage">Los filtros se aplican a la página seleccionada.</p></section>
+  <div class="floating-export-menu" id="floatingExportMenu" hidden aria-label="Exportar página actual"><button type="button" id="floatPdf">Descargar PDF</button><button type="button" id="floatPng">Exportar PNG</button><button type="button" id="floatCsv">Exportar CSV</button><button class="daily-copy-whatsapp" id="dailyCopyWhatsApp" type="button" title="Copiar comparación diaria para WhatsApp" aria-label="Copiar comparativo diario para WhatsApp" hidden disabled>Copiar para WhatsApp</button></div>
+ </div>
+ <button class="floating-filter-main" id="floatingFiltersToggle" type="button" aria-expanded="false" aria-controls="floatingFiltersMenu">☰ Menú</button>
+</div>
+<div class="floating-export" id="floatingExport" hidden><button type="button" id="floatingExportToggle" hidden aria-expanded="false">Exportar</button></div>
+<style id="jmToolsV30Styles">
+.jm-tools{bottom:max(15px,env(safe-area-inset-bottom));z-index:995}
+.jm-tools .floating-filters-menu{max-height:min(77vh,680px);width:min(430px,calc(100vw - 22px))}
+.jm-tools-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:10px}
+.jm-tools-choices button{border:1px solid #c2d5e8;border-radius:9px;padding:11px 5px;font-size:12px;font-weight:750;background:#edf4fc;color:#0a3b70;cursor:pointer}
+.jm-tools-choices button.active{background:#075398;color:white}
+.jm-tools .floating-export-menu{display:grid;position:static;min-width:0;box-shadow:none;max-width:none;width:100%;margin-top:5px}
+.jm-tools .floating-export-menu[hidden],.jm-tools #jmToolsFilterPanel[hidden]{display:none!important}
+.jm-tools .floating-filters-body{max-height:46vh;overflow:auto}
+.jm-tools #jmToolsFilterMessage{font-size:11px}
+@media print{.jm-tools{display:none!important}}
+</style>
 
+
+<div id="jmPageSettingsOverlay" class="jm-page-settings-overlay" hidden role="presentation">
+  <section class="jm-page-settings-dialog settings-panel" role="dialog" aria-modal="true" aria-labelledby="jmPageSettingsTitle">
+    <header class="jm-page-settings-head"><div><div class="eyebrow">HERRAMIENTAS DE PÁGINA</div><h2 id="jmPageSettingsTitle">Configuración de la página</h2></div><button class="btn small" id="jmPageSettingsClose" type="button" aria-label="Cerrar configuración">Cerrar ✕</button></header>
+    <p class="jm-page-settings-hint">Configura exclusivamente las opciones relacionadas con esta página. Los ajustes existentes se conservan y sincronizan según tu sesión.</p>
+    <div id="jmPageSettingsBody" class="jm-page-settings-body" aria-label="Opciones de configuración"></div>
+    <footer class="jm-page-settings-actions"><button id="jmPageSettingsCancel" class="btn" type="button">Cerrar</button><button id="jmPageSettingsSave" class="btn primary" type="button">Guardar y volver a la página</button></footer>
+  </section>
+</div>
+<link rel="stylesheet" href="/assets/jm-page-settings-v300.css">
 <div id="incDetailOverlay" class="invex-modal-overlay" hidden role="presentation"><div class="invex-modal inc-detail-modal" role="dialog" aria-modal="true" aria-labelledby="incDetailTitle"><div class="invex-modal-head"><h2 id="incDetailTitle">Detalle de incidencia</h2><button class="btn small" type="button" id="incDetailClose">Cerrar ✕</button></div><div id="incDetailBody"></div><div class="invex-modal-actions"><button class="btn primary" id="incDetailEdit" type="button">Editar</button><button class="btn danger" id="incDetailDelete" type="button">Eliminar</button></div><p id="incDetailStatus" class="settings-help" role="status"></p></div></div>
 <div id="bulkRecordBar" class="bulk-record-bar" hidden><span id="bulkRecordCount">0 registros seleccionados</span><button class="btn primary small" id="bulkRecordEdit" type="button">Editar seleccionados</button><button class="btn small" id="bulkRecordClear" type="button">Limpiar</button></div>
 <div id="updModal" class="upd-overlay" hidden role="presentation"><section class="upd-dialog" role="dialog" aria-modal="true" aria-labelledby="updModalHeading">

@@ -1,3 +1,4 @@
+import {downloadPdfCanvases} from './pdf-download.js';
 import {exportFriendlyText} from './import-date.js';
 /* Acuse de visita de coordinación · v2.2.2
    Los filtros, la captura y los cálculos son locales. Solo Guardar visita
@@ -284,7 +285,7 @@ function buildReport(){
  return pg;
 }
 function image(url){return new Promise((resolve,reject)=>{if(!url){resolve(null);return;}const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(Error('No se pudo cargar una imagen del reporte.'));im.src=url;});}
-async function exportPng(){
+async function exportPng(asPdf=false,pdfName=''){
  const btn=$('visitPng');btn.disabled=true;btn.textContent='Generando…';
  try{
    const d=prepareReportData(),pageW=816,pageH=1056,margin=18,contentW=pageW-2*margin;
@@ -392,6 +393,7 @@ async function exportPng(){
    x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);
    const outputScale=cv.width/pageW;
    x.save();x.scale(outputScale,outputScale);x.translate((pageW-pageW*fit)/2,3);x.scale(fit,fit);render(true);x.restore();
+   if(asPdf){downloadPdfCanvases([cv],pdfName||`Visitas de coordinación - ${visit.module} - ${visit.visitedAt}.pdf`);return;}
    const blob=await new Promise(res=>cv.toBlob(res,'image/png'));if(!blob)throw Error('El navegador no pudo generar el PNG.');
    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`visita_coordinacion_${visit.visitedAt}_${visit.module.replace(/[^a-z0-9áéíóúñ_-]/gi,'_').slice(0,30)||'modulo'}.png`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
  }catch(e){alert('No se pudo exportar el PNG: '+e.message);}finally{btn.disabled=false;btn.textContent='PNG';}
@@ -399,7 +401,7 @@ async function exportPng(){
 function setup(){
  $('visitForm').addEventListener('change',handleChange);$('visitForm').addEventListener('input',handleInput);
  $('visitNew').addEventListener('click',newVisit);$('visitSave').addEventListener('click',saveVisit);
- $('visitPdf').addEventListener('click',()=>{buildReport();window.print();});$('visitPng').addEventListener('click',exportPng);
+ $('visitPdf').addEventListener('click',()=>exportPng(true));$('visitPng').addEventListener('click',exportPng);
  $('visitRefresh').addEventListener('click',()=>refreshHistory(true));
  $('visitHistoryList').addEventListener('click',e=>{const id=e.target.dataset.loadVisit,del=e.target.dataset.delVisit;if(id)loadVisit(id);if(del)deleteVisit(del);});
  $('visitsSettingsEditor').addEventListener('change',e=>{if(e.target?.type==='file')settingImageUpload(e.target);else configChange(e);});
@@ -408,6 +410,6 @@ function setup(){
 }
 window.VISITS={
  open(){active=true;config=readConfig();renderSettings();sourceRefresh();void refreshHistory();},
- refreshSources:sourceRefresh,buildReport,exportPng
+ refreshSources:sourceRefresh,buildReport,exportPng,exportPdf:(filename)=>exportPng(true,filename)
 };
 setup();

@@ -32,5 +32,5 @@ const html=fs.readFileSync('index.html','utf8'),app=fs.readFileSync('src/legacy-
 for(const id of ['leaderExpandAll','leaderCollapseAll','leaderTargetsSection','leaderTargetsCards','lsGoalModule','lsGoalWeek','lsGoalSave','lsGoalConfigSave','settingsLeadershipGoalsV257'])assert(html.includes(`id="${id}"`),id);
 assert(app.includes('initLeadershipCollapse()'));assert(app.includes('initLeadershipGoalSettings()'));
 assert(LEADERSHIP_METRICS.length===9);
-assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'2.7.1');
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.0');
 console.log('V2.5.7: objetivos por módulo/semana, fuentes, proyección lineal/ponderada y secciones plegables: OK');

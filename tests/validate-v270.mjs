@@ -36,9 +36,9 @@ assert.equal(check.total,3);assert.equal(check.duplicatesInside,1);assert.equal(
 const store=new Map([['wmSamsBaseGoalsV258',JSON.stringify(base)]]);
 const faux={getItem:k=>store.get(k)??null};
 const backup=exportSettings(faux);
-assert.equal(backup.version,'2.7.1');assert.equal(validateSettingsImport(backup).length,1);
+assert.equal(backup.version,'3.0');assert.equal(validateSettingsImport(backup).length,1);
 const html=fs.readFileSync('index.html','utf8');
-assert(html.includes('<title>Jefatura Mid Marc V2.7.1</title>'));
+assert(html.includes('<title>Jefatura Mid Marc V3.0</title>'));
 for(const id of ['jmScenarioLab','settingsQuickSearch','settingsCategorySelect','importPreviewOverlay','jmLoadTrash','jmResolveConflict'])assert(html.includes('id="'+id+'"'),id);
 const shared=fs.readFileSync('src/cloud-boot.js','utf8'),settings=fs.readFileSync('netlify/functions/settings.js','utf8');
 assert(shared.includes('expectedRevisions')&&settings.includes('expectedRevisions'));

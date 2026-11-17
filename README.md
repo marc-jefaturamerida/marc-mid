@@ -1,4 +1,4 @@
-# Jefatura Mid Marc V2.7.1
+# Jefatura Mid Marc V3.0
 
 Proyecto completo de seguimiento operativo y simulación de comisiones para GitHub + Netlify. Actualizado desde la V2.6.1 con el mismo motor de cálculo.
 
@@ -9,9 +9,9 @@ Proyecto completo de seguimiento operativo y simulación de comisiones para GitH
 - `src/team-registry.js`, `src/base-goals.js`: catálogo, alias, estados y objetivos por vigencia.
 - `src/cloud-boot.js` y `netlify/functions/settings.js`: revisiones de sincronización y prevención de sobrescrituras.
 - `netlify/functions/incidents.js`, `netlify/functions/audit.js` y migración V2.7: incidencias recuperables y auditoría.
-- `MANUAL_USUARIO_JEFATURA_MID_MARC_V271.md` y `public/MANUAL_JEFATURA_MID_MARC_V271.pdf`: documentación vigente.
+- `MANUAL_USUARIO_JEFATURA_MID_MARC_V300.md` y `public/MANUAL_JEFATURA_MID_MARC_V300.pdf`: documentación vigente.
 - `netlify/functions/updates.js`, `src/updates-ui.js`, `src/update-request-rules.js` y migración V2.7.1: solicitudes por registro, filtro, historial, resolución y recordatorios lunes a miércoles.
-- `tests`: regresiones antiguas + nuevas verificaciones V2.7.1.
+- `tests`: regresiones antiguas + nuevas verificaciones V3.0.
 
 ## Instalación
 
@@ -33,3 +33,18 @@ El catálogo y las metas se guardan por cuenta como JSON estructurado en la tabl
 ## Actualizaciones V2.7.1
 
 En Administración → Actualizaciones gestiona solicitudes asociadas a registros. Una cuenta mantiene una solicitud pendiente por registro; al solicitar nuevamente se agregan campos. Los cambios reales del XLS se reflejan mediante correcciones guardadas en la nube y posteriormente la solicitud queda resuelta. La tabla PostgreSQL `dashboard_update_requests` conserva fechas, comentarios, resoluciones y papelera incluso si el XLS no está activo. Los avisos se muestran en la apertura del navegador lunes, martes y miércoles si hay pendientes.
+
+## Novedades V3.0 (Netlify)
+
+- Dashboard de Jefatura abre por defecto y consulta semanas completas de lunes a domingo.
+- Logros semanales usa exclusivamente objetivos configurados en los perfiles de módulos o Jefatura con vigencia histórica; los objetivos antiguos de la sección eliminada quedan como respaldo, sin participar en resultados.
+- Un solo botón «☰ Menú» reúne filtros, configuración y exportación.
+- **Descargar PDF** entrega un archivo con nombre de página, módulo/ejecutivo seleccionado y fecha/período. El navegador descarga en la carpeta configurada (normalmente Descargas) sin pedir nombre manual salvo ajustes propios del navegador.
+- `src/pdf-download.js` construye PDF carta en el cliente sin agregar dependencias npm. La base permanece en PostgreSQL, no SQLite.
+- No hay migraciones SQL nuevas para V3.0. Mantén las migraciones previas.
+
+**Límite de verificación:** se completaron las pruebas automáticas y de sintaxis, pero no se pudo instalar npm ni ejecutar el build por fallo de DNS del registro. Prueba primero en un despliegue de ensayo Netlify.
+
+
+### Configuración contextual de cada página (V3.0)
+Desde el botón flotante **Menú → Configuración** se abre una ventana sobre la página actual, con sus formularios correspondientes. **Guardar y volver a la página** guarda los cambios pendientes y cierra la ventana sin cambiar de página. Las opciones generales siguen existiendo en Configuraciones, para administrarlas cuando se necesite. Algunos controles ya se guardan en el momento de modificarlos. Las páginas sin ajustes específicos muestran un aviso en vez de controles de otras páginas.

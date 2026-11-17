@@ -1,3 +1,5 @@
+import {createPageSettingsModal} from './page-settings-modal.js';
+import {downloadPdfCanvases,pdfSafeName} from './pdf-download.js';
 import {initSettingsTransfer} from './settings-transfer.js';
 import {analyzeImportPreview} from './import-preview.js';
 import {initReminders} from './reminders.js';
@@ -51,7 +53,7 @@ import {WEEKLY_ADMIN_DEFAULTS,WEEKLY_ADMIN_STORAGE,cleanWeeklyAdminSettings,prel
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='2.7.1';
+  const APP_VERSION='3.0';
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -63,6 +65,7 @@ let dynamicBonusConfig=loadDynamicBonus();
 function dynamicBonusAmount(){return validRateAmount(dynamicBonusConfig.amount)?dynamicBonusConfig.amount:0;}
 
   const el=id=>document.getElementById(id);
+  let pageSettingsController=null;
   const state={base:{...DEFAULT_BASE},sim:{...DEFAULT_SIM}};
 
 
@@ -123,7 +126,7 @@ function validNavSettings(value){
  const groupTitles={};for(const g of groupOrder){const n=value?.groupTitles?.[g];if(typeof n==='string'&&n.trim()&&n.trim().length<=80)groupTitles[g]=n.trim();}
  const pageTitles={};for(const p of DEFAULT_PAGE_ORDER){const n=value?.pageTitles?.[p];if(typeof n==='string'&&n.trim()&&n.trim().length<=80)pageTitles[p]=n.trim();}
  const oldDefault=Array.isArray(value?.order)&&!value.order.includes('leadership')&&value?.home==='daily';
- return {order,groupOrder,groupBy,groupTitles,pageTitles,deletedGroups:deleted,home:oldDefault?'leadership':DEFAULT_PAGE_ORDER.includes(value?.home)?value.home:'leadership'};
+ return {order,groupOrder,groupBy,groupTitles,pageTitles,deletedGroups:deleted,layoutVersion:3,home:value?.layoutVersion===3&&DEFAULT_PAGE_ORDER.includes(value?.home)?value.home:'leadership'};
 }
 function navGroupLabel(g){return pageNavigation.groupTitles?.[g]||GROUP_LABELS[g]||'Nueva sección';}
 function navPageLabel(p){return pageNavigation.pageTitles?.[p]||PAGE_LABELS[p]||p;}
@@ -1451,7 +1454,7 @@ function initHistory(){
  for(const id of ['histPeriod','histModule','histFrom','histTo','histWeekday'])el(id).addEventListener('change',()=>{historyView.page=1;renderHistory();});
  el('histExecutive').addEventListener('change',()=>{el('histModule').value='';populateHistoryFilters();historyView.page=1;renderHistory();});
  el('histResetFilters').addEventListener('click',()=>{el('histModule').value='';el('histFrom').value='';el('histTo').value='';el('histWeekday').value='all';historyView.page=1;renderHistory();});
- el('histOpenSettings').addEventListener('click',()=>{if(!el('settingsPanel').open)el('toggleSettings').click();el('settingsSectionsNav').querySelector('[data-settings-group="settingsHistoryV253"]')?.click();});
+ el('histOpenSettings').addEventListener('click',()=>pageSettingsController?.open('history','settingsHistoryV253'));
  el('histPrev').addEventListener('click',()=>{historyView.page--;renderHistory();});
  el('histNext').addEventListener('click',()=>{historyView.page++;renderHistory();});
  el('histTableBody').addEventListener('change',event=>{
@@ -1592,7 +1595,7 @@ function initModuleHistory(){
  for(const id of ['mhPeriod','mhFrom','mhTo','mhWeekday'])el(id).addEventListener('change',()=>{moduleHistoryView.page=1;renderModuleHistory();});
  el('mhExecutive').addEventListener('change',()=>{populateModuleFilters();moduleHistoryView.page=1;renderModuleHistory();});
  el('mhResetFilters').addEventListener('click',()=>{el('mhFrom').value='';el('mhTo').value='';el('mhWeekday').value='all';moduleHistoryView.page=1;renderModuleHistory();});
- el('mhOpenSettings').addEventListener('click',()=>{if(!el('settingsPanel').open)el('toggleSettings').click();el('settingsSectionsNav').querySelector('[data-settings-group="settingsModuleHistoryV254"]')?.click();});
+ el('mhOpenSettings').addEventListener('click',()=>pageSettingsController?.open('moduleHistory','settingsModuleHistoryV254'));
  el('mhPrev').addEventListener('click',()=>{moduleHistoryView.page--;renderModuleHistory();});
  el('mhNext').addEventListener('click',()=>{moduleHistoryView.page++;renderModuleHistory();});
  el('mhTableBody').addEventListener('change',event=>{
@@ -1642,37 +1645,41 @@ function achParseGoal(input,key){
   if(ACH_QUANTITY_GOALS.has(key))return Number.isSafeInteger(v)&&v<=1000000?v:null;
   return v<=100?v:null;
 }
+// V3.0: los objetivos editados en Logros semanales se preservan en
+// achievementGoalStore exclusivamente como respaldo histórico. No se consultan.
 function achReadGoals(){
-  const obj=achievementGoalStore[achGoalScope()]||{};
-  const week=achValue('achWeek'),module=achValue('achModule');
-  return Object.fromEntries(Object.keys(ACH_GOAL_INPUTS).map(k=>{
-   const manual=achParseGoal(obj[k],k);
-   if(manual!==null)return [k,manual];
-   const baseKey=k==='app'?'apps':k;
-   const goal=resolveAnalysisGoal(module&&module!=='*'?'module':'headquarters',module||'Jefatura',week,baseKey);
-   return [k,goal.value>0?goal.value:null];
-  }));
+ const week=achValue('achWeek'),module=achValue('achModule');
+ // No se aceptan objetivos antiguos de Logros ni porcentajes predeterminados
+ // cuando no están explícitamente configurados en un perfil vigente.
+ const configured=(type,name,metric)=>{
+  const key=type==='headquarters'?'headquarters|JEFATURA':`${type}|${normalizeName(name)}`;
+  const profile=baseGoals.profiles?.[key];
+  return profile?.versions?.some(v=>v.from<=week&&Object.hasOwn(v.goals,metric))===true;
+ };
+ return Object.fromEntries(Object.keys(ACH_GOAL_INPUTS).map(k=>{
+  const metric=k==='app'?'apps':k;
+  if(module&&module!=='*'){
+   if(!configured('module',module,metric))return [k,null];
+   const goal=effectiveBaseGoal(baseGoals,'module',module,week,metric);
+   return [k,Number.isFinite(goal.value)&&goal.value>0?goal.value:null];
+  }
+  if(!configured('headquarters','Jefatura',metric)){
+   const modules=baseModuleNames();
+   if(!modules.length||modules.some(name=>!configured('module',name,metric)))return [k,null];
+  }
+  const goal=headquartersGoal(baseGoals,week,metric,baseModuleNames());
+  return [k,Number.isFinite(goal.value)&&goal.value>0?goal.value:null];
+ }));
 }
 function achShowGoals(){
-  const goals=achReadGoals();
-  for(const [key,id] of Object.entries(ACH_GOAL_INPUTS))el(id).value=goals[key]??'';
-  el('achGoalsStatus').textContent=Object.values(goals).some(Number.isFinite)?'Objetivos cargados para esta semana y módulo.':'Sin objetivos guardados para esta semana y módulo.';
+ const goals=achReadGoals();
+ for(const [key,id] of Object.entries(ACH_GOAL_INPUTS)){const input=el(id);if(input)input.value=goals[key]??'';}
+ const status=el('achGoalsStatus');if(status)status.textContent='Los objetivos provienen exclusivamente del perfil de cada módulo (con vigencia histórica).';
 }
-function achDraftGoals(){
-  const goals={};
-  for(const [key,id] of Object.entries(ACH_GOAL_INPUTS))goals[key]=achParseGoal(el(id).value,key);
-  achievementGoalStore[achGoalScope()]=goals;
-  el('achGoalsStatus').textContent='Cambios locales. Pulsa Guardar objetivos para conservarlos.';
-  renderAchievements();
-}
-function achSaveGoals(){
-  const invalid=Object.entries(ACH_GOAL_INPUTS).filter(([key,id])=>el(id).value.trim()&&!achParseGoal(el(id).value,key));
-  if(invalid.length){el('achGoalsStatus').textContent='Registros y Ventas requieren enteros positivos; los demás, porcentajes mayores a 0 y hasta 100.';el(invalid[0][1]).focus();return;}
-  achievementGoalStore[achGoalScope()]=Object.fromEntries(Object.entries(ACH_GOAL_INPUTS).map(([k,id])=>[k,achParseGoal(el(id).value,k)]));
-  localStorage.setItem(ACH_GOALS_STORAGE,JSON.stringify(achievementGoalStore)); // Una escritura al confirmar, sincronizable con login.
-  el('achGoalsStatus').textContent=window.APP_CLOUD?.user?'Guardado localmente · sincronización pendiente de confirmar en la nube.':'Objetivos guardados en este dispositivo.';
-  renderAchievements();
-}
+// Se conservan los nombres de estos callbacks para compatibilidad de versiones,
+// pero ningún control visible escribe en el depósito antiguo de objetivos.
+function achDraftGoals(){}
+function achSaveGoals(){}
 function achPrintEnabled(key){return el('achievementsPage')?.querySelector(`[data-ach-print="${key}"]`)?.checked!==false;}
 function achPrintFilters(){
   const pairs=[['Semana',achValue('achWeek')?weekLabel(achValue('achWeek')):'Sin seleccionar'],['Módulo',achValue('achModule')||'Todos los módulos'],['Supervisores',el('achIncludeSupervisors').checked?'Incluidos':'Excluidos'],['Búsqueda',achValue('achSearch')||'Ninguna']];
@@ -1857,8 +1864,7 @@ function initAchievements(){
   el('achPrev').addEventListener('click',()=>{achievementsView.page--;renderAchievements();});
   el('achNext').addEventListener('click',()=>{achievementsView.page++;renderAchievements();});
   el('achRecordsTable').addEventListener('change',e=>applyFolioValidationChange(e.target));
-  for(const id of Object.values(ACH_GOAL_INPUTS))el(id).addEventListener('input',achDraftGoals);
-  el('achSaveGoals').addEventListener('click',achSaveGoals);
+  // V3.0: se retiran los editores duplicados de metas de esta página.
   el('achievementsPage').querySelectorAll('[data-ach-print]').forEach(input=>{
     const key=input.dataset.achPrint;
     input.checked=Object.prototype.hasOwnProperty.call(achievementPrintStore,key)?!!achievementPrintStore[key]:ACH_PRINT_DEFAULTS[key];
@@ -2771,9 +2777,20 @@ function leadershipRows(){return historyData().map(r=>({fecha:r.fecha,module:r.m
  dental:isYes(r.dental),p0:isYes(r.p0),app:appEnabled(r),incident:selectedIncident(r)}));}
 function persistLeadership(){try{localStorage.setItem(LEADERSHIP_KEY,JSON.stringify(leadershipPrefs));return true;}catch(error){el('lsStatus').textContent='Error al guardar: '+error.message;return false;}}
 const lPct=n=>Number.isFinite(n)?pct(n):'—';
+function populateLeaderWeeks(){
+ const select=el('leaderWeek');if(!select)return;
+ const current=mondayOf(dateIso(new Date())),before=select.value;
+ const weeks=new Set([current]);
+ for(const row of historyData())if(/^\d{4}-\d{2}-\d{2}$/.test(row.fecha||''))weeks.add(mondayOf(row.fecha));
+ const ordered=[...weeks].sort((a,b)=>b.localeCompare(a));
+ if(before&&!weeks.has(before))ordered.push(before);
+ select.innerHTML=ordered.map(w=>`<option value="${w}">${esc(weekLabel(w))}${w===current?' · Actual':''}</option>`).join('');
+ select.value=before||current;
+}
 function leadershipSelectedRange(){
- const today=dateIso(new Date()),period=el('leaderPeriod').value;
- return leadershipRange(period,today,el('leaderFrom').value,el('leaderTo').value);
+ const start=el('leaderWeek')?.value||mondayOf(dateIso(new Date()));
+ const endDate=dateFromIso(start);endDate.setDate(endDate.getDate()+6);
+ return {from:start,to:dateIso(endDate)};
 }
 function leadershipCalc(){
  const {from,to}=leadershipSelectedRange(),today=dateIso(new Date());
@@ -2791,7 +2808,7 @@ function leadershipCalc(){
   headquartersGoal:(week,_module,metric)=>leadershipHeadquartersGoal(week,metric)});
 }
 function renderLeadership(){
- if(!el('leadershipPage'))return;
+ if(!el('leadershipPage'))return;populateLeaderWeeks();
  let info;try{info=leadershipCalc();leadershipSnapshot=info;}catch(error){
   leadershipSnapshot=null;el('leaderNotice').textContent='Revisa el período: '+error.message;return;
  }
@@ -2997,34 +3014,32 @@ function initLeadershipGoalSettings(){
 }
 function refreshLeadershipSettingsEditor(){
  const prefs=leadershipPrefs;
- for(const [id,key] of [['lsPeriod','period'],['lsConversion','minConversion'],['lsProjected','minProjectedCompletion'],['lsStale','staleDays'],['lsTopPeople','topPeople'],['lsTitle','exportTitle'],['lsSubtitle','exportSubtitle'],['lsColor','color'],['lsNote','exportNote']])el(id).value=prefs[key];
+ for(const [id,key] of [['lsPeriod','period'],['lsConversion','minConversion'],['lsProjected','minProjectedCompletion'],['lsStale','staleDays'],['lsTopPeople','topPeople'],['lsTitle','exportTitle'],['lsSubtitle','exportSubtitle'],['lsColor','color'],['lsNote','exportNote']])el(id).value=id==='lsPeriod'?'week':prefs[key];
  el('lsIncludeSupervisor').value=prefs.includeSupervisors?'yes':'no';
  el('lsSections').querySelectorAll('[data-leader-setting]').forEach(ch=>ch.checked=prefs[ch.dataset.leaderSetting]);
 }
 function saveLeadershipSettings(){
  const read=(id)=>Number(el(id).value);
  const next=cleanLeadershipSettings({...leadershipPrefs,
-  period:el('lsPeriod').value,includeSupervisors:el('lsIncludeSupervisor').value==='yes',
+  period:'week',includeSupervisors:el('lsIncludeSupervisor').value==='yes',
   minConversion:read('lsConversion'),minProjectedCompletion:read('lsProjected'),staleDays:read('lsStale'),topPeople:read('lsTopPeople'),
   exportTitle:el('lsTitle').value,exportSubtitle:el('lsSubtitle').value,color:el('lsColor').value,exportNote:el('lsNote').value,
   ...Object.fromEntries([...el('lsSections').querySelectorAll('[data-leader-setting]')].map(ch=>[ch.dataset.leaderSetting,ch.checked]))});
  leadershipPrefs=next;
  if(!persistLeadership())return;
- el('leaderPeriod').value=next.period;el('leaderSupervisor').value=next.includeSupervisors?'yes':'no';
+ el('leaderPeriod').value='week';el('leaderSupervisor').value=next.includeSupervisors?'yes':'no';
  leaderPeriodToggled();renderLeadership();leaderGoalSettingsEditor();el('lsStatus').textContent='Dashboard guardado localmente'+(isAuthorized()?' y pendiente de sincronización automática.':'. Inicia sesión para sincronizar.');
 }
 function leaderPeriodToggled(){
- const on=el('leaderPeriod').value==='custom';el('leaderFrom').disabled=!on;el('leaderTo').disabled=!on;
- if(on&&(!el('leaderFrom').value||!el('leaderTo').value)){
-  const now=new Date(),end=dateIso(now);now.setDate(now.getDate()-29);
-  el('leaderFrom').value=dateIso(now);el('leaderTo').value=end;
- }
+ // El dashboard opera siempre en semanas completas de lunes a domingo.
+ el('leaderPeriod').value='week';
+ const range=leadershipSelectedRange();el('leaderFrom').value=range.from;el('leaderTo').value=range.to;
 }
 function initLeadership(){
- initLeadershipCollapse();initLeadershipGoalSettings();refreshLeadershipSettingsEditor();el('leaderPeriod').value=leadershipPrefs.period;el('leaderSupervisor').value=leadershipPrefs.includeSupervisors?'yes':'no';leaderPeriodToggled();
- el('leaderPeriod').addEventListener('change',()=>{leaderPeriodToggled();renderLeadership();});
- for(const id of ['leaderFrom','leaderTo','leaderSupervisor'])el(id).addEventListener('change',renderLeadership);
- el('leadershipSettingsOpen').addEventListener('click',()=>{if(!el('settingsPanel').open)el('toggleSettings').click();el('settingsSectionsNav').querySelector('[data-settings-group="settingsLeadershipV256"]')?.click();});
+ initLeadershipCollapse();initLeadershipGoalSettings();refreshLeadershipSettingsEditor();el('leaderPeriod').value='week';el('leaderSupervisor').value=leadershipPrefs.includeSupervisors?'yes':'no';leaderPeriodToggled();
+ populateLeaderWeeks();el('leaderWeek').addEventListener('change',()=>{leaderPeriodToggled();renderLeadership();});
+ el('leaderSupervisor').addEventListener('change',renderLeadership);
+ el('leadershipSettingsOpen').addEventListener('click',()=>pageSettingsController?.open('leadership','settingsLeadershipV256'));
  el('lsSave').addEventListener('click',()=>{saveLeadershipSettings();if(!el('lsStatus').textContent.startsWith('Error'))toggleSettings(false);});
  el('lsRestore').addEventListener('click',()=>{leadershipPrefs=cleanLeadershipSettings({...LEADERSHIP_DEFAULTS,actions:leadershipPrefs.actions});refreshLeadershipSettingsEditor();saveLeadershipSettings();});
  el('leaderActionForm').addEventListener('submit',event=>{
@@ -3137,7 +3152,7 @@ function renderNavOrderEditor(){
  }).join('');
 }
 function saveNavSettings(){
- try{localStorage.setItem(PAGE_NAV_KEY,JSON.stringify(pageNavigation));}catch(error){el('pageOrderStatus').textContent='No se pudo guardar: '+error.message;return;}
+ try{pageNavigation.layoutVersion=3;localStorage.setItem(PAGE_NAV_KEY,JSON.stringify(pageNavigation));}catch(error){el('pageOrderStatus').textContent='No se pudo guardar: '+error.message;return;}
  applyNavOrder();renderNavOrderEditor();if(el('settingsPanel').open)toggleSettings(false);el('pageOrderStatus').textContent='Categorías, páginas y principal guardadas'+(isAuthorized()?' · sincronización en cola.':'. Inicia sesión para sincronizar.');
 }
 function initNavOrder(){
@@ -3192,24 +3207,21 @@ function initNavOrder(){
 }
 
 function updateFloatingExport(){
-  const isDaily=activePage==='daily',isVisit=activePage==='visits',isIncident=activePage==='incidents';
-  el('dailyCopyWhatsApp').hidden=!isDaily;
-  el('floatCsv').hidden=isVisit||activePage==='history'||activePage==='moduleHistory'||activePage==='leadership';
-  el('floatPdf').hidden=false;el('floatPng').hidden=false;
-  el('floatingExportMenu').hidden=true;el('floatingExportToggle').setAttribute('aria-expanded','false');
-  el('floatCsv').textContent=isIncident?'Exportar incidencias CSV':'Exportar CSV';
+ const isDaily=activePage==='daily',isVisit=activePage==='visits',isIncident=activePage==='incidents';
+ el('dailyCopyWhatsApp').hidden=!isDaily;
+ el('floatCsv').hidden=isVisit||activePage==='history'||activePage==='moduleHistory'||activePage==='leadership';
+ el('floatPdf').hidden=false;el('floatPng').hidden=false;
+ el('floatingExportMenu').hidden=true;
+ el('floatCsv').textContent=isIncident?'Exportar incidencias CSV':'Exportar CSV';
 }
 function initFloatingExport(){
-  const menu=el('floatingExportMenu'),toggle=el('floatingExportToggle');
-  toggle.addEventListener('click',()=>{menu.hidden=!menu.hidden;toggle.setAttribute('aria-expanded',String(!menu.hidden));});
-  const action=(id,fn)=>el(id).addEventListener('click',()=>{menu.hidden=true;toggle.setAttribute('aria-expanded','false');fn();});
-  action('floatPdf',()=>el(activePage==='visits'?'visitPdf':'print').click());
-  action('floatPng',()=>el(activePage==='visits'?'visitPng':'exportImage').click());
-  action('floatCsv',()=>activePage==='incidents'?exportIncidentCsv():el('export').click());
-  el('dailyCopyWhatsApp').addEventListener('click',()=>{menu.hidden=true;toggle.setAttribute('aria-expanded','false');});
-  document.addEventListener('click',event=>{if(!el('floatingExport').contains(event.target)){menu.hidden=true;toggle.setAttribute('aria-expanded','false');}});
-  document.addEventListener('keydown',event=>{if(event.key==='Escape'){menu.hidden=true;toggle.setAttribute('aria-expanded','false');}});
-  updateFloatingExport();
+ const close=()=>{el('floatingFiltersMenu').hidden=true;el('floatingFiltersToggle').setAttribute('aria-expanded','false');};
+ const action=(id,fn)=>el(id).addEventListener('click',()=>{close();fn();});
+ action('floatPdf',()=>el('print').click());
+ action('floatPng',()=>el(activePage==='visits'?'visitPng':'exportImage').click());
+ action('floatCsv',()=>activePage==='incidents'?exportIncidentCsv():el('export').click());
+ el('dailyCopyWhatsApp').addEventListener('click',close);
+ updateFloatingExport();
 }
 // V2.6.0 — filtros secundarios de todas las páginas en un único menú flotante.
 const FILTER_MOVES={
@@ -3231,7 +3243,6 @@ function filterControlWrapper(id){
  return node.closest('.field')||node.closest('label')||(node.tagName==='BUTTON'?node:null);
 }
 function initFloatingFilters(){
- // Los filtros de fechas son primarios aun en Registros manuales: conservarlos en pantalla.
  const recordsPrimary=el('allRecordsPage')?.querySelector('.all-records-primary');
  for(const id of ['allRecordsFrom','allRecordsTo']){
   const field=el(id)?.closest('.field');if(field&&recordsPrimary)recordsPrimary.appendChild(field);
@@ -3243,11 +3254,20 @@ function initFloatingFilters(){
   body.appendChild(host);host.appendChild(element);secondaryFilterSlots.set(element,host);
   if(element.tagName==='DETAILS')element.open=true;
  }
- // Filtros visuales de la calculadora individual: el resto reside en Ajustes → Tabla de folios.
  const individual=el('tableFilter')?.closest('.folio-main-search');
  if(individual){const slot=document.createElement('div');slot.className='floating-filter-slot';slot.dataset.filterPage='individual';body.appendChild(slot);slot.appendChild(individual);}
+ const filters=el('jmToolsFilterPanel'),exports=el('floatingExportMenu');
+ function mode(which){
+  filters.hidden=which!=='filters';exports.hidden=which!=='export';
+  for(const [id,value] of [['jmToolsFilters','filters'],['jmToolsExport','export']])el(id).classList.toggle('active',value===which);
+ }
  function hide(){popup.hidden=true;toggle.setAttribute('aria-expanded','false');}
- toggle.addEventListener('click',()=>{popup.hidden=!popup.hidden;toggle.setAttribute('aria-expanded',String(!popup.hidden));});
+ toggle.addEventListener('click',()=>{const open=popup.hidden;popup.hidden=!open;toggle.setAttribute('aria-expanded',String(open));if(open)mode('filters');});
+ el('jmToolsFilters').addEventListener('click',()=>mode('filters'));
+ el('jmToolsExport').addEventListener('click',()=>mode('export'));
+ el('jmToolsSettings').addEventListener('click',()=>{
+  hide();pageSettingsController?.open(activePage);
+ });
  el('floatingFiltersClose').addEventListener('click',hide);
  document.addEventListener('click',e=>{if(!el('floatingFilters').contains(e.target))hide();});
  document.addEventListener('keydown',e=>{if(e.key==='Escape')hide();});
@@ -3256,10 +3276,11 @@ function initFloatingFilters(){
 function updateFloatingFilters(){
  const popup=el('floatingFiltersMenu');if(!popup)return;
  popup.hidden=true;el('floatingFiltersToggle').setAttribute('aria-expanded','false');
- let count=0;for(const slot of el('floatingFiltersBody').children){
-  const enabled=slot.dataset.filterPage===activePage;slot.hidden=!enabled;if(enabled)count++;
- }
- el('floatingFilters').hidden=count===0;
+ let count=0;
+ for(const slot of el('floatingFiltersBody').children){const enabled=slot.dataset.filterPage===activePage;slot.hidden=!enabled;if(enabled)count++;}
+ el('jmToolsFilterMessage').textContent=count?'Los filtros se aplican a la página seleccionada.':'Esta página no tiene filtros secundarios adicionales. Usa sus filtros principales.';
+ el('floatingFilters').hidden=false;
+ el('jmToolsFilterPanel').hidden=false;el('floatingExportMenu').hidden=true;
 }
 // Las secciones que ya son <details> conservan sus controles. En las restantes se añade plegado.
 function initGlobalCollapses(){
@@ -3494,6 +3515,7 @@ function initMondayReminder(){
   window.addEventListener('focus',maybeShow);
 }
 function switchPage(page){
+  pageSettingsController?.close();
   activePage=DEFAULT_PAGE_ORDER.includes(page)?page:pageNavigation.home;
   document.body.dataset.page=activePage;
   // Las secciones y filtros de la calculadora solo pertenecen a su propia página.
@@ -3798,12 +3820,7 @@ el('teamTable').addEventListener('click',e=>{
   el('plusDental').addEventListener('click',()=>{simDirty=true;const r=calculate(state.sim);if(!r.ok||r.validDental>=r.validSales)return;state.sim.dental+=1;update('sim');});
   el('plusP0').addEventListener('click',()=>{simDirty=true;const r=calculate(state.sim);if(!r.ok||r.validP0>=r.validReg)return;state.sim.p0+=1;update('sim');});
   el('nextTier').addEventListener('click',()=>{simDirty=true;const r=calculate(state.sim);if(!r.ok||!r.nextTarget)return;state.sim.reg+=r.needed;state.sim.app+=r.needed;update('sim');});
-  el('print').addEventListener('click',async()=>{
-    try{
-      if(activePage==='achievements')await preloadWeeklyAdminAssets();
-      refreshAuthorizedPages();buildReport();window.print();
-    }catch(error){alert('No se pudo preparar el PDF: '+error.message);}
-  });
+  el('print').addEventListener('click',exportPdfV30);
   el('export').addEventListener('click',()=>{
     if(activePage==='incidents'){exportIncidentCsv();return;}
     if(activePage==='supervisor'){
@@ -3820,7 +3837,7 @@ el('teamTable').addEventListener('click',e=>{
       const {metricList,counts,goals,filteredRows:records}=achData(),cols=allRecordsColumns();
       const lines=[];
       if(achPrintEnabled('filters'))lines.push(['FILTROS APLICADOS','Valor'],...achPrintFilters(),[]);
-      if(achPrintEnabled('goals'))lines.push(['OBJETIVOS EN CANTIDADES Y PORCENTAJES','Meta'],...Object.entries(ACH_GOAL_INPUTS).map(([key])=>[ACH_GOAL_LABELS[key],achGoalText(key,goals[key])]),[]);
+      // Las metas heredadas ya no generan una sección de objetivos en Logros semanales.
       if(achPrintEnabled('percentages'))lines.push(['LOGROS POR PORCENTAJE','Alcance real','Calidad'],...metricList.map(m=>[m.name,qualityPercentText(m.reach),qualityPercentText(m.quality)]),[]);
       if(achPrintEnabled('quantities')){
         const targets={'Registros':'records','Ventas con código':'sales','Plan Dental':'dental','Plan Cero':'p0','Primera compra':'purchase','APP activadas':'app'};
@@ -4438,6 +4455,63 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     return result;
   }
   function saveBlob(blob,fileName){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=fileName;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);}
+  function selectedPdfFilename(){
+   const value=id=>String(el(id)?.value||'').trim();
+   const name=navPageLabel(activePage);
+   const context={leadership:[],achievements:[value('achModule')],history:[value('histExecutive'),value('histModule')],moduleHistory:[value('mhExecutive')],team:[value('teamModule')],supervisor:[value('supModule'),value('supExecutive')],allrecords:[value('allRecordsModule'),value('allRecordsExecutive')],incidents:[value('incFilterModule')],visits:[value('visitModule')],individual:[imported.executive],daily:[],accumulated:[],weekly:[]}[activePage]||[];
+   let date=({leadership:()=>{const r=leadershipSelectedRange();return r.from+'_al_'+r.to;},achievements:()=>value('achWeek'),history:()=>[value('histFrom'),value('histTo')].filter(Boolean).join('_al_'),moduleHistory:()=>[value('mhFrom'),value('mhTo')].filter(Boolean).join('_al_'),supervisor:()=>supView.week,allrecords:()=>[value('allRecordsFrom'),value('allRecordsTo')].filter(Boolean).join('_al_'),accumulated:()=>[value('accumulatedFrom'),value('accumulatedTo')].filter(Boolean).join('_al_'),weekly:()=>weeklySelection().primary+'_vs_'+weeklySelection().previous,daily:()=>{const d=dailyDates();return d.latest+'_vs_'+d.previous;},team:()=>imported.week,individual:()=>imported.week})[activePage]?.()||dateIso(new Date());
+   return pdfSafeName([name,...context.filter(Boolean),date].join(' - '))+'.pdf';
+  }
+  function paginateCanvas(draw,measure,{width=1120,pageHeight=1450,scale=1.35}={}){
+   const probe=document.createElement('canvas').getContext('2d');
+   const totalHeight=Math.max(1,Math.ceil(measure(probe)));
+   const count=Math.ceil(totalHeight/pageHeight);
+   if(count>90)throw Error('El reporte es demasiado extenso. Reduce el rango o los filtros.');
+   const pages=[];
+   for(let i=0;i<count;i++){
+    const canvas=document.createElement('canvas');canvas.width=Math.round(width*scale);canvas.height=Math.round(pageHeight*scale);
+    const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.scale(scale,scale);ctx.translate(0,-i*pageHeight);draw(ctx);pages.push(canvas);
+   }
+   return pages;
+  }
+  function textPageCanvases(root){
+   if(!root)throw Error('No hay contenido visible para exportar.');
+   const lines=(root.innerText||'Sin resultados').split(/\n+/).map(t=>t.trim()).filter(Boolean);
+   if(lines.length>1200)throw Error('Demasiados renglones para el PDF. Aplica un filtro más específico.');
+   const group=[],rowsPerPage=55;
+   for(let n=0;n<Math.max(1,Math.ceil(lines.length/rowsPerPage));n++){
+    const canvas=document.createElement('canvas');canvas.width=1224;canvas.height=1584;const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#003b7a';ctx.font='bold 30px Arial';ctx.fillText(navPageLabel(activePage),45,65);
+    ctx.fillStyle='#263d52';ctx.font='18px Arial';let y=105;
+    for(const line of lines.slice(n*rowsPerPage,(n+1)*rowsPerPage)){let t=line;while(t.length&&ctx.measureText(t).width>1125)t=t.slice(0,-1);ctx.fillText(t+(t!==line?'…':''),45,y);y+=25;}
+    group.push(canvas);
+   }
+   return group;
+  }
+  async function exportPdfV30(){
+   const button=el('floatPdf');if(button.disabled)return;
+   const label=button.textContent;button.disabled=true;button.textContent='Generando PDF…';
+   try{
+    if(activePage==='visits'){if(!window.VISITS?.exportPdf)throw Error('El módulo de visitas todavía no está listo.');await window.VISITS.exportPdf();return;}
+    let pages=[];
+    if(activePage==='leadership')pages=leadershipPngPages({data:leadershipCalc(),settings:leadershipPrefs},{scale:1.6});
+    else if(activePage==='history')pages=historyPngPages(historyReportModel(),{scale:1.5});
+    else if(activePage==='moduleHistory')pages=historyPngPages(moduleReportModel(),{scale:1.5});
+    else if(activePage==='achievements'){
+     const assets=await preloadWeeklyAdminAssets();
+     pages=renderWeeklyAdminSheets(weeklyAchievementReportModel(),assets,{scale:2});
+    }else if(activePage==='updates'||activePage==='reminders'){
+     pages=textPageCanvases(el(activePage==='updates'?'updatesPage':'remindersPage'));
+    }else{
+     buildReport();
+     const supervisor=activePage==='supervisor'?supervisorStatementModel():null;
+     pages=paginateCanvas(supervisor?ctx=>paintSupervisorStatement(ctx,true,supervisor):ctx=>paintReportCanvas(ctx,true),supervisor?ctx=>paintSupervisorStatement(ctx,false,supervisor):ctx=>paintReportCanvas(ctx,false));
+    }
+    downloadPdfCanvases(pages,selectedPdfFilename());
+   }catch(error){alert('No se pudo generar el PDF: '+error.message);}
+   finally{button.disabled=false;button.textContent=label;}
+  }
   // PNG puro con Canvas: funciona offline y evita que SVG foreignObject contamine el lienzo.
   // Toma todas las secciones, filas, columnas y orden desde el mismo reporte que usa la impresión.
   function paintReportCanvas(ctx,draw){
@@ -4513,7 +4587,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y=paragraph(selection,margin,y,content,10,15)+6;
     line(margin,y,content,accent);y+=9;
     for(const section of sections){
-      const key=section.dataset.reportSection;heading(key==='sup-overview'?'Resumen de comisiones':key==='sup-filters'?'Parámetros de consulta':key==='sup-search'?'Búsqueda de folios':key==='sup-quality'?'Calidad del equipo':key==='sup-bonus'?'Bono por resultados':key==='sup-own'?'Ventas propias':key==='sup-team-records'?'Folios ejecutivos':key==='sup-own-records'?'Folios supervisor':key==='ach-filters'?'Filtros aplicados':key==='ach-goals'?'Objetivos: cantidades y porcentajes':key==='ach-percents'?'Logros por porcentaje':key==='ach-quantities'?'Logros en cantidades':key==='ach-records'?'Registros manuales filtrados':key==='allrecords'?'Registros manuales filtrados':key==='weekly-variance'?'Variación de resultados':SECTION_LABELS[key]||(key==='daily'?'Por módulo y ejecutivo':key==='team'?'Comparativo por ejecutivo':'Resumen del equipo'));
+      const key=section.dataset.reportSection;heading(key==='sup-overview'?'Resumen de comisiones':key==='sup-filters'?'Parámetros de consulta':key==='sup-search'?'Búsqueda de folios':key==='sup-quality'?'Calidad del equipo':key==='sup-bonus'?'Bono por resultados':key==='sup-own'?'Ventas propias':key==='sup-team-records'?'Folios ejecutivos':key==='sup-own-records'?'Folios supervisor':key==='ach-filters'?'Filtros aplicados':key==='ach-goals'?'Objetivos históricos (respaldo)':key==='ach-percents'?'Logros por porcentaje':key==='ach-quantities'?'Logros en cantidades':key==='ach-records'?'Registros manuales filtrados':key==='allrecords'?'Registros manuales filtrados':key==='weekly-variance'?'Variación de resultados':SECTION_LABELS[key]||(key==='daily'?'Por módulo y ejecutivo':key==='team'?'Comparativo por ejecutivo':'Resumen del equipo'));
       if(['sup-overview','sup-filters','sup-search','sup-quality','sup-bonus','sup-own'].includes(key)){
         y=tableAt(section.querySelector('.sup-report-table'),margin,y,content,{fontSize:11,rowMin:28,widths:key==='sup-quality'?[2,1,1]:key==='sup-own'?[2,1.4,1]:[3,1],striped:true})+9;
       }
@@ -4679,7 +4753,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
    openPage:switchPage
   });
   initReminders();initSettingsTransfer();
-  initAllRecordsPage();initAchievements();initTeamRegistry();initWeeklyAdminSettings();initQualitySettings();initBaseGoals();initSupervisorCalculator();initIncidences();initHistory();initModuleHistory();initLeadership();initNavOrder();initFloatingExport();initFloatingFilters();initRecordManagement();initGlobalCollapses();initMondayReminder();
+  initAllRecordsPage();initAchievements();initTeamRegistry();initWeeklyAdminSettings();initQualitySettings();initBaseGoals();initSupervisorCalculator();initIncidences();initHistory();initModuleHistory();initLeadership();initNavOrder();initFloatingExport();initFloatingFilters();pageSettingsController=createPageSettingsModal({getActivePage:()=>activePage});initRecordManagement();initGlobalCollapses();initMondayReminder();
   restore();setForm('base');setForm('sim');render();initializeWeeklyDates();refreshAuthorizedPages();switchPage(pageNavigation.home);initArchive();
   window.APP_CLOUD?.registerRefresh(async()=>{
     if(!isAuthorized())return;
