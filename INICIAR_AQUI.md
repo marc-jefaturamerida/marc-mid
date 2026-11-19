@@ -42,3 +42,8 @@ En cada página pulsa **☰ Menú → Exportar → Descargar PDF**. El archivo s
 ### Mejoras del menú V3.0 (actualización)
 
 Dashboard de Jefatura cuenta con filtros ampliados y porcentajes mínimos individuales de alerta en Menú → Configuración. Incidencias y Actualizaciones tienen botón Copiar reporte en sus detalles. Logros semanales ofrece Menú → Exportar → Copiar folios comisionables. Consulta el apartado 31 del manual para conocer el alcance de cada filtro y los formatos de texto.
+
+
+### Verificación de actualizaciones al 19 de noviembre de 2026
+
+Después del despliegue, prueba desde la Comparativa diaria los dos botones de copia del menú Exportar, usando una semana con objetivos configurados y ventas comisionables. Comprueba también el guardado de una visita desde el celular. Los registros y las fórmulas de comisión no se migran. Ejecuta `npm run check` y `npm test` en el repositorio antes de publicar.

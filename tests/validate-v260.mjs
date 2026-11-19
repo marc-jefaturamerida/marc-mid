@@ -16,7 +16,7 @@ assert.throws(()=>validateRecordFields({fecha:'16/11/2026'}),/Fecha/);
 assert.deepEqual(validateRecordFields({module:'  Pensiones  ',dental:'Si'}),{module:'Pensiones',dental:'Si'});
 const report=buildDailyWhatsAppReport({currentDate:'2026-11-15',previousDate:'2026-11-14',todayIso:'2026-11-15',current:{records:20,sales:15,reg:10,guar:2,p0:3,dental:8},previous:{records:17,sales:14,reg:9,guar:1,p0:4,dental:7},currentQuality:76.04,previousQuality:104.49});
 const block=report.split('```')[1].trim().split('\n');
-assert.equal(block.length,6);assert(block.every(line=>/^[^ ]{1,8}(?: [^ ]+)?  [^ ]+  \([^)]+\)$/.test(line)));
+assert.equal(block.length,6);assert(block.every(line=>/^.{8}\S.{2,}\([^)]+\)$/.test(line))); // columnas alineadas
 assert(report.includes('```\n\nCalidad  76.04%  (-28.45 pp)'));
 const html=fs.readFileSync('index.html','utf8'),app=fs.readFileSync('src/legacy-app.js','utf8');
 for(const id of ['globalFolioSearch','globalFolioResults','floatingFiltersToggle','floatingFiltersMenu','recordActionOverlay','recordActionCopy','recordActionDelete','recordActionIncident','recordActionSave','bulkRecordBar'])assert(html.includes(`id="${id}"`),id);

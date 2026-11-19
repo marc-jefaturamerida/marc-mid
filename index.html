@@ -369,8 +369,8 @@ body[data-page="weekly"] #quickFilters{display:none!important}
 .floating-export-menu button{border:0;background:transparent;border-radius:8px;text-align:left;padding:10px 13px;font:inherit;font-size:13px;font-weight:750;color:#17416e;cursor:pointer}
 .floating-export-menu button:hover{background:#eef5fc}
 .floating-export-menu button[hidden]{display:none!important}
-#dailyCopyWhatsApp{position:static!important;box-shadow:none!important;border:0!important;max-width:none!important;width:100%;border-radius:8px!important;color:#075e54!important;background:#e6f6ee!important;padding:10px 13px!important;text-align:left;justify-content:flex-start;font-size:13px!important}
-#dailyCopyWhatsApp:disabled{opacity:.5}
+#dailyCopyWhatsApp,#dailyCopyGoalProgress{position:static!important;box-shadow:none!important;border:0!important;max-width:none!important;width:100%;border-radius:8px!important;color:#075e54!important;background:#e6f6ee!important;padding:10px 13px!important;text-align:left;justify-content:flex-start;font-size:13px!important}
+#dailyCopyWhatsApp:disabled,#dailyCopyGoalProgress:disabled{opacity:.5}
 .toolbar>#print,.toolbar>#export,.toolbar>#exportImage{display:none!important}
 #visitPdf,#visitPng{display:none!important}
 .page-order-list{display:grid;gap:7px;margin:12px 0}
@@ -1599,7 +1599,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="floating-filters-head"><strong>Herramientas de página</strong><button id="floatingFiltersClose" type="button" aria-label="Cerrar menú">✕</button></div>
   <div class="jm-tools-choices"><button id="jmToolsFilters" type="button">Filtros</button><button id="jmToolsSettings" type="button">Configuración</button><button id="jmToolsExport" type="button">Exportar</button></div>
   <section id="jmToolsFilterPanel" hidden><div id="floatingFiltersBody" class="floating-filters-body"></div><p class="floating-filter-foot" id="jmToolsFilterMessage">Los filtros se aplican a la página seleccionada.</p></section>
-  <div class="floating-export-menu" id="floatingExportMenu" hidden aria-label="Exportar página actual"><button type="button" id="floatPdf">Descargar PDF</button><button type="button" id="floatPng">Exportar PNG</button><button type="button" id="floatCsv">Exportar CSV</button><button class="btn small" type="button" id="achCopyCommissionable" hidden>Copiar folios comisionables</button><button class="daily-copy-whatsapp" id="dailyCopyWhatsApp" type="button" title="Copiar comparación diaria para WhatsApp" aria-label="Copiar comparativo diario para WhatsApp" hidden disabled>Copiar para WhatsApp</button></div>
+  <div class="floating-export-menu" id="floatingExportMenu" hidden aria-label="Exportar página actual"><button type="button" id="floatPdf">Descargar PDF</button><button type="button" id="floatPng">Exportar PNG</button><button type="button" id="floatCsv">Exportar CSV</button><button class="btn small" type="button" id="achCopyCommissionable" hidden>Copiar folios comisionables</button><button class="daily-copy-whatsapp" id="dailyCopyWhatsApp" type="button" title="Copiar comparación diaria para WhatsApp" aria-label="Copiar comparativo diario para WhatsApp" hidden disabled>Copiar para WhatsApp</button><button class="daily-copy-whatsapp" id="dailyCopyGoalProgress" type="button" title="Copiar avance y objetivo de Jefatura" aria-label="Copiar avance y objetivo de Jefatura" hidden disabled>Copiar avance y objetivo de Jefatura</button></div>
  </div>
  <button class="floating-filter-main" id="floatingFiltersToggle" type="button" aria-expanded="false" aria-controls="floatingFiltersMenu">☰ Menú</button>
 </div>

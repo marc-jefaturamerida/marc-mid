@@ -720,3 +720,15 @@ Aviación
 ```
 
 Cuando se seleccionan todos los módulos, el reporte agrupa los folios por módulo. Se evitan renglones duplicados que tengan idénticos módulo, fecha y folio. La selección de filtros **No pagable** o **Sin código** normalmente produce un reporte vacío, porque la exportación respeta los filtros actuales. No afecta las comisiones ni actualiza el XLS.
+
+
+## Actualización de reportes V3.0 (19 de noviembre de 2026)
+
+En **Comparativa diaria → Menú → Exportar** hay ahora dos opciones de copiado:
+
+1. **Copiar para WhatsApp:** incluye el mensaje fijo de cierre, las métricas diarias alineadas en un bloque monoespaciado, Calidad y tres valores acumulados de ventas comisionables (avance semanal %, esperado a la fecha %, diferencia %). El avance esperado se calcula como días transcurridos desde lunes, incluido el día del reporte, entre siete. La diferencia es en puntos porcentuales, aunque se presenta con el signo `%` del formato solicitado. No se añade comentario final.
+2. **Copiar avance y objetivo de Jefatura:** muestra Ventas, Plan Dental y Plan Cero con porcentaje de alcance, requerido y diferencia. Ventas usa su meta semanal de cantidad. Dental es penetración de ventas comisionables con Plan Dental sobre todas las ventas comisionables; Plan Cero es penetración de Plan Cero sobre ventas regulares comisionables. En las penetraciones el objetivo porcentual sigue siendo el mismo durante la semana y no se divide entre siete, porque hacerlo alteraría su interpretación.
+
+Las dos opciones respetan la fecha principal seleccionada y los registros disponibles en el histórico de la cuenta; las ventas consideradas para el avance son **solo comisionables** según la validación de pago vigente, no todas las ventas con código. Si faltan objetivos configurados para la semana en el perfil de Jefatura o en todos los perfiles de módulos, los porcentajes sin meta se muestran como `—` o con un aviso. Las copias requieren permisos de portapapeles del navegador.
+
+En **Visitas de coordinación**, el servidor acepta los criterios e incidencias en el formato de objeto que envía el formulario. Se conservan límites de protección y se muestran mensajes específicos cuando se exceden.

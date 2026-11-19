@@ -1,19 +1,8 @@
 import {authorize,send,jsonBody,responseError} from '../lib/_shared.js';
 
-const MAX_TEXT=9000;
+import {validateVisit} from '../lib/visit-validation.js';
+
 const validId=id=>typeof id==='string'&&/^vis_[a-z0-9_-]{10,70}$/i.test(id);
-const isoDate=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s+'T12:00:00Z'));
-const limitText=(v,max=MAX_TEXT)=>typeof v==='string'&&v.length<=max;
-function validateVisit(v){
-  if(!v||typeof v!=='object'||!validId(v.id)||!isoDate(v.visitedAt))throw Error('Identificador o fecha de visita inválidos.');
-  if(!limitText(v.module,150)||!v.module.trim()||!limitText(v.supervisor,150)||!v.supervisor.trim())throw Error('Elige un módulo y un supervisor/ejecutivo.');
-  if(!v.sections||typeof v.sections!=='object'||Array.isArray(v.sections))throw Error('Las secciones de la visita son inválidas.');
-  if(!Array.isArray(v.sections.checklist)||v.sections.checklist.length>80||
-     !Array.isArray(v.sections.folios)||v.sections.folios.length>3||
-     !Array.isArray(v.sections.incidents)||v.sections.incidents.length>150)throw Error('La cantidad de criterios o folios supera el límite.');
-  if(Object.values(v.sections.comments||{}).some(x=>!limitText(x,8000)))throw Error('Los comentarios superan el límite permitido.');
-  if(!Number.isFinite(Number(v.total))||Math.abs(Number(v.total))>10000)throw Error('Puntuación inválida.');
-}
 export default async function handler(request){
   const auth=await authorize(request);if(auth.response)return auth.response;
   const {owner,db}=auth;

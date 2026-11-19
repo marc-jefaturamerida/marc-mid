@@ -19,7 +19,7 @@ const fmtDelta=(value,previous,asPoints=false)=>{
   return `(${prefix}${numberFmt.format(difference)}${asPoints?' pp':''})`;
 };
 /** Recibe datos ya calculados por dailyGroups y qualityResult; nunca reconstruye métricas. */
-export function buildDailyWhatsAppReport({currentDate,previousDate,current,previous,currentQuality,previousQuality,todayIso}){
+export function buildDailyWhatsAppReport({currentDate,previousDate,current,previous,currentQuality,previousQuality,todayIso,progressText=''}){
   if(!currentDate||!previousDate||currentDate===previousDate||!current||!previous){
     throw new Error('Selecciona dos fechas distintas e importa registros antes de copiar.');
   }
@@ -31,6 +31,10 @@ export function buildDailyWhatsAppReport({currentDate,previousDate,current,previ
   const heading=isTodayVsYesterday?'Reporte general de hoy versus ayer.':`Reporte general del ${fmtDate(currentDate)} versus ${fmtDate(previousDate)}.`;
   const rows=DAILY_WHATSAPP_LABELS.map(([key,label])=>({label,value:fmtCount(current[key]||0),delta:fmtDelta(current[key]||0,previous[key]||0)}));
   const qualityLine=`Calidad  ${fmtPct(currentQuality)}  ${fmtDelta(currentQuality,previousQuality,true)}`;
-  const lines=rows.map(row=>`${row.label}  ${row.value}  ${row.delta}`);
-  return `*${heading}*\n\n\`\`\`\n${lines.join('\n')}\n\`\`\`\n\n${qualityLine}`;
+  // Columnas de ancho fijo en el bloque monoespaciado de WhatsApp.
+  // El espacio entre valores es variable para conservar la alineación.
+  const labelWidth=Math.max(8,...rows.map(row=>row.label.length+1));
+  const numberWidth=Math.max(2,...rows.map(row=>row.value.length));
+  const lines=rows.map(row=>`${row.label.padEnd(labelWidth)}${row.value.padEnd(numberWidth)} ${row.delta}`);
+  return `${progressText?'Buenas noches cierre del. Día.\n':''}*${heading}*\n\n\`\`\`\n${lines.join('\n')}\n\`\`\`\n\n${qualityLine}${progressText?'\n\n'+progressText:''}`;
 }

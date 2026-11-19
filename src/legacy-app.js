@@ -15,6 +15,7 @@ import {HISTORY_KEY,HISTORY_METRICS,HISTORY_DEFAULTS,cleanHistorySettings,analyz
 import {historyReportHtml,historyPrintCss,historyPngPages} from './history-export.js';
 import {createSupervisorStatement,supervisorStatementHtml,SUPERVISOR_STATEMENT_CSS,paintSupervisorStatement} from './supervisor-statement.js';
 import {buildDailyWhatsAppReport} from './daily-whatsapp-report.js';
+import {jefaturaDailyProgress,jefaturaProgressInline,jefaturaProgressReport} from './jefatura-daily-progress.js';
 import { dateAsArchiveName, exportFriendlyText } from './import-date.js';
 import {WEEKLY_ADMIN_DEFAULTS,WEEKLY_ADMIN_STORAGE,cleanWeeklyAdminSettings,preloadWeeklyAdminAssets,cachedWeeklyAdminAssets,renderWeeklyAdminSheets,weeklyAdminPageMarkup,weeklyAdminPrintCss} from './weekly-admin-report.js';
 
@@ -2057,7 +2058,7 @@ function dailyRowMarkup(g,isTotal=false,groupBy='module'){
 function renderDaily(){
   if(!el('dailyModuleRows'))return;
   if(!imported.data){
-    el('dailyCopyWhatsApp').disabled=true;
+    el('dailyCopyWhatsApp').disabled=true;el('dailyCopyGoalProgress').disabled=true;
     el('dailyPeriod').textContent='Importa un archivo XLS';
     el('dailyModulesCount').textContent='—';el('dailyExecutivesCount').textContent='—';
     el('dailyCurrentDate').disabled=true;el('dailyPreviousDate').disabled=true;
@@ -2068,9 +2069,10 @@ function renderDaily(){
     return;
   }
   const dates=dailyDates();
-  if(!dates){el('dailyCopyWhatsApp').disabled=true;return;}
+  if(!dates){el('dailyCopyWhatsApp').disabled=true;el('dailyCopyGoalProgress').disabled=true;return;}
   const hasComparedRows=filterPageSupervisors(imported.data.rows,'daily').some(r=>r.fecha===dates.latest||r.fecha===dates.previous);
   el('dailyCopyWhatsApp').disabled=!hasComparedRows||dates.latest===dates.previous;
+  el('dailyCopyGoalProgress').disabled=!hasComparedRows;
   el('dailyPeriod').textContent=`${fmtDay(dates.latest)} vs. ${fmtDay(dates.previous)}`;
   const previousRows=filterPageSupervisors(imported.data.rows,'daily').filter(r=>r.fecha===dates.previous).length;
   el('dailyDataNotice').textContent=previousRows?`${el('dailyDateMode').value==='auto'?'Comparación automática':'Comparación personalizada'} · ${previousRows} registros en el día comparado.`:'El día comparado no tiene registros en los XLS activos: variación frente a cero.';
@@ -2086,6 +2088,27 @@ function renderDaily(){
 }
 
 
+// V3.0 · Metas de Jefatura efectivamente configuradas para la semana de trabajo.
+// No se inventan cantidades ni se consideran porcentajes predeterminados no capturados.
+function configuredJefaturaDailyGoal(week,metric){
+ const configured=(type,name)=>baseGoals.profiles?.[type==='headquarters'?'headquarters|JEFATURA':`module|${normalizeName(name)}`]?.versions?.some(v=>v.from<=week&&Object.hasOwn(v.goals||{},metric))===true;
+ if(configured('headquarters','Jefatura'))return headquartersGoal(baseGoals,week,metric,baseModuleNames()).value;
+ const modules=baseModuleNames();
+ if(!modules.length||!modules.every(name=>configured('module',name)))return null;
+ return headquartersGoal(baseGoals,week,metric,modules).value;
+}
+function dailyJefaturaSnapshot(date){
+ const week=mondayOf(date);
+ const rows=filterPageSupervisors(historyData(),'daily').map(r=>({
+  fecha:r.fecha,payable:payable(r),regular:isNo(r.guaranteed),
+  dental:isYes(r.dental),p0:isYes(r.p0)
+ }));
+ return jefaturaDailyProgress({date,rows,
+  weeklySalesGoal:configuredJefaturaDailyGoal(week,'sales'),
+  dentalGoalPct:configuredJefaturaDailyGoal(week,'dental'),
+  p0GoalPct:configuredJefaturaDailyGoal(week,'p0')});
+}
+
 // V2.4.8 · Copia el TOTAL de «Por módulo» con el mismo origen de cifras que renderDaily().
 function dailyWhatsAppText(){
   if(!imported.data)throw new Error('Importa un XLS para generar el reporte de WhatsApp.');
@@ -2099,7 +2122,8 @@ function dailyWhatsAppText(){
     current:totals.current,previous:totals.previous,
     currentQuality:qualityResult(totals.currentRows,'module','TOTAL','daily').global,
     previousQuality:qualityResult(totals.previousRows,'module','TOTAL','daily').global,
-    todayIso:dateIso(new Date())
+    todayIso:dateIso(new Date()),
+    progressText:jefaturaProgressInline(dailyJefaturaSnapshot(dates.latest))
   });
 }
 async function copyWhatsAppText(value){
@@ -2130,6 +2154,17 @@ async function copyDailyWhatsApp(){
   finally{button.blur();}
 }
 
+async function copyDailyJefaturaProgress(){
+ const button=el('dailyCopyGoalProgress');
+ try{
+  if(!imported.data)throw Error('Importa registros para generar el avance de Jefatura.');
+  const dates=dailyDates();if(!dates)throw Error('Selecciona una fecha válida para el reporte.');
+  const report=jefaturaProgressReport(dailyJefaturaSnapshot(dates.latest));
+  if(!await copyWhatsAppText(report))throw Error('El navegador bloqueó la copia. Comprueba los permisos del portapapeles.');
+  dailyCopyFeedback('Avance y objetivo de Jefatura copiados al portapapeles.');
+ }catch(error){dailyCopyFeedback(error?.message||'No se pudo copiar el avance.');}
+ finally{button?.blur();}
+}
 
 // V12 · Acumulados independientes de la selección activa. Solo XLS persistidos.
 function accumulatedRows(){
@@ -3247,6 +3282,7 @@ function initNavOrder(){
 function updateFloatingExport(){
  const isDaily=activePage==='daily',isVisit=activePage==='visits',isIncident=activePage==='incidents';
  el('dailyCopyWhatsApp').hidden=!isDaily;
+ el('dailyCopyGoalProgress').hidden=!isDaily;
  el('achCopyCommissionable').hidden=activePage!=='achievements';
  el('floatCsv').hidden=isVisit||activePage==='history'||activePage==='moduleHistory'||activePage==='leadership';
  el('floatPdf').hidden=false;el('floatPng').hidden=false;
@@ -3267,6 +3303,7 @@ function initFloatingExport(){
   else alert('Reporte de folios comisionables copiado al portapapeles.');
  });
  el('dailyCopyWhatsApp').addEventListener('click',close);
+ el('dailyCopyGoalProgress').addEventListener('click',()=>{close();copyDailyJefaturaProgress();});
  updateFloatingExport();
 }
 // V2.6.0 — filtros secundarios de todas las páginas en un único menú flotante.

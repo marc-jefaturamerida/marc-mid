@@ -1,3 +1,17 @@
+## V3.0 · Reportes de avance de Jefatura y validación de visitas (19 de noviembre de 2026)
+
+- **Visitas de coordinación:** se mantiene la corrección previa del backend de Netlify: acepta mapas de criterios/incidencias y valida los límites de 80 criterios, 3 folios y 150 incidencias sin rechazar el formato válido.
+- **Comparativa diaria → Exportar → Copiar para WhatsApp:** conserva las cifras actuales y anteriores y alinea las columnas de texto con anchuras según etiqueta y dato. Al copiar se antepone el texto fijo «Buenas noches cierre del. Día.» y se agrega debajo de Calidad el avance de ventas comisionables acumuladas de lunes a la fecha principal contra la meta semanal de Jefatura: alcance (%), esperado al día (% = días transcurridos/7 × 100) y diferencia entre porcentajes. El reporte no agrega comentario final ni usa el cociente «cumplimiento respecto al esperado».
+- **Nuevo botón Comparativa diaria → Exportar → Copiar avance y objetivo de Jefatura:** copia Ventas, Plan Dental y Plan Cero con alcance, requerido al corte y diferencia. Ventas usa cantidad comisionable acumulada/objetivo semanal; Dental usa ventas con plan dental/ventas comisionables; Plan Cero usa planes cero/ventas regulares comisionables. Los dos últimos son porcentajes de penetración con objetivo semanal fijo (NO se prorratean), mientras que Ventas se compara con el avance de la semana de lunes a domingo.
+- **Datos históricos y metas:** se utilizan los registros deduplicados del historial disponible y los objetivos explícitamente capturados en Jefatura o consolidados desde todos los módulos con metas configuradas para la semana correspondiente. Si no existe una meta vigente, se muestra un guion (—) o aviso, sin inventar objetivos; no se cambian comisiones, validaciones de pago ni la estructura PostgreSQL.
+- **Pruebas:** nueva verificación de formatos y cálculo de reportes; se conserva la verificación de límites de visitas.
+
+## Corrección parcial de validación de visitas y alineación de WhatsApp (19 de noviembre de 2026)
+
+- Netlify /api/visits: acepta el formato real de los criterios e incidencias (objetos por identificador), conservando compatibilidad con listas anteriores. Valida máximo 80 criterios, 3 folios y 150 incidencias, con errores particulares por límite.
+- Comparativa diaria: alinea los indicadores dentro del bloque monoespaciado de WhatsApp, con anchuras calculadas según etiqueta y cifras; no cambia métricas.
+- **Pendiente de confirmar**: texto del saludo/cierre y definición del progreso contra objetivo de Jefatura; aún no se incorporan esos cambios en esta revisión parcial.
+
 ## V3.0 · Ajuste de filtros, alertas y portapapeles (17 de noviembre de 2026)
 
 - **Dashboard de Jefatura:** Menú → Filtros incorpora módulo (afecta consolidado y objetivos del módulo), ejecutivo (acota exclusivamente la tabla de productividad, sin falsear las metas consolidadas), prioridad y categoría de alerta. Se añadió «Restablecer filtros». Se mantiene la semana completa de lunes a domingo.

@@ -183,7 +183,7 @@ assert(!sample.includes('_12/11/2026 vs. 11/11/2026_')); // fechas sin repetirse
 assert.equal((sample.match(/```/g)||[]).length,2);
 const table=sample.split('```')[1].trim().split('\n');
 assert.equal(table.length,6);
-assert(table.every(x=>/^.{1,8}  \S+  \(/.test(x)),'Separación de exactamente dos espacios entre factor, valor y variación');
+assert(table.every(x=>/^.{8}\S.{2,}\(/.test(x)),'Columnas alineadas en WhatsApp');
 assert(table[0].includes('20')&&table[0].includes('(+2)'));
 assert(table[2].includes('10')&&table[2].includes('(-3)'));
 assert(table[4].includes('(0)'));

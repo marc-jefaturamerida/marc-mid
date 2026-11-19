@@ -58,3 +58,10 @@ Desde el botón flotante **Menú → Configuración** se abre una ventana sobre 
 - Logros semanales: **Menú → Exportar → Copiar folios comisionables** en formato `Nombre del módulo` seguido de `fecha, folio`, usando los mismos criterios de validación de pago.
 - Componentes nuevos: `src/report-copy.js`, `public/assets/jm-v301.css`, `tests/validate-v301.mjs` y `tests/validate-clipboard-v301.mjs`.
 - Sin cambios en `netlify/functions`, SQL ni fórmulas de pago. No requiere una nueva migración.
+
+
+## Reportes diarios de Jefatura (19/11/2026)
+
+En Comparativa diaria → Menú → Exportar están **Copiar para WhatsApp** y **Copiar avance y objetivo de Jefatura**. Ambos toman los valores comisionables del histórico al corte de la fecha principal; los porcentajes usan metas base explícitas de Jefatura o metas vigentes de todos los módulos. La primera copia conserva las cifras operativas de la tabla del día, agrega el avance acumulado y no introduce comentarios automáticos. La segunda copia Ventas, Plan Dental y Plan Cero con alcance, requerido y diferencia. Consulte el manual vigente para los denominadores (Dental: ventas comisionables; Plan Cero: regulares comisionables).
+
+La validación de visitas en Netlify acepta listas y mapas para criterios/incidencias; la tabla de datos y las migraciones PostgreSQL permanecen sin cambios. Pruebas de regresión: `npm test`.
