@@ -65,3 +65,8 @@ Desde el botón flotante **Menú → Configuración** se abre una ventana sobre 
 En Comparativa diaria → Menú → Exportar están **Copiar para WhatsApp** y **Copiar avance y objetivo de Jefatura**. Ambos toman los valores comisionables del histórico al corte de la fecha principal; los porcentajes usan metas base explícitas de Jefatura o metas vigentes de todos los módulos. La primera copia conserva las cifras operativas de la tabla del día, agrega el avance acumulado y no introduce comentarios automáticos. La segunda copia Ventas, Plan Dental y Plan Cero con alcance, requerido y diferencia. Consulte el manual vigente para los denominadores (Dental: ventas comisionables; Plan Cero: regulares comisionables).
 
 La validación de visitas en Netlify acepta listas y mapas para criterios/incidencias; la tabla de datos y las migraciones PostgreSQL permanecen sin cambios. Pruebas de regresión: `npm test`.
+
+
+#### Ajuste de reporte: cantidades de Ventas
+
+El botón «Copiar avance y objetivo de Jefatura» en Comparativa diaria ahora indica, junto al porcentaje de Ventas, las ventas comisionables acumuladas y el mínimo de ventas requeridas al corte, redondeado hacia arriba desde la meta semanal prorrateada en siete días. No requiere migraciones SQL.

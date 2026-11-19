@@ -732,3 +732,22 @@ En **Comparativa diaria → Menú → Exportar** hay ahora dos opciones de copia
 Las dos opciones respetan la fecha principal seleccionada y los registros disponibles en el histórico de la cuenta; las ventas consideradas para el avance son **solo comisionables** según la validación de pago vigente, no todas las ventas con código. Si faltan objetivos configurados para la semana en el perfil de Jefatura o en todos los perfiles de módulos, los porcentajes sin meta se muestran como `—` o con un aviso. Las copias requieren permisos de portapapeles del navegador.
 
 En **Visitas de coordinación**, el servidor acepta los criterios e incidencias en el formato de objeto que envía el formulario. Se conservan límites de protección y se muestran mensajes específicos cuando se exceden.
+
+
+### Actualización: cantidades de Ventas en «Copiar avance y objetivo de Jefatura»
+
+En **Comparativa diaria → Menú → Exportar → Copiar avance y objetivo de Jefatura**, la sección Ventas agrega la cantidad de ventas comisionables acumuladas y la cantidad requerida al corte. Ejemplo (meta semanal: 72 ventas; miércoles; acumuladas: 29):
+
+```text
+*Avance y objetivo de la jefatura*
+
+Semana: 16/11/2026 al 22/11/2026
+Corte: 18/11/2026 · 3 de 7 días
+
+*Ventas*
+Alcance: 40.28% (29 ventas)
+Requerido hoy: 42.86% (31 requeridas)
+Diferencia: -2.58%
+```
+
+La cantidad requerida es `redondear hacia arriba(objetivo semanal × días transcurridos / 7)`. Los porcentajes se calculan con los valores exactos antes del redondeo de la cantidad. Si falta la meta semanal, la cantidad requerida no se muestra como un dato inventado. Plan Dental y Plan Cero mantienen el formato de porcentajes vigente.

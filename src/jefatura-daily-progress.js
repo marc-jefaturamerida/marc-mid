@@ -7,6 +7,7 @@
 const fmt = new Intl.NumberFormat('es-MX', {maximumFractionDigits:2});
 const fmtDay = iso => /^\d{4}-\d{2}-\d{2}$/.test(String(iso||'')) ? `${iso.slice(8,10)}/${iso.slice(5,7)}/${iso.slice(0,4)}` : '—';
 const fmtValue = n => Number.isFinite(n) ? `${fmt.format(Number(n.toFixed(2)))}%` : '—';
+const fmtUnits = n => Number.isFinite(n) ? fmt.format(n) : '—';
 const fmtGap = n => Number.isFinite(n) ? `${n>0?'+':''}${fmt.format(Number(n.toFixed(2)))}%` : '—';
 const validGoal = n => typeof n==='number' && Number.isFinite(n) && n>0;
 const monday = iso => {
@@ -30,8 +31,11 @@ export function jefaturaDailyProgress({date,rows=[],weeklySalesGoal=null,dentalG
   const p0=scoped.filter(r=>r.regular===true && r.p0===true).length;
   const saleProgress=validGoal(weeklySalesGoal)?100*sales/weeklySalesGoal:null;
   const requiredSales=validGoal(weeklySalesGoal)?100*elapsed/7:null;
+  // Las ventas no son fraccionables: el umbral mínimo para cumplir el avance
+  // esperado se expresa como un número entero redondeado hacia arriba.
+  const requiredSalesCount=validGoal(weeklySalesGoal)?Math.ceil(weeklySalesGoal*elapsed/7):null;
   return {
-    date,weekStart,weekEnd,elapsed,counts:{sales,regular,dental,p0},
+    date,weekStart,weekEnd,elapsed,counts:{sales,regular,dental,p0},requiredSalesCount,
     sales:metric(saleProgress,requiredSales),
     dental:metric(ratio(dental,sales),validGoal(dentalGoalPct)?dentalGoalPct:null),
     p0:metric(ratio(p0,regular),validGoal(p0GoalPct)?p0GoalPct:null)
@@ -45,18 +49,23 @@ export function jefaturaProgressInline(snapshot){
 }
 export function jefaturaProgressReport(snapshot){
   if(!snapshot)throw Error('Sin información para el avance de Jefatura.');
-  const section=(name,values,note='')=>[
+  const section=(name,values)=>[
     `*${name}*`,
     `Alcance: ${fmtValue(values.actual)}`,
     `Requerido hoy: ${fmtValue(values.required)}`,
-    `Diferencia: ${fmtGap(values.difference)}`,
-    ...(note?[note]:[])
+    `Diferencia: ${fmtGap(values.difference)}`
+  ].join('\n');
+  const salesSection=[
+    '*Ventas*',
+    `Alcance: ${fmtValue(snapshot.sales.actual)} (${fmtUnits(snapshot.counts?.sales)} ventas)`,
+    `Requerido hoy: ${fmtValue(snapshot.sales.required)}${Number.isFinite(snapshot.requiredSalesCount)?` (${fmtUnits(snapshot.requiredSalesCount)} requeridas)`:''}`,
+    `Diferencia: ${fmtGap(snapshot.sales.difference)}`
   ].join('\n');
   return [
     '*Avance y objetivo de la jefatura*',
     `Semana: ${fmtDay(snapshot.weekStart)} al ${fmtDay(snapshot.weekEnd)}`,
     `Corte: ${fmtDay(snapshot.date)} · ${snapshot.elapsed} de 7 días`,
-    section('Ventas',snapshot.sales),
+    salesSection,
     section('Plan Dental',snapshot.dental),
     section('Plan Cero',snapshot.p0)
   ].join('\n\n');

@@ -1,3 +1,10 @@
+## V3.0 · Cantidades de Ventas en el reporte de avance de Jefatura (19 de noviembre de 2026)
+
+- **Comparativa diaria → Exportar → Copiar avance y objetivo de Jefatura:** en Ventas se agrega la cantidad real de ventas comisionables acumuladas junto al porcentaje de alcance, y el número mínimo de ventas requeridas al corte junto al porcentaje esperado.
+- **Requeridas:** se calcula `techo(objetivo semanal de ventas × días transcurridos / 7)`; se redondea hacia arriba porque las ventas son unidades enteras. Los porcentajes mantienen precisión previa y no se alteran.
+- Se conservan los bloques de Plan Dental y Plan Cero con sus porcentajes de penetración, el texto del reporte diario de WhatsApp, las fórmulas de comisiones y el almacenamiento Netlify/PostgreSQL. Sin migración SQL.
+- Se añade prueba del ejemplo de 72 ventas semanales con 29 ventas comisionables acumuladas al miércoles (40.28%, requerido 42.86% = 31 ventas).
+
 ## V3.0 · Reportes de avance de Jefatura y validación de visitas (19 de noviembre de 2026)
 
 - **Visitas de coordinación:** se mantiene la corrección previa del backend de Netlify: acepta mapas de criterios/incidencias y valida los límites de 80 criterios, 3 folios y 150 incidencias sin rechazar el formato válido.
