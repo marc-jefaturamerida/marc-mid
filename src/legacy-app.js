@@ -448,7 +448,7 @@ function drawImportMeta(name){
 // V9 · Base local de reportes XLS (IndexedDB) y selección persistente.
 const ARCHIVE_DB='wmSamsArchivoComisionesV9', ARCHIVE_STORE='reports';
 const ARCHIVE_SELECTION_KEY='wmSamsArchivoSeleccionV9', FOLIO_FLAGS_KEY='wmSamsFolioFlagsV9';
-const archive={db:null,reports:[],selection:{mode:'all',ids:[]},ready:false,tempReports:[],temporaryMode:false};
+const archive={db:null,reports:[],selection:{mode:'all',ids:[]},ready:false,tempReports:[],temporaryMode:false,lastError:''};
 let archiveLoading=null; // Comparte la misma descarga entre inicio e importación; nunca carga dos veces a la vez.
 let recordEdits=readRecordEdits();
 function readRecordEdits(){try{return cleanRecordEdits(JSON.parse(localStorage.getItem(RECORD_EDITS_KEY)||'{}'));}catch(_){return {};}}
@@ -806,7 +806,35 @@ async function importXlsFiles(files){
           // Importante: el archivo NUNCA se envía si el historial completo no está verificado.
           xlsUploadFeedback('Verificando historial y duplicados en Supabase antes de guardar…');
           if(!await ensureArchiveReady()){
-            throw Error('No fue posible recuperar el historial completo de Supabase. No se guardó el XLS. Revisa Ajustes → Archivos XLS guardados → Reintentar historial.');
+            // Cuando el historial no puede descargarse, sólo un catálogo
+            // remoto VERIFICADO Y VACÍO permite iniciar la cuenta desde cero.
+            // Con datos históricos presentes no deben mostrarse sumatorias parciales.
+            if(window.APP_CLOUD?.provider==='supabase' && typeof window.APP_CLOUD.listFileMetadata==='function'){
+              xlsUploadFeedback('Comprobando si existen XLS guardados, sin descargar sus filas…');
+              let meta;
+              try{meta=await window.APP_CLOUD.listFileMetadata();}
+              catch(error){
+                throw Error('No se pudo verificar el catálogo XLS: '+(error?.message||String(error))+'. Causa del historial: '+(archive.lastError||'sin detalle'));
+              }
+              if(meta.length){
+                if(meta.some(r=>r.fingerprint===fingerprint)){
+                  duplicated++;
+                  xlsUploadFeedback('Este XLS ya existe en Supabase. No se duplicó.');
+                  continue;
+                }
+                throw Error(`Supabase tiene ${meta.length} XLS guardado(s), pero no fue posible leerlos para calcular el acumulado. No se guardó ni se borró nada. Detalle: ${archive.lastError||'sin detalle'}. Usa Reintentar historial.`);
+              }
+              // Una lista vacía validada por el servidor significa que la
+              // cuenta no tiene archivos anteriores. Es seguro iniciar su historial.
+              archive.reports=[];
+              archive.ready=true;
+              archive.lastError='';
+              const status=el('archiveLoadStatus');
+              if(status)status.textContent='Historial nuevo verificado: 0 XLS en Supabase.';
+              const retry=el('archiveRetry');if(retry)retry.hidden=true;
+            }else{
+              throw Error('No fue posible recuperar el historial completo. No se guardó el XLS. Detalle: '+(archive.lastError||'sin detalle'));
+            }
           }
           // ensureArchiveReady() puede REEMPLAZAR archive.reports: consultar lista actual.
           if(currentReports().some(r=>r.fingerprint===fingerprint)){
@@ -877,6 +905,7 @@ async function ensureArchiveReady(){
       reports.sort((a,b)=>a.addedAt-b.addedAt||a.id.localeCompare(b.id));
       archive.reports=reports;
       archive.ready=true; // SOLO después de recuperar todas las páginas.
+      archive.lastError='';
       status.textContent=`Historial conectado: ${reports.length} XLS.`;
       // Fallos de renderizado NO son fallos de Netlify Database.
       try { refreshArchiveData(true);window.VISITS?.refreshSources(); }
@@ -885,7 +914,8 @@ async function ensureArchiveReady(){
       return true;
     }catch(error){
       archive.ready=false;
-      status.textContent='No se pudo completar la consulta. Los XLS almacenados no se modificaron.';
+      archive.lastError=error?.message||String(error);
+      status.textContent='Historial XLS incompleto: '+archive.lastError+'. Los archivos existentes no se modificaron.';
       statusBox('Historial no disponible: '+esc(error.message||String(error))+'. Revisa la sesión/conexión y usa «Reintentar historial».','error');
       console.error('Error al descargar historial XLS:',error);
       return false;

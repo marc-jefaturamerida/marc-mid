@@ -260,6 +260,28 @@ async function listFiles(){
   fileSignatures=new Map(reports.map(r=>[r.id,r.fingerprint]));
   return reports;
 }
+/**
+ * Lista ligera y completa de firmas XLS, sin descargar filas de clientes.
+ * GET /files?meta=1 existe en dashboard-api y consulta por owner_id.
+ * No es equivalente a tener cargado el historial para los cálculos.
+ */
+async function listFileMetadata(){
+  if(!user)throw Error('Inicia sesión para verificar el historial de XLS.');
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),20000);
+  try{
+    const payload=await api('files?meta=1',{signal:controller.signal});
+    if(!payload||!Array.isArray(payload.reports))throw Error('La lista de firmas XLS no tiene el formato esperado.');
+    for(const item of payload.reports){
+      if(!item||typeof item.id!=='string'||typeof item.fingerprint!=='string')
+        throw Error('La respuesta de firmas XLS contiene datos incompletos.');
+    }
+    return payload.reports;
+  }catch(error){
+    if(controller.signal.aborted)throw Error('La consulta de firmas XLS agotó el tiempo de espera.');
+    throw error;
+  }finally{clearTimeout(timer);}
+}
 async function putFile(report){
   if(!user)throw Error('Inicia sesión para guardar el XLS en la nube.');
   const result=await api('files',{method:'POST',body:JSON.stringify(report)});
@@ -349,7 +371,7 @@ window.APP_CLOUD={
   provider:'supabase',api,
   get user(){return user;},
   resetAll:async()=>{if(!user)throw Error("Inicia sesión.");await flush();if(pending.size)throw Error("Sincroniza los cambios pendientes primero.");await api("reset",{method:"POST",body:JSON.stringify({confirmation:"RESTABLECER TODO"})});clearDashboardCache();},
-  openLogin,logout:signOut,listFiles,putFile,deleteFile,clearFiles,listIncidents,putIncident,deleteIncident,
+  openLogin,logout:signOut,listFiles,listFileMetadata,putFile,deleteFile,clearFiles,listIncidents,putIncident,deleteIncident,
   registerRefresh:fn=>{refresher=fn;},flush,listTrash,restoreIncident,listAudit,
   listUpdates,createUpdate,changeUpdate,trashUpdate,restoreUpdate,
   get pendingCount(){return pending.size;}
