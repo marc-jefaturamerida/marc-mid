@@ -1,2 +1,6 @@
+
 [functions.dashboard-api]
-verify_jwt = false  # JWT validado explícitamente con Supabase Auth en _shared.js
+verify_jwt = false
+
+[remotes.production]
+project_id = "https://feysztaielfexueulqkn.supabase.co"
