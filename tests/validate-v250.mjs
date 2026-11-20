@@ -120,8 +120,8 @@ assert.equal(capped.net,Math.round((capped.afterPenalty-capped.recover+capped.dy
 // Version stamped uniformly in UI and generated reports.
 const html=fs.readFileSync('index.html','utf8');
 assert(!html.includes('Versión 2.4.2</footer>'));
-assert.equal((html.match(/Versión 3\.0\.4\.3<\/footer>/g)||[]).length,5);
-assert(source.includes("APP_VERSION='3.0.4.3'"));
+assert.equal((html.match(/Versión 3\.0\.4\.4<\/footer>/g)||[]).length,5);
+assert(source.includes("APP_VERSION='3.0.4.4'"));
 assert(source.includes('write(\'Versión \'+APP_VERSION'));
 assert(source.includes('data-sup-include-sales'));
 assert(source.includes('data-dynamic-bonus-id'));
@@ -141,7 +141,7 @@ assert(source.includes("from './supervisor-statement.js'"));
 assert(source.includes('supervisorStatementHtml(model)'));
 assert(source.includes('paintSupervisorStatement(ctx,true,supModel)'));
 for(const term of ['Estado de comisión · Supervisor','Nómina semanal','ALCANCE GLOBAL','Bono por dinámica','Folios propios','ss-pay','@page{size:A4 portrait'])assert(statement.includes(term),`No aparece elemento de diseño: ${term}`);
-assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.4.3');
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.4.4');
 console.log('OK: plantilla de supervisor y motores de exportación vinculados a los mismos cálculos.');
 
 // Contrato real de la exportación: una sola fuente de cifras para PDF y PNG.

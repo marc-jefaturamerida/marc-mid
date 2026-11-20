@@ -1,3 +1,15 @@
+## V3.0.4.4 — 20 de noviembre de 2026
+
+- **Corrección de importación XLS con sesión Supabase:** el guardado deja de depender de `GET /files?meta=1` o de descargar todo el historial, mientras `UNIQUE (owner_id, fingerprint)` y `ON CONFLICT DO NOTHING` evitan duplicar archivos ya almacenados.
+- **Catálogo liviano:** `GET /files?meta=1` solo consulta identidad, firma, nombre, tamaño y fecha de cada XLS; no ejecuta `jsonb_array_length(rows)` sobre todo el catálogo.
+- **Lectura individual estricta:** la ficha del XLS comprueba su estructura; si no contiene arreglos de encabezados y filas válidos, se responde 422 y se conservan todos los datos sin cambios.
+- **Duplicados más claros:** el POST devuelve el identificador del archivo ya almacenado al encontrar una firma idéntica; la interfaz lo identifica como existente y pendiente de lectura cuando corresponda.
+- **Sin modificación de datos previos:** no hay migraciones nuevas, operaciones de reparación automática, borrados ni actualización de filas antiguas. No se cambiaron los cálculos de comisiones.
+- **Pruebas:** casos de alta 201, duplicado 409, error 500 y catálogos incompletos; comprobaciones del motor anterior conservadas.
+- **Limitación:** la compilación y las pruebas de extremo a extremo con el proyecto Supabase real deben confirmarse tras el despliegue de GitHub Pages y `dashboard-api`.
+
+---
+
 ## V3.0.4.3 — Recuperación verificable de XLS (20/11/2026)
 
 - Corrección de la interpretación de «0 guardados, 1 duplicado»: el archivo ya puede estar almacenado, aunque el historial no haya terminado de recuperarse.

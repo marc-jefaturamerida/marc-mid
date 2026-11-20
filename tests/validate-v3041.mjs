@@ -24,11 +24,11 @@ await assert.rejects(loadCompleteHistory(async()=>{const error=Error('Sesión ex
 const code=readFileSync(new URL('../src/legacy-app.js',import.meta.url),'utf8');
 const boot=readFileSync(new URL('../src/cloud-boot.js',import.meta.url),'utf8');
 const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
-assert(code.includes('if(!await ensureArchiveReady())'),'El importador espera a que la descarga de historial termine');
+assert(!code.includes('if(!await ensureArchiveReady())'),'El guardado atomico no bloquea la carga esperando el historial');
 assert(code.includes('if(archiveLoading)return archiveLoading;'),'Una sola descarga para inicio e importación');
 assert(code.includes('archive.ready=true; // SOLO después de recuperar todas las páginas.'),'Disponibilidad marcada al terminar la descarga');
 assert(code.indexOf('await ensureArchiveReady();',code.indexOf('async function initArchive()'))<code.indexOf('await refreshIncidents(true)',code.indexOf('async function initArchive()')),'Incidencias no bloquean la carga inicial de XLS');
 assert(html.includes('id="archiveRetry"')&&html.includes('id="archiveLoadStatus"'),'Reintento visible y estado de descarga');
 assert(boot.includes('loadCompleteHistory('),'Descarga paginada robusta');
-assert.equal(JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8')).version,'3.0.4.3');
-console.log('V3.0.4.3: recuperación por páginas, errores, reintento, carrera al importar y aislamiento de incidencias OK');
+assert.equal(JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8')).version,'3.0.4.4');
+console.log('V3.0.4.4: descarga robusta independiente del guardado atomico, reintento y aislamiento de incidencias OK');

@@ -1,4 +1,8 @@
-# JEFATURA MID MARC V3.0.4.3 — GitHub Pages + Supabase
+# JEFATURA MID MARC 3.0.4.4
+
+La versión 3.0.4.4 corrige el bloqueo de importación XLS cuando la consulta del catálogo o algún archivo histórico no puede recuperarse. Se conserva la verificación atómica de duplicados por cuenta mediante `UNIQUE(owner_id,fingerprint)`, sin cambios de tablas ni fórmulas. La recuperación íntegra sigue siendo obligatoria para los cálculos.
+
+# JEFATURA MID MARC V3.0.4.4 — GitHub Pages + Supabase
 
 **Este ZIP es un proyecto completo, no un parche.** Incluye `.github/workflows/github-pages.yml`, `index.html`, `src/`, `tests/`, `public/` y `supabase/`, además del respaldo Netlify.
 
@@ -6,7 +10,7 @@ Lee **INICIAR_AQUI.md** para sustituir el repositorio en un único commit. El ca
 
 Causa y solución de «0 nuevos · 1 duplicado»: significa que el XLS ya está guardado; el cliente ahora distingue un duplicado existente de un error de recuperación y descarga archivos grandes por bloques tras actualizar `dashboard-api`.
 
-Manual completo: `MANUAL_USUARIO_JEFATURA_MID_MARC_V3043.md`.
+Manual completo: `MANUAL_USUARIO_JEFATURA_MID_MARC_V3044.md`.
 
 ---
 
@@ -27,7 +31,7 @@ Estado activo/inactivo junto a los objetivos de cada módulo o ejecutivo; alerta
 - `src/team-registry.js`, `src/base-goals.js`, `src/goals-workflow.js`: catálogo, alias, estados y objetivos por vigencia.
 - `src/cloud-boot.js` y `netlify/functions/settings.js`: revisiones de sincronización y prevención de sobrescrituras.
 - `netlify/functions/incidents.js`, `netlify/functions/audit.js` y migración V2.7: incidencias recuperables y auditoría.
-- `MANUAL_USUARIO_JEFATURA_MID_MARC_V304.md` y `public/MANUAL_JEFATURA_MID_MARC_V304.pdf`: documentación vigente.
+- `MANUAL_USUARIO_JEFATURA_MID_MARC_V3044.md` y `public/MANUAL_JEFATURA_MID_MARC_V3044.pdf`: documentación vigente.
 - `netlify/functions/updates.js`, `src/updates-ui.js`, `src/update-request-rules.js` y migración V2.7.1: solicitudes por registro, filtro, historial, resolución y recordatorios lunes a miércoles.
 - `tests`: regresiones antiguas + nuevas verificaciones V3.0.
 

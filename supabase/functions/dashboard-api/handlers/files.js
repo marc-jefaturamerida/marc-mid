@@ -24,26 +24,35 @@ export default async function handler(request) {
       const reportId=url.searchParams.get('id')||'';
       if(url.searchParams.get('meta')==='1') {
         // Metadatos completos, sin traer las filas crudas de los clientes.
-        const meta=await db.sql`SELECT id, fingerprint, file_name, file_size, added_at,
-          jsonb_array_length(rows) AS row_count
+        // El catálogo sólo enumera firmas. Nunca debe fallar porque un XLS
+        // grande o antiguo tenga filas incompletas: la integridad se comprueba
+        // individualmente en ?part=info y antes de incluirlo en cálculos.
+        const meta=await db.sql`SELECT id, fingerprint, file_name, file_size, added_at
           FROM dashboard_reports WHERE owner_id=${owner} ORDER BY added_at ASC, id ASC`;
         return send({reports:meta.map(r=>({id:r.id,fingerprint:r.fingerprint,
-          name:r.file_name,size:r.file_size,addedAt:Number(r.added_at),rowCount:Number(r.row_count)})),protocol:2});
+          name:r.file_name,size:r.file_size,addedAt:Number(r.added_at)})),protocol:2});
       }
       if(part==='info'||part==='rows') {
         if(!/^xls_[\w-]{5,90}$/.test(reportId))return send({error:'Identificador de XLS inválido.'},400);
         const info=await db.sql`SELECT id,file_name,file_size,fingerprint,headers,added_at,
-          jsonb_array_length(rows) AS row_count
+          CASE WHEN jsonb_typeof(rows)='array' THEN jsonb_array_length(rows) ELSE NULL END AS row_count
           FROM dashboard_reports WHERE owner_id=${owner} AND id=${reportId} LIMIT 1`;
         if(!info.length)return send({error:'No se encontró el XLS en tu cuenta.'},404);
-        const item=info[0],total=Number(item.row_count);
+        const item=info[0];
+        if(!Array.isArray(item.headers)||item.row_count===null||Number(item.row_count)<1){
+          console.error('files: XLS previo con estructura incompleta',reportId);
+          return send({error:'Este XLS almacenado tiene encabezados o filas incompletos. Se ha conservado sin modificaciones.',id:reportId},422);
+        }
+        const total=Number(item.row_count);
         if(part==='info')return send({report:{id:item.id,name:item.file_name,size:item.file_size,
           fingerprint:item.fingerprint,headers:item.headers,addedAt:Number(item.added_at),rowCount:total}});
         const offset=Math.max(0,Math.min(50000,Math.floor(Number(url.searchParams.get('offset')||0))));
         const limit=Math.max(1,Math.min(500,Math.floor(Number(url.searchParams.get('limit')||250))));
         const data=await db.sql`SELECT COALESCE(jsonb_agg(e.value ORDER BY e.ordinality),'[]'::jsonb) AS chunk
           FROM dashboard_reports r
-          CROSS JOIN LATERAL jsonb_array_elements(r.rows) WITH ORDINALITY AS e(value,ordinality)
+          CROSS JOIN LATERAL jsonb_array_elements(
+            CASE WHEN jsonb_typeof(r.rows)='array' THEN r.rows ELSE '[]'::jsonb END
+          ) WITH ORDINALITY AS e(value,ordinality)
           WHERE r.owner_id=${owner} AND r.id=${reportId}
           AND e.ordinality > ${offset} AND e.ordinality <= ${offset+limit}`;
         const chunk=data[0]?.chunk;
@@ -77,7 +86,12 @@ export default async function handler(request) {
         (owner_id,id,file_name,file_size,fingerprint,headers,rows,added_at)
         VALUES (${owner},${r.id},${r.name},${Math.max(0,Math.round(Number(r.size)||0))},${r.fingerprint},${JSON.stringify(r.headers)}::jsonb,${JSON.stringify(r.rows)}::jsonb,${Math.floor(Number(r.addedAt))})
         ON CONFLICT (owner_id,fingerprint) DO NOTHING RETURNING id`;
-      if(!rows.length) return send({error:'Este mismo XLS ya está almacenado en la cuenta.'},409);
+      if(!rows.length){
+        const original=await db.sql`SELECT id,file_name,added_at FROM dashboard_reports
+          WHERE owner_id=${owner} AND fingerprint=${r.fingerprint} LIMIT 1`;
+        return send({error:'Este mismo XLS ya está almacenado en la cuenta.',
+          storedId:original[0]?.id||null,storedName:original[0]?.file_name||null},409);
+      }
       return send({ok:true,id:rows[0].id},201);
     }
     if(request.method==='DELETE') {

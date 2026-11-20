@@ -1,4 +1,4 @@
-## Actualización obligatoria para V3.0.4.3
+## Actualización obligatoria para V3.0.4.4
 
 La nueva recuperación de XLS requiere **desplegar `supabase/functions/dashboard-api`**, además de publicar GitHub Pages. Si instalaste la integración oficial de GitHub con Supabase, confirma que el despliegue de producción de la Edge Function se ejecutó correctamente. No hace falta ninguna migración SQL nueva ni borrar XLS existentes.
 

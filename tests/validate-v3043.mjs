@@ -28,7 +28,7 @@ await assert.rejects(loadChunkedHistory(async()=>[...meta,...meta],async()=>null
 await assert.rejects(loadChunkedHistory(async()=>meta,async id=>({id,fingerprint:'DISTINTA',headers:[],rowCount:5}),async()=>null),/no coincide/);
 await assert.rejects(loadChunkedHistory(async()=>meta,async id=>({id,fingerprint:'abc123',headers:[],rowCount:5}),async (id,offset)=>({id,rows:[['x']],totalRows:5,nextOffset:offset+2}),{pageSize:1}),/inconsistente/);
 assert(cloud.includes('loadChunkedHistory(')&&cloud.includes("files?part=rows&id=")&&cloud.includes("files?part=info&id="));
-assert(handler.includes("part==='info'||part==='rows'")&&handler.includes('jsonb_array_elements(r.rows)')&&handler.includes("protocol:2"));
+assert(handler.includes("part==='info'||part==='rows'")&&handler.includes('jsonb_array_elements(')&&handler.includes("protocol:2"));
 assert(handler.includes('UNIQUE')===false,'No cambia el esquema; la restricción única pertenece a la migración SQL');
 const sql=readFileSync(new URL('../supabase/migrations/20261120050000_dashboard_complete.sql',import.meta.url),'utf8');
 assert(sql.includes('UNIQUE (owner_id, fingerprint)'), 'El servidor ya bloquea firmas duplicadas por usuario');

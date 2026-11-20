@@ -39,5 +39,5 @@ for(const key of [LEADERSHIP_KEY]){assert(cloud.includes(key));assert(settings.i
 for(const id of ['leaderPeriod','leaderFrom','leaderKpis','leaderModuleRows','leaderPeopleRows','leaderQualityCards','leaderTrend','leaderProjection','leaderAlerts','leaderActionRows','settingsLeadershipV256','lsSave'])assert(html.includes('id="'+id+'"'),id);
 assert(app.includes("activePage==='leadership'"));assert(app.includes('buildLeadershipReport()'));assert(app.includes('exportLeadershipPng()'));
 assert(app.includes('switchPage(pageNavigation.home)'));
-assert(JSON.parse(fs.readFileSync('package.json','utf8')).version==='3.0.4.3');
+assert(JSON.parse(fs.readFileSync('package.json','utf8')).version==='3.0.4.4');
 console.log('V2.5.6: consolidación, límites de calidad, faltantes, riesgos, proyección, alertas, acciones, PDF y sincronización: OK.');

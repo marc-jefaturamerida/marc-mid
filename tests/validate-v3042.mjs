@@ -32,122 +32,53 @@ assert(app.includes('const displayed=temporary?archive.tempReports:(pendingRemot
 assert(app.includes('const selected=[...event.target.files||[]];'),'Conservar selección durante cargas asíncronas');
 
 
-// Regresión autenticada: la vista previa NO debe esperar la descarga del historial.
-// Simulación aislada del orquestador de XLS sin datos ni credenciales reales.
+// V3.0.4.4: el servidor, y no un GET del historial, verifica duplicados
+// atomicamente mediante UNIQUE(owner_id,fingerprint). No se muestran cálculos
+// si hay un XLS antiguo que no pudo recuperarse completamente.
 {
  const {runInNewContext}=await import('node:vm');
  const source=app.slice(app.indexOf('function xlsUploadFeedback('),app.indexOf('/** Verifica el historial entero antes de admitir XLS nuevos',app.indexOf('function xlsUploadFeedback(')));
- const events=[];
- let historyReady;
- const nodes={xlsInput:{value:'selected'},xlsUploadFeedback:{hidden:true,textContent:'',dataset:{}}};
- const archive={ready:false,reports:[],metadata:[],tempReports:[],temporaryMode:false};
- const ctx={
-  archive,el:id=>nodes[id]||null,number:new Intl.NumberFormat('es-MX'),XLS_LIMIT:30*1024*1024,
-  isAuthorized:()=>true,bytesFingerprint:()=> 'test-fingerprint',
-  parseExcelFile:async()=>{events.push('parse');return {headers:['Módulo'],rows:[{raw:['Prueba']}],missingOptional:[]};},
-  confirmImportPreview:async(_data,_name,_existing,pending)=>{events.push('preview'+(pending?'-pending':''));return true;},
-  ensureArchiveReady:async()=>{events.push('history');await new Promise(resolve=>historyReady=resolve);archive.ready=true;return true;},
-  chooseImportArchiveDate:async()=>{events.push('date');return '2026-11-20';},
-  archivePut:async()=>{events.push('save');},
-  loadFolioFlags:()=>{},renderArchiveList:()=>{},refreshArchiveData:()=>{},refreshIncidents:async()=>{},
-  requestGoalAudit:()=>{},window:{VISITS:{refreshSources:()=>{}}},
-  statusBox:()=>{},esc:String,imported:{data:null},
-  console,Math,Date,Error,Number,String,Set,Array,Promise
- };
- runInNewContext(source+'\nthis.runImport=importXlsFiles;',ctx);
- const file={name:'prueba.xls',size:100,arrayBuffer:async()=>Uint8Array.of(1).buffer};
- const task=ctx.runImport([file]);
- await new Promise(resolve=>setImmediate(resolve));
- assert(events.includes('preview-pending'),'Debe abrir vista previa sin esperar historial de Supabase');
- assert(events.includes('history'),'Tras aprobar vista previa debe verificar historial');
- assert(!events.includes('save'),'No guarda sin verificar historial remoto completo');
- historyReady();await task;
- assert(events.includes('save'),'Guarda después de confirmar historial');
- assert(events.indexOf('preview-pending')<events.indexOf('history')&&events.indexOf('history')<events.indexOf('save'),'Secuencia: vista previa, historial, guardar');
- assert.equal(nodes.xlsUploadFeedback.dataset.kind,'success','El estado final es visible junto a Cargar XLS');
- assert.equal(archive.reports.length,1);
-}
-assert(html.includes('id="xlsUploadFeedback"'),'Aviso de carga debe ser visible en la barra principal');
-assert(app.includes('if(!await ensureArchiveReady())'),'Sigue verificando el historial antes de guardar XLS autenticados');
-assert(boot.includes('controller.abort(),20000'),'GET /files tiene tiempo máximo para evitar bloqueo indefinido');
-console.log('V3.0.4.3 hotfix XLS con sesión: vista previa antes de historial, sin guardado inseguro: OK');
-
-// Falla de GET /files: jamás hacer POST; el error debe quedar visible fuera de otra sección.
-{
- const {runInNewContext}=await import('node:vm');
- const source=app.slice(app.indexOf('function xlsUploadFeedback('),app.indexOf('/** Verifica el historial entero antes de admitir XLS nuevos',app.indexOf('function xlsUploadFeedback(')));
- let writes=0,previewed=false;
- const archive={ready:false,reports:[],metadata:[],tempReports:[],temporaryMode:false};
- const nodes={xlsInput:{value:'selected'},xlsUploadFeedback:{hidden:true,textContent:'',dataset:{}}};
- const ctx={
-  archive,el:id=>nodes[id]||null,number:new Intl.NumberFormat('es-MX'),XLS_LIMIT:30*1024*1024,
-  isAuthorized:()=>true,bytesFingerprint:()=> 'test-fingerprint-2',
-  parseExcelFile:async()=>({headers:['Módulo'],rows:[{raw:['Prueba']}],missingOptional:[]}),
-  confirmImportPreview:async()=>{previewed=true;return true;},
-  ensureArchiveReady:async()=>false,
-  chooseImportArchiveDate:async()=>{throw Error('No debe solicitar fecha cuando el historial falla');},
-  archivePut:async()=>{writes++;},
-  loadFolioFlags:()=>{},renderArchiveList:()=>{},refreshArchiveData:()=>{},refreshIncidents:async()=>{},
-  requestGoalAudit:()=>{},window:{VISITS:{refreshSources:()=>{}}},
-  statusBox:()=>{},esc:String,imported:{data:null},
-  console,Math,Date,Error,Number,String,Set,Array,Promise
- };
- runInNewContext(source+'\nthis.runImport=importXlsFiles;',ctx);
- await ctx.runImport([{name:'prueba.xls',size:100,arrayBuffer:async()=>Uint8Array.of(1).buffer}]);
- assert(previewed,'La vista previa no queda secuestrada por un GET /files fallido');
- assert.equal(writes,0,'No debe guardar archivos sin verificar historial');
- assert.equal(nodes.xlsUploadFeedback.dataset.kind,'error','Un error debe mostrarse junto al botón');
- assert.match(nodes.xlsUploadFeedback.textContent,/No se completó la carga/);
-}
-console.log('V3.0.4.3 hotfix XLS con sesión: error visible y cero escrituras si historial falla: OK');
-
-// Recuperación segura cuando GET /files responde pero el cliente no puede validar
-// su contenido: usar solamente firmas verificadas, nunca asumir historial vacío.
-{
- const {runInNewContext}=await import('node:vm');
- const source=app.slice(app.indexOf('function xlsUploadFeedback('),app.indexOf('/** Verifica el historial entero antes de admitir XLS nuevos',app.indexOf('function xlsUploadFeedback(')));
- const makeContext=(meta,fail=false)=>{
-  const events=[];
-  const archive={ready:false,reports:[],metadata:[],tempReports:[],temporaryMode:false,lastError:'El formato de los reportes no es válido'};
-  const nodes={xlsInput:{value:'selected'},xlsUploadFeedback:{hidden:true,textContent:'',dataset:{}},archiveLoadStatus:{textContent:''},archiveRetry:{hidden:false}};
-  const ctx={
-   archive,el:id=>nodes[id]||null,number:new Intl.NumberFormat('es-MX'),XLS_LIMIT:30*1024*1024,
-   isAuthorized:()=>true,bytesFingerprint:()=> 'archivo-firma-123',
-   parseExcelFile:async()=>({headers:['Módulo'],rows:[{raw:['Prueba']}],missingOptional:[]}),
-   confirmImportPreview:async()=>true,ensureArchiveReady:async()=>false,
-   chooseImportArchiveDate:async()=> '2026-11-20',
-   archivePut:async()=>{events.push('post');},
+ function context({ready=false,duplicates=[],postError=null}={}){
+  const events=[],statuses=[];
+  const archive={ready,reports:[],metadata:duplicates,tempReports:[],temporaryMode:false,selection:{mode:'all',ids:[]}};
+  const nodes={xlsInput:{value:'selected'},xlsUploadFeedback:{hidden:true,textContent:'',dataset:{}}};
+  const ctx={archive,el:id=>nodes[id]||null,number:new Intl.NumberFormat('es-MX'),XLS_LIMIT:30*1024*1024,
+   isAuthorized:()=>true,bytesFingerprint:()=> 'test-fingerprint',
+   parseExcelFile:async()=>{events.push('parse');return {headers:['Módulo'],rows:[{raw:['Prueba']}],missingOptional:[]};},
+   confirmImportPreview:async()=>{events.push('preview');return true;},
+   ensureArchiveReady:async()=>{events.push('history');throw Error('No deberia consultar el historial');},
+   chooseImportArchiveDate:async()=>{events.push('date');return '2026-11-20';},
+   archivePut:async()=>{events.push('post');if(postError)throw postError;},
    loadFolioFlags:()=>{},renderArchiveList:()=>{},refreshArchiveData:()=>{},refreshIncidents:async()=>{},
-   requestGoalAudit:()=>{},window:{APP_CLOUD:{provider:'supabase',listFileMetadata:async()=>{
-     events.push('meta');if(fail)throw Error('Error en la API metadata');return meta;
-   }},VISITS:{refreshSources:()=>{}}},
-   statusBox:()=>{},esc:String,imported:{data:null},console,
-   Math,Date,Error,Number,String,Set,Array,Promise
+   requestGoalAudit:()=>{},window:{VISITS:{refreshSources:()=>{}}},
+   statusBox:x=>statuses.push(x),esc:String,imported:{data:null},
+   console:{error:()=>{},warn:()=>{},log:()=>{}},Math,Date,Error,Number,String,Set,Array,Promise
   };
   runInNewContext(source+'\nthis.runImport=importXlsFiles;',ctx);
-  return {ctx,archive,nodes,events};
- };
+  return {ctx,archive,nodes,events,statuses};
+ }
  const file={name:'prueba.xls',size:100,arrayBuffer:async()=>Uint8Array.of(1).buffer};
- const empty=makeContext([]);
- await empty.ctx.runImport([file]);
- assert.deepEqual(empty.events,['meta','post'],'Una cuenta sin historial verificado puede importar su primer XLS');
- assert.equal(empty.archive.ready,true,'El catálogo vacío confirmado permite inicializar el historial');
- assert.equal(empty.archive.reports.length,1);
- const duplicate=makeContext([{id:'xls_valid_1',fingerprint:'archivo-firma-123'}]);
- await duplicate.ctx.runImport([file]);
- assert.deepEqual(duplicate.events,['meta'],'Un duplicado remoto no hace POST');
- assert.match(duplicate.nodes.xlsUploadFeedback.textContent,/YA ESTÁ GUARDADO/,'El usuario sabe que el XLS existe en la nube');
- const existing=makeContext([{id:'xls_valid_1',fingerprint:'otro-archivo-firma'}]);
- await existing.ctx.runImport([file]);
- assert.deepEqual(existing.events,['meta','post'],'El catálogo verificado autoriza guardar XLS NUEVOS aunque otro esté pendiente de lectura');
- assert.equal(existing.archive.ready,false,'No presenta sumatorias parciales como completas');
- assert.equal(existing.archive.reports.length,0,'No incorpora filas aisladas a los cálculos');
- assert.equal(existing.archive.metadata.length,2,'Conserva ambos XLS en el catálogo de la cuenta');
- const failure=makeContext([],true);
- await failure.ctx.runImport([file]);
- assert.deepEqual(failure.events,['meta'],'Fallo de metadatos no autoriza escrituras');
- assert.match(failure.nodes.xlsUploadFeedback.textContent,/Error en la API metadata/);
- assert(boot.includes("api('files?meta=1'"),'El adaptador Supabase debe consultar los metadatos autenticados');
- assert(boot.includes('listFiles,listFileMetadata,putFile'),'La API expone listFileMetadata');
- console.log('Hotfix historial meta: cuenta vacía, duplicados, historial previo y fallo de conexión: OK');
+ const normal=context();await normal.ctx.runImport([file]);
+ assert.deepEqual(normal.events,['parse','preview','date','post'],'El XLS debe guardarse sin depender de una consulta de historial fallida');
+ assert.equal(normal.archive.reports.length,0,'Si el historial anterior es incompleto, no participa en calculos');
+ assert.equal(normal.archive.metadata.length,1,'El nuevo XLS se agrega a la lista de pendientes');
+ assert.equal(normal.nodes.xlsUploadFeedback.dataset.kind,'success','Se informa guardado confirmado');
+ const conflict=Error('Archivo duplicado');conflict.status=409;conflict.storedId='xls_servidor';conflict.storedName='guardado.xls';
+ const existed=context({postError:conflict});await existed.ctx.runImport([file]);
+ assert(existed.events.includes('post'),'Duplicados remotos verificados por DB, sin depender de GET de catalogo');
+ assert.equal(existed.archive.reports.length,0,'No se crea archivo duplicado en memoria');
+ assert.equal(existed.archive.metadata[0].id,'xls_servidor','El conflicto identifica el XLS que ya existe');
+ assert.match(existed.nodes.xlsUploadFeedback.textContent,/YA ESTABAN guardados|YA ESTÁ GUARDADO/);
+ const already=context({duplicates:[{id:'xls_antes',fingerprint:'test-fingerprint'}],postError:conflict});
+ await already.ctx.runImport([file]);
+ assert(already.events.includes('post'),'Un catalogo no confirmado nunca sustituye la verificacion atomica del servidor');
+ assert.equal(already.archive.reports.length,0,'El servidor impide duplicados y no se alteran calculos');
+ const broken=context({postError:Object.assign(Error('Database failure'),{status:500})});
+ await broken.ctx.runImport([file]);
+ assert.equal(broken.archive.metadata.length,0,'Fallo POST nunca es marcado como guardado');
+ assert.match(broken.nodes.xlsUploadFeedback.textContent,/Database failure/,'El error de base de datos se muestra');
+ assert(!broken.events.includes('history'),'La carga no espera la descarga completa');
 }
+assert(html.includes('id="xlsUploadFeedback"'));
+assert(boot.includes('loadChunkedHistory('));
+console.log('V3.0.4.4: archivo nuevo, duplicado remoto, catalogo parcial y error POST con pruebas de estado OK');

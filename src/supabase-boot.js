@@ -127,7 +127,11 @@ async function api(endpoint,options={}){
  let res=await request();
  if(res.status===401&&user){try{await refreshSession();}catch(_){}res=await request();}
  let data;try{data=await res.json();}catch(_){throw Error(`Supabase devolvió datos no válidos (${res.status}).`);}
- if(!res.ok){const err=Error(data?.error||`Solicitud rechazada (${res.status})`);err.status=res.status;throw err;}
+ if(!res.ok){const err=Error(data?.error||`Solicitud rechazada (${res.status})`);
+  err.status=res.status;
+  if(res.status===409&&typeof data?.storedId==='string')err.storedId=data.storedId;
+  if(res.status===409&&typeof data?.storedName==='string')err.storedName=data.storedName;
+  throw err;}
  return data;
 }
 function pendingKey(){return PENDING_PREFIX+user.id;}

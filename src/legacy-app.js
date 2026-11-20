@@ -57,7 +57,7 @@ import {WEEKLY_ADMIN_DEFAULTS,WEEKLY_ADMIN_STORAGE,cleanWeeklyAdminSettings,prel
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='3.0.4.3';
+  const APP_VERSION='3.0.4.4';
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -800,7 +800,7 @@ async function importXlsFiles(files){
       xlsUploadFeedback(`${fileName}: ya se encontraba guardado en Supabase y está disponible para consultar. No se creó otra copia.`,'info');
     }else{
       const msg=`${fileName}: Supabase confirma que este XLS YA ESTÁ GUARDADO, pero aún falta recuperarlo para mostrarlo. No se duplicó. Usa «Reintentar historial».`;
-      failures.push(msg);xlsUploadFeedback(msg,'error');
+      warnings.push(msg);xlsUploadFeedback(msg,'info');
     }
   };
   try{
@@ -821,45 +821,18 @@ async function importXlsFiles(files){
         const confirmed=await confirmImportPreview(data,file.name,currentReports(),persistent&&!archive.ready);
         if(!confirmed){cancelled++;xlsUploadFeedback('Importación cancelada. No se envió ningún dato.');continue;}
         if(persistent){
-          // Verificar primero firmas existentes; el servidor también impide duplicados.
-          xlsUploadFeedback('Verificando historial y duplicados en Supabase antes de guardar…');
-          if(!await ensureArchiveReady()){
-            // Sin descarga completa: aceptar guardados nuevos tras comprobar el
-            // catálogo remoto, pero NO calcular sumatorias hasta leer todo.
-            if(window.APP_CLOUD?.provider==='supabase' && typeof window.APP_CLOUD.listFileMetadata==='function'){
-              xlsUploadFeedback('Comprobando si existen XLS guardados, sin descargar sus filas…');
-              let meta;
-              try{meta=await window.APP_CLOUD.listFileMetadata();}
-              catch(error){
-                throw Error('No se pudo verificar el catálogo XLS: '+(error?.message||String(error))+'. Causa del historial: '+(archive.lastError||'sin detalle'));
-              }
-              archive.metadata=meta;
-              renderArchiveList();
-              if(meta.some(r=>r.fingerprint===fingerprint)){
-                markStoredDuplicate(file.name,fingerprint);
-                continue;
-              }
-              // Guardar XLS NUEVOS es seguro: el servidor valida el usuario y
-              // UNIQUE(owner_id,fingerprint). Aun así NO presentar cálculos parciales
-              // mientras sigan sin recuperarse los XLS antiguos.
-              if(meta.length){
-                xlsUploadFeedback(`Hay ${meta.length} XLS anteriores pendientes de lectura; el archivo nuevo se guardará sin alterar ese historial.`);
-              }else{
-                // Catálogo realmente vacío: se puede construir el primer acumulado.
-                archive.reports=[];
-                archive.ready=true;
-                archive.lastError='';
-                const status=el('archiveLoadStatus');
-                if(status)status.textContent='Historial nuevo verificado: 0 XLS en Supabase.';
-                const retry=el('archiveRetry');if(retry)retry.hidden=true;
-              }
-            }else{
-              throw Error('No fue posible recuperar el historial completo. No se guardó el XLS. Detalle: '+(archive.lastError||'sin detalle'));
-            }
-          }
-          // ensureArchiveReady() puede REEMPLAZAR archive.reports: consultar lista actual.
-          if(currentReports().some(r=>r.fingerprint===fingerprint)){
+          // La descarga del historial se necesita para CALCULAR, pero nunca para
+          // GUARDAR un XLS nuevo. La base comprueba duplicados atómicamente con
+          // UNIQUE(owner_id,fingerprint); no se elimina ni reemplaza nada.
+          // El catálogo puede fallar si hay un XLS antiguo incompleto o grande.
+          // No se permite usar historiales parciales en sumatorias.
+          if(archive.ready && currentReports().some(r=>r.fingerprint===fingerprint)){
             markStoredDuplicate(file.name,fingerprint);continue;
+          }
+          // Un catálogo parcial puede estar desactualizado. Para historiales
+          // pendientes decide el servidor, nunca una copia local de metadatos.
+          if(!archive.ready){
+            xlsUploadFeedback('El historial anterior no está completo. El servidor verificará duplicados al guardar este XLS; los cálculos seguirán bloqueados.');
           }
         }
         const displayName=await chooseImportArchiveDate(file.name);
@@ -873,7 +846,12 @@ async function importXlsFiles(files){
           try { await archivePut(record); }
           catch(error){
             if(error?.status===409){
-              try{archive.metadata=await window.APP_CLOUD.listFileMetadata();}catch(_){/* El servidor ya confirmó el duplicado. */}
+              // El servidor confirmó el conflicto por la clave única de PostgreSQL.
+              // No es necesario recuperar el catálogo para probar el duplicado.
+              if(!archive.ready && error.storedId && !archive.metadata.some(r=>r.id===error.storedId)){
+                archive.metadata.push({id:error.storedId,fingerprint,name:error.storedName||file.name});
+                renderArchiveList();
+              }
               markStoredDuplicate(file.name,fingerprint);continue;
             }
             throw error;
@@ -920,7 +898,7 @@ async function importXlsFiles(files){
       statusBox(esc(resultText+' Errores: '+failures.join('; ')),'error');
       xlsUploadFeedback('No se completó la carga: '+failures.join('; '),'error');
     }else if(added||duplicated||cancelled){
-      statusBox(esc(resultText)+` ${number.format(imported.data?.rows.length||0)} registros únicos en uso.`+(warnings.length?` <span class="muted">Avisos: ${esc(warnings.join('; '))}.</span>`:''),'success');
+      statusBox(esc(resultText)+` ${number.format(imported.data?.rows.length||0)} registros únicos en uso.`+(warnings.length?` <span class="muted">Avisos: ${esc(warnings.join('; '))}.</span>`:''),added?'success':'info');
       xlsUploadFeedback(added?`${added} XLS guardado(s) en Supabase.${savedWaiting?' Historial pendiente de leer: no se mostrarán cálculos parciales.':''}`:resultText,added?'success':'info');
     }
   }finally{
