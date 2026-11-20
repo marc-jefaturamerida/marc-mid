@@ -755,12 +755,12 @@ function chooseImportArchiveDate(fileName){
     dialog.addEventListener('keydown',escapeKey);
   });
 }
-function confirmImportPreview(data,fileName,existing){
+function confirmImportPreview(data,fileName,existing,historyPending=false){
  const report=analyzeImportPreview(data,existing),dialog=el('importPreviewOverlay');
  const host=el('importPreviewBody');if(!dialog||!host)return Promise.resolve(true);
  const ths=['Fecha','Folio','Módulo','Ejecutivo','Código'];
  const row=r=>[r.fecha,r.folio,r.module,r.executive,r.code].map(v=>`<td>${esc(v||'—')}</td>`).join('');
- host.innerHTML=`<p><strong>${esc(fileName)}</strong> · ${number.format(report.total)} filas</p><div class="preview-metrics">`+
+ host.innerHTML=`<p><strong>${esc(fileName)}</strong> · ${number.format(report.total)} filas</p>${historyPending?'<p class="settings-help"><strong>Importante:</strong> el historial en línea sigue cargando. Los duplicados remotos se comprobarán antes de guardar el archivo.</p>':''}<div class="preview-metrics">`+
  [['Duplicados en archivo',report.duplicatesInside],['Ya presentes en historial',report.duplicatesInHistory],['Sin fecha válida',report.missingDate],['Sin folio',report.missingFolio],['Sin código',report.missingCode]].map(([l,v])=>`<div><b>${v}</b><span>${esc(l)}</span></div>`).join('')+
  `</div><p class="settings-help">Columnas opcionales faltantes: ${esc(report.optionalMissing.join(', ')||'Ninguna')}. La importación conserva las filas originales; no elimina datos ni altera reglas de comisiones. Los posibles duplicados son advertencias para revisión.</p><div class="preview-table-wrap"><table><thead><tr>${ths.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${report.preview.map(r=>`<tr>${row(r)}</tr>`).join('')}</tbody></table></div>`;
  dialog.hidden=false;
@@ -769,56 +769,95 @@ function confirmImportPreview(data,fileName,existing){
   const accept=()=>finish(true),decline=()=>finish(false);ok.addEventListener('click',accept);cancel.addEventListener('click',decline);
  });
 }
+// Aviso siempre visible junto al botón de XLS, incluso en Comparativa diaria.
+function xlsUploadFeedback(message,kind='info'){
+  const node=el('xlsUploadFeedback');
+  if(!node)return;
+  node.textContent=String(message||'');
+  node.dataset.kind=kind;
+  node.hidden=!message;
+}
+let importXlsBusy=false;
 async function importXlsFiles(files){
   if(!files?.length)return;
-  // Sólo una sesión autorizada puede incorporar datos a IndexedDB.
-  // Si no hay sesión, los XLS residen exclusivamente en memoria hasta cerrar o recargar.
+  if(importXlsBusy){xlsUploadFeedback('Ya se está procesando un XLS. Termina esa importación antes de seleccionar otro.','error');return;}
+  importXlsBusy=true;
   const persistent=isAuthorized();
-  if(persistent&&!archive.ready){
-    statusBox('Verificando el historial en línea antes de guardar el XLS…');
-    if(!await ensureArchiveReady()){
-      statusBox('No se pudo verificar el historial completo. El XLS no se envió al servidor. Usa «Reintentar historial» en Ajustes → Archivos XLS guardados y vuelve a seleccionar el archivo.','error');
-      el('xlsInput').value='';
-      return;
-    }
-  }
-  const target=persistent?archive.reports:archive.tempReports;
+  const currentReports=()=>persistent?archive.reports:archive.tempReports;
   let added=0,duplicated=0,cancelled=0,failures=[],warnings=[];
   const newReports=[];
-  for(const file of [...files]){
-    try{
-      if(!/\.(xls|xlsx|csv|tsv)$/i.test(file.name))throw Error('Selecciona un archivo XLS, XLSX, CSV o TSV.');
-      if(file.size>XLS_LIMIT)throw Error('El archivo supera 30 MB.');
-      const buffer=await file.arrayBuffer(),fingerprint=bytesFingerprint(new Uint8Array(buffer));
-      if(target.some(r=>r.fingerprint===fingerprint)){duplicated++;continue;}
-      const data=await parseExcelFile(buffer,file.name);
-      if(!await confirmImportPreview(data,file.name,target)){cancelled++;continue;}
-      const displayName=await chooseImportArchiveDate(file.name);
-      if(displayName===null){cancelled++;continue;}
-      if(data.missingOptional?.length)warnings.push(`${file.name}: faltan ${data.missingOptional.join(', ')} (se dejan vacíos)`);
-      const record={id:'xls_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9),
-        name:displayName,size:file.size,addedAt:Date.now(),fingerprint,
-        headers:data.headers,rows:data.rows.map(r=>r.raw)};
-      if(persistent)await archivePut(record);
-      target.push(record);newReports.push(record);added++;
-    }catch(err){failures.push(file.name+': '+(err.message||'Error de lectura'));}
+  try{
+    for(const file of [...files]){
+      try{
+        if(!/\.(xls|xlsx|csv|tsv)$/i.test(file.name))throw Error('Selecciona un archivo XLS, XLSX, CSV o TSV.');
+        if(file.size>XLS_LIMIT)throw Error('El archivo supera 30 MB.');
+        xlsUploadFeedback(`Leyendo ${file.name}…`);
+        const buffer=await file.arrayBuffer(),fingerprint=bytesFingerprint(new Uint8Array(buffer));
+        // Al estar autenticado, NO bloquear la vista previa esperando GET /files.
+        // La lista completa se comprueba después de confirmar y ANTES de guardar.
+        if(currentReports().some(r=>r.fingerprint===fingerprint)){
+          if(!persistent||archive.ready){duplicated++;continue;}
+        }
+        const data=await parseExcelFile(buffer,file.name);
+        xlsUploadFeedback(`Archivo ${file.name} leído. Revisa la vista previa.`);
+        const confirmed=await confirmImportPreview(data,file.name,currentReports(),persistent&&!archive.ready);
+        if(!confirmed){cancelled++;xlsUploadFeedback('Importación cancelada. No se envió ningún dato.');continue;}
+        if(persistent){
+          // Importante: el archivo NUNCA se envía si el historial completo no está verificado.
+          xlsUploadFeedback('Verificando historial y duplicados en Supabase antes de guardar…');
+          if(!await ensureArchiveReady()){
+            throw Error('No fue posible recuperar el historial completo de Supabase. No se guardó el XLS. Revisa Ajustes → Archivos XLS guardados → Reintentar historial.');
+          }
+          // ensureArchiveReady() puede REEMPLAZAR archive.reports: consultar lista actual.
+          if(currentReports().some(r=>r.fingerprint===fingerprint)){
+            duplicated++;xlsUploadFeedback('Este XLS ya está guardado en tu cuenta. No se duplicó.');continue;
+          }
+        }
+        const displayName=await chooseImportArchiveDate(file.name);
+        if(displayName===null){cancelled++;continue;}
+        if(data.missingOptional?.length)warnings.push(`${file.name}: faltan ${data.missingOptional.join(', ')} (se dejan vacíos)`);
+        const record={id:'xls_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9),
+          name:displayName,size:file.size,addedAt:Date.now(),fingerprint,
+          headers:data.headers,rows:data.rows.map(r=>r.raw)};
+        if(persistent){
+          xlsUploadFeedback(`Guardando ${file.name} en Supabase…`);
+          await archivePut(record);
+        }
+        currentReports().push(record);
+        newReports.push(record);added++;
+        xlsUploadFeedback(persistent?`Guardado en Supabase: ${file.name}`:`XLS temporal listo: ${file.name}`,'success');
+      }catch(error){
+        const message=file.name+': '+(error?.message||'Error de lectura');
+        failures.push(message);
+        xlsUploadFeedback('No se importó '+message,'error');
+        console.error('Importación XLS:',error);
+      }
+    }
+    currentReports().sort((a,b)=>a.addedAt-b.addedAt||a.id.localeCompare(b.id));
+    if(added||currentReports().length){
+      archive.temporaryMode=!persistent;
+      loadFolioFlags();
+      try{refreshArchiveData(true);window.VISITS?.refreshSources();}
+      catch(error){console.error('La carga se guardó, pero falló su visualización:',error);
+        failures.push('Visualización: '+(error.message||String(error)));}
+      if(persistent){try{await refreshIncidents(true);}catch(error){console.warn('Incidencias: ',error);}}
+      if(newReports.length)requestGoalAudit('import',newReports);
+    }
+    const stateText=persistent?
+      `${added} archivo(s) guardado(s) en el historial · ${duplicated} duplicado(s) omitido(s).`:
+      `${added} archivo(s) temporal(es) · ${duplicated} duplicado(s) omitido(s). No se guardan: al recargar o cerrar esta página se perderán.`;
+    const resultText=cancelled?stateText+` ${cancelled} archivo(s) cancelado(s) sin importar.`:stateText;
+    if(failures.length){
+      statusBox(esc(resultText+' Errores: '+failures.join('; ')),'error');
+      xlsUploadFeedback('No se completó la carga: '+failures.join('; '),'error');
+    }else if(added||duplicated||cancelled){
+      statusBox(esc(resultText)+` ${number.format(imported.data?.rows.length||0)} registros únicos en uso.`+(warnings.length?` <span class="muted">Avisos: ${esc(warnings.join('; '))}.</span>`:''),'success');
+      xlsUploadFeedback(added?`${added} XLS procesado(s) correctamente.${persistent?' Guardado en Supabase.':' Temporal, sin guardar en la nube.'}`:resultText,added?'success':'info');
+    }
+  }finally{
+    importXlsBusy=false;
+    el('xlsInput').value='';
   }
-  target.sort((a,b)=>a.addedAt-b.addedAt||a.id.localeCompare(b.id));
-  if(added||target.length){
-    archive.temporaryMode=!persistent;
-    // Mantener las marcas de los folios de histórico, pero no persistir cambios temporales.
-    loadFolioFlags();
-    refreshArchiveData(true);window.VISITS?.refreshSources();
-    if(persistent)await refreshIncidents(true);
-    if(newReports.length)requestGoalAudit('import',newReports);
-  }
-  const stateText=persistent?
-    `${added} archivo(s) guardado(s) en el historial · ${duplicated} duplicado(s) omitido(s).`:
-    `${added} archivo(s) temporal(es) · ${duplicated} duplicado(s) omitido(s). No se guardan: al recargar o cerrar esta página se perderán.`;
-  const resultText=cancelled?stateText+` ${cancelled} archivo(s) cancelado(s) sin importar.`:stateText;
-  if(failures.length)statusBox(esc(resultText+' Errores: '+failures.join('; ')),'error');
-  else if(added||target.length)statusBox(esc(resultText)+` ${number.format(imported.data?.rows.length||0)} registros únicos en uso.`+(warnings.length?` <span class="muted">Avisos: ${esc(warnings.join('; '))}.</span>`:''),'success');
-  el('xlsInput').value='';
 }
 
 /** Verifica el historial entero antes de admitir XLS nuevos (protege duplicados).
@@ -4234,9 +4273,11 @@ el('xlsInput').addEventListener('change',event=>{
   const selected=[...event.target.files||[]];
   if(!selected.length)return;
   statusBox(`Se seleccionaron ${selected.length} archivo(s). Preparando vista previa…`);
+  xlsUploadFeedback(`${selected.length} XLS seleccionado(s). Leyendo archivo para mostrar la vista previa…`);
   void importXlsFiles(selected).catch(error=>{
     console.error('Error no esperado durante la importación XLS:',error);
     statusBox('No se pudo completar la importación: '+esc(error?.message||String(error)),'error');
+    xlsUploadFeedback('Error al importar: '+(error?.message||String(error)),'error');
   }).finally(()=>{event.target.value='';});
 });
 el('manualMode').addEventListener('click',resetToManual);

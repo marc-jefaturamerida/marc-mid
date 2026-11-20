@@ -246,7 +246,15 @@ async function listFiles(){
   // Las páginas grandes pueden devolver errores 502 por tamaño o espera.
   // Reducir de 8 a 4/2/1 sin descartar registros ni marcar éxito parcial.
   const reports=await loadCompleteHistory(
-    (offset,limit)=>api('files?offset='+offset+'&limit='+limit),
+    async (offset,limit)=>{
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),20000);
+      try{return await api('files?offset='+offset+'&limit='+limit,{signal:controller.signal});}
+      catch(error){
+        if(controller.signal.aborted)throw Error('La consulta del historial agotó 20 segundos; revisa Edge Functions → dashboard-api → Logs.');
+        throw error;
+      }finally{clearTimeout(timeout);}
+    },
     {onProgress:count=>{const node=$('archiveLoadStatus');if(node)node.textContent=`Recuperando historial: ${count} XLS…`;}}
   );
   fileSignatures=new Map(reports.map(r=>[r.id,r.fingerprint]));
