@@ -33,5 +33,5 @@ for(const id of ['remindersPage','remForm','remPopup','registryRows','registrySa
 for(const source of ['function calculate(', 'function supervisorCalculator(', 'function correctedGlobalQuality('])assert(app.includes(source),source);
 assert(/leader-target-cards\{[^}]*215px/.test(html),'El dashboard usa tarjetas de ancho compacto');
 assert(app.includes('class=\"target-values\"') && app.includes('class=\"target-origin\"'),'Se conserva objetivo, logrado, avance y origen expandible');
-assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.4.1');
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.4.2');
 console.log('V2.6.1: historial preservado, inactivos, objetivos, recordatorios, respaldo, navegación y fichas: OK');
