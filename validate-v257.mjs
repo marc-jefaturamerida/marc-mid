@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {LEADERSHIP_DEFAULTS,cleanLeadershipSettings,leadershipTargetGoal,leadershipWeeklyKey,projectWeeklySales,analyzeLeadership,LEADERSHIP_METRICS} from '../src/leadership-dashboard.js';
+const mod='Pensiones',week='2026-11-09';
+const defaults=cleanLeadershipSettings(null);
+assert.equal(defaults.projectionMode,'linear');assert.equal(defaults.goalFallback,'existing');
+const weekKey=leadershipWeeklyKey(week,mod);
+const prefs=cleanLeadershipSettings({defaultGoals:{PENSIONES:{sales:28,records:45,apps:20}},weeklyGoals:{[weekKey]:{sales:35,dental:17}},projectionMode:'weighted',weekdayWeights:[1,1,1,1,1,2,2],showTargets:false,collapsedSections:{leaderModulesSection:true}});
+assert.equal(prefs.collapsedSections.leaderModulesSection,true);
+assert.equal(prefs.showTargets,false);
+const target=(key,w=week)=>leadershipTargetGoal(prefs,w,mod,key,()=>({value:17,source:'Logros semanales'}));
+assert.deepEqual(target('sales'),{value:35,source:'Meta de Jefatura · semana'});
+assert.equal(target('dental').value,17);
+assert.equal(target('apps').value,20);
+assert.equal(target('records').value,45);
+assert.equal(target('purchase').value,null);
+assert.equal(leadershipTargetGoal(prefs,'2026-11-16',mod,'sales',()=>({value:17,source:'Logros semanales'})).value,28);
+assert.equal(leadershipTargetGoal(defaults,week,mod,'sales',()=>({value:17,source:'Logros semanales'})).source,'Logros semanales');
+assert.equal(leadershipTargetGoal(cleanLeadershipSettings({goalFallback:'manual'}),week,mod,'sales',()=>17).value,null);
+assert.equal(projectWeeklySales({salesToDate:12,weekStart:week,today:'2026-11-12'}),21);
+assert.equal(projectWeeklySales({salesToDate:12,weekStart:week,today:'2026-11-12',mode:'weighted',weights:[1,1,1,1,1,2,2]}),27);
+const sale=(fecha)=>({fecha,module:mod,executive:'Leticia',valid:true,code:true,regular:true,guaranteed:false,p0:true,dental:true,app:true});
+const rows=[sale('2026-11-10'),sale('2026-11-12'),sale('2026-11-14')];
+const rules=()=>key=>({required:{completion:100,purchase:90,p0:30,app:90}[key],minimum:60});
+const result=analyzeLeadership({rows,from:week,to:'2026-11-15',today:'2026-11-12',weeklyGoal:(w,m,k)=>leadershipTargetGoal(prefs,w,m,k,()=>({value:null,source:'Sin meta'})),rulesFor:rules,knownModules:[mod,'Aviación'],projectionMode:'weighted',weekdayWeights:[1,1,1,1,1,2,2]});
+const m=result.modules.find(x=>x.name===mod);
+assert(m);assert.equal(m.goal,35);assert.equal(m.goalSource,'Meta de Jefatura · semana');assert(Math.abs(m.targets.records.value-45)<1e-8);assert(Math.abs(m.targets.dental.value-17)<1e-8);
+assert.equal(m.salesToDate,2);assert.equal(m.projected,4.5); // 2 x 9 pesos / 4 transcurridos
+assert.equal(m.counts.sales,3); // Fechas futuras presentes no influyen en proyección.
+assert.equal(result.modules.find(x=>x.name==='Aviación').goal,null);
+const html=fs.readFileSync('index.html','utf8'),app=fs.readFileSync('src/legacy-app.js','utf8');
+for(const id of ['leaderExpandAll','leaderCollapseAll','leaderTargetsSection','leaderTargetsCards','lsGoalModule','lsGoalWeek','lsGoalSave','lsGoalConfigSave','settingsLeadershipGoalsV257'])assert(html.includes(`id="${id}"`),id);
+assert(app.includes('initLeadershipCollapse()'));assert(app.includes('initLeadershipGoalSettings()'));
+assert(LEADERSHIP_METRICS.length===9);
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.4.2');
+console.log('V2.5.7: objetivos por módulo/semana, fuentes, proyección lineal/ponderada y secciones plegables: OK');
