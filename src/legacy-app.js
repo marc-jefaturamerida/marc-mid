@@ -7,7 +7,7 @@ import {analyzeImportPreview} from './import-preview.js';
 import {initReminders} from './reminders.js';
 import {initUpdates} from './updates-ui.js';
 import {RECORD_EDITS_KEY,cleanRecordEdits,overlayRecord,validateRecordFields,validateRawRecordFields,EDITABLE_RECORD_FIELDS} from './record-overrides.js';
-import {TEAM_REGISTRY_KEY,cleanTeamRegistry,registryEntry,registryRowEligible,registryNames,registryUpdate,registryGoalAt} from './team-registry.js';
+import {TEAM_REGISTRY_KEY,cleanTeamRegistry,registryEntry,registryRowEligible,registryNames,registryUpdate,registryGoalAt,registryActiveAt} from './team-registry.js';
 import {findMissingBaseGoals,saveQuickBaseGoals,recordsForGoalReview} from './goals-workflow.js';
 import {BASE_GOALS_KEY,BASE_METRICS,BASE_TYPES,BASE_RATE_DEFAULTS,isBasePercentage,cleanBaseGoals,upsertBaseGoals,effectiveBaseGoal,headquartersGoal,knownBaseProfiles,mondayISO,normalizeName} from './base-goals.js';
 import {LEADERSHIP_KEY,LEADERSHIP_DEFAULTS,cleanLeadershipSettings,leadershipRange,analyzeLeadership,LEADERSHIP_METRICS,LEADERSHIP_METRIC_LABELS,leadershipTargetGoal,leadershipModuleKey,leadershipWeeklyKey} from './leadership-dashboard.js';
