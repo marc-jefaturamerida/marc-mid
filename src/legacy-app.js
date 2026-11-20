@@ -686,13 +686,16 @@ function combinedArchiveData(reports){
 }
 function renderArchiveList(){
   if(!el('archiveList'))return;
+  const temporary=archive.temporaryMode;
   for(const radio of document.querySelectorAll('[name=archiveMode]'))radio.checked=radio.value===archive.selection.mode;
-  const idSet=new Set(archive.selection.ids),sel=selectedArchiveReports();
-  el('archiveList').innerHTML=archive.reports.length?archive.reports.map(r=>`<div class="archive-item">
-    <label class="archive-choice"><input type="checkbox" data-report-id="${esc(r.id)}" ${archive.selection.mode==='all'||idSet.has(r.id)?'checked':''} ${archive.selection.mode==='all'?'disabled':''}>
-    <span style="min-width:0"><b title="${esc(r.name)}">${esc(r.name)}</b><small>${r.rows.length} registros · ${new Date(r.addedAt).toLocaleDateString('es-MX')} · ${Math.round((r.size||0)/1024)} KB</small></span></label>
-    <button class="btn small" type="button" data-delete-report="${esc(r.id)}" aria-label="Eliminar ${esc(r.name)}">Eliminar</button></div>`).join(''):
-    '<div class="archive-empty">No hay XLS guardados. Usa «Cargar XLS» para agregarlos.</div>';
+  const idSet=new Set(archive.selection.ids),sel=temporary?archive.tempReports:selectedArchiveReports();
+  // Los XLS del invitado permanecen sólo en memoria. Mostrarlos sin fingir que están guardados.
+  const displayed=temporary?archive.tempReports:archive.reports;
+  el('archiveList').innerHTML=displayed.length?displayed.map(r=>`<div class="archive-item">
+    ${temporary?'<span class="tiny-pill">Temporal · solo esta sesión</span>':`<label class="archive-choice"><input type="checkbox" data-report-id="${esc(r.id)}" ${archive.selection.mode==='all'||idSet.has(r.id)?'checked':''} ${archive.selection.mode==='all'?'disabled':''}></label>`}
+    <span style="min-width:0"><b title="${esc(r.name)}">${esc(r.name)}</b><small>${r.rows.length} registros · ${new Date(r.addedAt).toLocaleDateString('es-MX')} · ${Math.round((r.size||0)/1024)} KB</small></span>
+    ${temporary?'':`<button class="btn small" type="button" data-delete-report="${esc(r.id)}" aria-label="Eliminar ${esc(r.name)}">Eliminar</button>`}</div>`).join(''):
+    `<div class="archive-empty">${temporary?'No hay XLS temporales en esta sesión.':'No hay XLS guardados.'} Usa «Cargar XLS» para agregarlos.</div>`;
   const n=sel.length,unique=imported.data?.rows.length||0;
   el('archiveActive').textContent=archive.temporaryMode?`Temporal: ${archive.tempReports.length} XLS solo en memoria · ${number.format(unique)} registros únicos. No se guardan en el historial.`:`${archive.selection.mode==='all'?'Acumulado':'Selección'}: ${n} de ${archive.reports.length} archivos · ${number.format(unique)} registros únicos`;
   el('archiveClear').disabled=!archive.reports.length;
@@ -4226,7 +4229,16 @@ el('teamTable').addEventListener('click',e=>{
   });
 
 // El botón «Cargar XLS» queda libre; la selección de semana y ejecutivo también.
-el('xlsInput').addEventListener('change',e=>importXlsFiles(e.target.files));
+el('xlsInput').addEventListener('change',event=>{
+  // Capturar los File antes de cualquier espera; soporta cambios de sesión y carga múltiple.
+  const selected=[...event.target.files||[]];
+  if(!selected.length)return;
+  statusBox(`Se seleccionaron ${selected.length} archivo(s). Preparando vista previa…`);
+  void importXlsFiles(selected).catch(error=>{
+    console.error('Error no esperado durante la importación XLS:',error);
+    statusBox('No se pudo completar la importación: '+esc(error?.message||String(error)),'error');
+  }).finally(()=>{event.target.value='';});
+});
 el('manualMode').addEventListener('click',resetToManual);
 el('weekSelect').addEventListener('change',e=>{
   imported.week=e.target.value;imported.executive='';chooseExecutive();populateTeamModules();renderTeam();drawImportMeta(imported.sourceName||'Reporte.xls');
@@ -4355,7 +4367,12 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     if(e.key==='Escape'&&settingsDialog.open)toggleSettings(false);
   });
   // La carga de XLS no requiere contraseña. Solo los Ajustes permanecen protegidos.
-  el('chooseXls').addEventListener('click',()=>el('xlsInput').click());
+  // El ratón y el tacto activan el selector de archivos mediante un label nativo.
+  // Para teclado se admite Enter/Espacio sin depender del estado de la sesión.
+  el('chooseXls').addEventListener('keydown',event=>{
+    if(event.key!=='Enter'&&event.key!==' ')return;
+    event.preventDefault();el('xlsInput').click();
+  });
   el('archiveRetry').addEventListener('click',()=>{void ensureArchiveReady();});
   el('archiveList').addEventListener('change',e=>{
     if(!e.target.matches('input[data-report-id]'))return;
