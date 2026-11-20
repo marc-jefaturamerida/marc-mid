@@ -49,5 +49,5 @@ assert(app.includes('function resolveAnalysisGoal('));
 assert(app.includes('weeklyGoal:cachedGoal'));
 for(const filepath of ['src/cloud-boot.js','netlify/functions/settings.js'])assert(fs.readFileSync(filepath,'utf8').includes(BASE_GOALS_KEY));
 assert(!fs.readFileSync('src/base-goals.js','utf8').includes('commission'));
-assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.4');
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.4.1');
 console.log('V2.5.8: dynamic profiles, historical effective goals, Jefatura overrides, independent persistence and dashboards: OK');

@@ -1,3 +1,11 @@
+# Corrección V3.0.4.1 · Historial XLS de Netlify
+
+Sustituye los archivos del repositorio GitHub por el contenido íntegro de este ZIP. Conserva Netlify Identity, PostgreSQL y todas las migraciones; **NO borres XLS, base de datos ni ajustes existentes**. Tras publicar, inicia sesión, comprueba que el historial esté disponible y carga un archivo de prueba nuevo. Si una consulta falla, abre **Ajustes → Archivos XLS guardados → Reintentar historial**. El importador espera la recuperación del historial y no guarda archivos con historial incompleto.
+
+Verificación previa a publicar: `npm install`, `npm run check`, `npm test` y `npm run build`. La última ejecución depende de las dependencias npm y no se verificó aquí. Documento vigente: `MANUAL_USUARIO_JEFATURA_MID_MARC_V3041.md`.
+
+---
+
 # Actualización V3.0.4
 
 Esta entrega actualiza el ZIP V3.0.3 con estados activos junto a objetivos, asignación rápida obligatoria y período por semanas o fechas para el comparativo. **Conserva la carpeta `netlify/` y los datos de PostgreSQL sin reinicializar tablas.** Antes de publicar, ejecuta `npm install`, `npm run check`, `npm test` y `npm run build`, y revisa CHANGELOG y manual.
@@ -21,7 +29,7 @@ npm run check
 npm test
 npm run build
 git add -A
-git commit -m "Jefatura Mid Marc V3.0 Netlify"
+git commit -m "Jefatura Mid Marc V3.0.4.1 historial XLS"
 git push origin HEAD
 ```
 
@@ -36,7 +44,7 @@ En cada página pulsa **☰ Menú → Exportar → Descargar PDF**. El archivo s
 
 - No uses archivos de la edición local Wi-Fi ni migres a SQLite: son proyectos diferentes.
 - Las metas antiguas capturadas en la sección retirada de Logros semanales quedan respaldadas bajo su clave existente, pero ya no participan en el cálculo de Logros.
-- El motor de comisiones permanece sin cambios; revisa el manual `MANUAL_USUARIO_JEFATURA_MID_MARC_V304.md` (con actualización V3.0.4 al inicio).
+- El motor de comisiones permanece sin cambios; revisa el manual `MANUAL_USUARIO_JEFATURA_MID_MARC_V3041.md` (con actualización V3.0.4 al inicio).
 - Sintaxis y pruebas automatizadas completadas; build completo y funcionamiento real en Netlify pendientes por falta de acceso al registro npm durante esta entrega.
 
 

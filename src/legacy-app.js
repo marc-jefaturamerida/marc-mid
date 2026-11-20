@@ -57,7 +57,7 @@ import {WEEKLY_ADMIN_DEFAULTS,WEEKLY_ADMIN_STORAGE,cleanWeeklyAdminSettings,prel
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='3.0.4';
+  const APP_VERSION='3.0.4.1';
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -450,6 +450,7 @@ function drawImportMeta(name){
 const ARCHIVE_DB='wmSamsArchivoComisionesV9', ARCHIVE_STORE='reports';
 const ARCHIVE_SELECTION_KEY='wmSamsArchivoSeleccionV9', FOLIO_FLAGS_KEY='wmSamsFolioFlagsV9';
 const archive={db:null,reports:[],selection:{mode:'all',ids:[]},ready:false,tempReports:[],temporaryMode:false};
+let archiveLoading=null; // Comparte la misma descarga entre inicio e importación; nunca carga dos veces a la vez.
 let recordEdits=readRecordEdits();
 function readRecordEdits(){try{return cleanRecordEdits(JSON.parse(localStorage.getItem(RECORD_EDITS_KEY)||'{}'));}catch(_){return {};}}
 function persistRecordEdits(){localStorage.setItem(RECORD_EDITS_KEY,JSON.stringify(recordEdits));combinedArchiveCache.clear();}
@@ -771,7 +772,14 @@ async function importXlsFiles(files){
   // Sólo una sesión autorizada puede incorporar datos a IndexedDB.
   // Si no hay sesión, los XLS residen exclusivamente en memoria hasta cerrar o recargar.
   const persistent=isAuthorized();
-  if(persistent&&!archive.ready){statusBox('No está disponible el historial en línea. No se pudo guardar el XLS.','error');return;}
+  if(persistent&&!archive.ready){
+    statusBox('Verificando el historial en línea antes de guardar el XLS…');
+    if(!await ensureArchiveReady()){
+      statusBox('No se pudo verificar el historial completo. El XLS no se envió al servidor. Usa «Reintentar historial» en Ajustes → Archivos XLS guardados y vuelve a seleccionar el archivo.','error');
+      el('xlsInput').value='';
+      return;
+    }
+  }
   const target=persistent?archive.reports:archive.tempReports;
   let added=0,duplicated=0,cancelled=0,failures=[],warnings=[];
   const newReports=[];
@@ -811,14 +819,50 @@ async function importXlsFiles(files){
   el('xlsInput').value='';
 }
 
+/** Verifica el historial entero antes de admitir XLS nuevos (protege duplicados).
+ * Un error de visualización, incidencias o solicitudes NO desactiva su disponibilidad.
+ */
+async function ensureArchiveReady(){
+  if(!isAuthorized())return false;
+  if(archive.ready)return true;
+  if(archiveLoading)return archiveLoading;
+  archiveLoading=(async()=>{
+    const retry=el('archiveRetry'),status=el('archiveLoadStatus');
+    retry.hidden=true;
+    status.textContent='Consultando los archivos XLS guardados…';
+    statusBox('Recuperando el historial en línea…');
+    try{
+      const reports=await archiveGetAll();
+      reports.sort((a,b)=>a.addedAt-b.addedAt||a.id.localeCompare(b.id));
+      archive.reports=reports;
+      archive.ready=true; // SOLO después de recuperar todas las páginas.
+      status.textContent=`Historial conectado: ${reports.length} XLS.`;
+      // Fallos de renderizado NO son fallos de Netlify Database.
+      try { refreshArchiveData(true);window.VISITS?.refreshSources(); }
+      catch(error){console.error('Error visualizando el historial XLS:',error);
+        statusBox('Se recuperaron los XLS de la nube, pero hubo un problema al mostrarlos: '+esc(error.message||String(error)),'error');}
+      return true;
+    }catch(error){
+      archive.ready=false;
+      status.textContent='No se pudo completar la consulta. Los XLS almacenados no se modificaron.';
+      statusBox('Historial no disponible: '+esc(error.message||String(error))+'. Revisa la sesión/conexión y usa «Reintentar historial».','error');
+      console.error('Error al descargar historial XLS:',error);
+      return false;
+    }finally{
+      retry.hidden=archive.ready;
+    }
+  })();
+  try{return await archiveLoading;}
+  finally{archiveLoading=null;}
+}
 async function initArchive(){
   archiveSelectionRestore();loadFolioFlags();
-  try{
-    archive.reports=await archiveGetAll();archive.reports.sort((a,b)=>a.addedAt-b.addedAt||a.id.localeCompare(b.id));archive.ready=isAuthorized();
-    refreshArchiveData(true);window.VISITS?.refreshSources();
-    await refreshIncidents(true);
-  }catch(err){archive.ready=false;renderArchiveList();statusBox('No se pudo conectar al historial en línea: '+esc(err.message||String(err))+'. Comprueba la conexión, la sesión y Netlify Database.','error');}
-  finally{if(!incidentLoaded)await refreshIncidents(true);await updatesManager?.refresh(true);requestGoalAudit('start');}
+  await ensureArchiveReady();
+  // Independiente del historial XLS: un fallo de estas consultas no debe
+  // bloquear el guardado cuando /api/files ya devolvió todos los XLS.
+  try{await refreshIncidents(true);}catch(error){console.warn('Incidencias:',error);}
+  try{await updatesManager?.refresh(true);}catch(error){console.warn('Actualizaciones:',error);}
+  requestGoalAudit('start');
 }
 // Columnas configurables y filtros visuales (no alteran las métricas por sí mismos).
 function columnLabel(c){return c.key==='dynamicBonus'?'Bono adicional':c.key==='incident'?'Incidencia':c.key==='app'?'APP':c.key==='payment'?'Validación de pago':c.name;}
@@ -4281,6 +4325,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   });
   // La carga de XLS no requiere contraseña. Solo los Ajustes permanecen protegidos.
   el('chooseXls').addEventListener('click',()=>el('xlsInput').click());
+  el('archiveRetry').addEventListener('click',()=>{void ensureArchiveReady();});
   el('archiveList').addEventListener('change',e=>{
     if(!e.target.matches('input[data-report-id]'))return;
     const ids=new Set(archive.selection.ids);

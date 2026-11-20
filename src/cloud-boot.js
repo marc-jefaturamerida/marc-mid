@@ -3,6 +3,7 @@ import {
   requestPasswordRecovery, updateUser, refreshSession
 } from '@netlify/identity';
 import { rememberSession, readRememberedSession, isRememberedSessionExpired, clearRememberedSession } from './session-lifetime.js';
+import { loadCompleteHistory } from './history-loading.js';
 
 // 1.9: sin sondeo continuo. Datos remotos por cuenta; cálculos y UI locales.
 // Las ediciones se agrupan y se conservan como pendientes si falla la conexión.
@@ -97,7 +98,7 @@ async function api(endpoint,options={}){
   }
   let data;
   try{data=await res.json();}catch(_){throw Error(`El servidor devolvió un resultado inválido (${res.status}). Comprueba Functions y Database.`);}
-  if(!res.ok)throw Error(data?.error||`Solicitud rechazada (${res.status})`);
+  if(!res.ok){const err=Error(data?.error||`Solicitud rechazada (${res.status})`);err.status=res.status;throw err;}
   return data;
 }
 function pendingKey(){return PENDING_PREFIX+user.id;}
@@ -213,16 +214,12 @@ async function flush(){
 function filesSignature(){return JSON.stringify([...fileSignatures].sort(([a],[b])=>a.localeCompare(b)));}
 async function listFiles(){
   if(!user)return [];
-  const reports=[],seen=new Set();
-  let offset=0;
-  for(let call=0;call<100&&offset<500;call++){
-    const data=await api('files?offset='+offset+'&limit=8');
-    const batch=Array.isArray(data.reports)?data.reports:[];
-    for(const report of batch){if(!seen.has(report.id)){seen.add(report.id);reports.push(report);}}
-    if(!data.hasMore||!batch.length)break;
-    const next=Number(data.nextOffset);
-    offset=Number.isInteger(next)&&next>offset?next:offset+batch.length;
-  }
+  // Las páginas grandes pueden devolver errores 502 por tamaño o espera.
+  // Reducir de 8 a 4/2/1 sin descartar registros ni marcar éxito parcial.
+  const reports=await loadCompleteHistory(
+    (offset,limit)=>api('files?offset='+offset+'&limit='+limit),
+    {onProgress:count=>{const node=$('archiveLoadStatus');if(node)node.textContent=`Recuperando historial: ${count} XLS…`;}}
+  );
   fileSignatures=new Map(reports.map(r=>[r.id,r.fingerprint]));
   return reports;
 }
