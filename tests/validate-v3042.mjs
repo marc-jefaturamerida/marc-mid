@@ -100,3 +100,51 @@ console.log('V3.0.4.2 hotfix XLS con sesión: vista previa antes de historial, s
  assert.match(nodes.xlsUploadFeedback.textContent,/No se completó la carga/);
 }
 console.log('V3.0.4.2 hotfix XLS con sesión: error visible y cero escrituras si historial falla: OK');
+
+// Recuperación segura cuando GET /files responde pero el cliente no puede validar
+// su contenido: usar solamente firmas verificadas, nunca asumir historial vacío.
+{
+ const {runInNewContext}=await import('node:vm');
+ const source=app.slice(app.indexOf('function xlsUploadFeedback('),app.indexOf('/** Verifica el historial entero antes de admitir XLS nuevos',app.indexOf('function xlsUploadFeedback(')));
+ const makeContext=(meta,fail=false)=>{
+  const events=[];
+  const archive={ready:false,reports:[],tempReports:[],temporaryMode:false,lastError:'El formato de los reportes no es válido'};
+  const nodes={xlsInput:{value:'selected'},xlsUploadFeedback:{hidden:true,textContent:'',dataset:{}},archiveLoadStatus:{textContent:''},archiveRetry:{hidden:false}};
+  const ctx={
+   archive,el:id=>nodes[id]||null,number:new Intl.NumberFormat('es-MX'),XLS_LIMIT:30*1024*1024,
+   isAuthorized:()=>true,bytesFingerprint:()=> 'archivo-firma-123',
+   parseExcelFile:async()=>({headers:['Módulo'],rows:[{raw:['Prueba']}],missingOptional:[]}),
+   confirmImportPreview:async()=>true,ensureArchiveReady:async()=>false,
+   chooseImportArchiveDate:async()=> '2026-11-20',
+   archivePut:async()=>{events.push('post');},
+   loadFolioFlags:()=>{},refreshArchiveData:()=>{},refreshIncidents:async()=>{},
+   requestGoalAudit:()=>{},window:{APP_CLOUD:{provider:'supabase',listFileMetadata:async()=>{
+     events.push('meta');if(fail)throw Error('Error en la API metadata');return meta;
+   }},VISITS:{refreshSources:()=>{}}},
+   statusBox:()=>{},esc:String,imported:{data:null},console,
+   Math,Date,Error,Number,String,Set,Array,Promise
+  };
+  runInNewContext(source+'\nthis.runImport=importXlsFiles;',ctx);
+  return {ctx,archive,nodes,events};
+ };
+ const file={name:'prueba.xls',size:100,arrayBuffer:async()=>Uint8Array.of(1).buffer};
+ const empty=makeContext([]);
+ await empty.ctx.runImport([file]);
+ assert.deepEqual(empty.events,['meta','post'],'Una cuenta sin historial verificado puede importar su primer XLS');
+ assert.equal(empty.archive.ready,true,'El catálogo vacío confirmado permite inicializar el historial');
+ assert.equal(empty.archive.reports.length,1);
+ const duplicate=makeContext([{id:'xls_valid_1',fingerprint:'archivo-firma-123'}]);
+ await duplicate.ctx.runImport([file]);
+ assert.deepEqual(duplicate.events,['meta'],'Un duplicado remoto no hace POST');
+ const existing=makeContext([{id:'xls_valid_1',fingerprint:'otro-archivo-firma'}]);
+ await existing.ctx.runImport([file]);
+ assert.deepEqual(existing.events,['meta'],'Si existen reportes que no se pueden descargar, no se guardan nuevos');
+ assert.match(existing.nodes.xlsUploadFeedback.textContent,/Supabase tiene 1 XLS/);
+ const failure=makeContext([],true);
+ await failure.ctx.runImport([file]);
+ assert.deepEqual(failure.events,['meta'],'Fallo de metadatos no autoriza escrituras');
+ assert.match(failure.nodes.xlsUploadFeedback.textContent,/Error en la API metadata/);
+ assert(boot.includes("api('files?meta=1'"),'El adaptador Supabase debe consultar los metadatos autenticados');
+ assert(boot.includes('listFiles,listFileMetadata,putFile'),'La API expone listFileMetadata');
+ console.log('Hotfix historial meta: cuenta vacía, duplicados, historial previo y fallo de conexión: OK');
+}
