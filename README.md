@@ -1,3 +1,15 @@
+# JEFATURA MID MARC V3.0.4.3 — GitHub Pages + Supabase
+
+**Este ZIP es un proyecto completo, no un parche.** Incluye `.github/workflows/github-pages.yml`, `index.html`, `src/`, `tests/`, `public/` y `supabase/`, además del respaldo Netlify.
+
+Lee **INICIAR_AQUI.md** para sustituir el repositorio en un único commit. El catálogo XLS en PostgreSQL **no se elimina** al reemplazar los archivos de GitHub. No ejecutes SQL de creación otra vez si las tablas ya existen.
+
+Causa y solución de «0 nuevos · 1 duplicado»: significa que el XLS ya está guardado; el cliente ahora distingue un duplicado existente de un error de recuperación y descarga archivos grandes por bloques tras actualizar `dashboard-api`.
+
+Manual completo: `MANUAL_USUARIO_JEFATURA_MID_MARC_V3043.md`.
+
+---
+
 > **V3.0.4.2:** El nuevo modo Supabase está documentado en [SUPABASE_DESPLIEGUE.md](SUPABASE_DESPLIEGUE.md). Para conservar Netlify actual, no establezcas `VITE_CLOUD_PROVIDER=supabase`. Antes de migrar historiales, confirma el mapeo de cuentas.
 
 # Jefatura Mid Marc V3.0.4

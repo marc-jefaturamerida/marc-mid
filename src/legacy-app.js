@@ -57,7 +57,7 @@ import {WEEKLY_ADMIN_DEFAULTS,WEEKLY_ADMIN_STORAGE,cleanWeeklyAdminSettings,prel
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='3.0.4.2';
+  const APP_VERSION='3.0.4.3';
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -448,7 +448,7 @@ function drawImportMeta(name){
 // V9 · Base local de reportes XLS (IndexedDB) y selección persistente.
 const ARCHIVE_DB='wmSamsArchivoComisionesV9', ARCHIVE_STORE='reports';
 const ARCHIVE_SELECTION_KEY='wmSamsArchivoSeleccionV9', FOLIO_FLAGS_KEY='wmSamsFolioFlagsV9';
-const archive={db:null,reports:[],selection:{mode:'all',ids:[]},ready:false,tempReports:[],temporaryMode:false,lastError:''};
+const archive={db:null,reports:[],metadata:[],selection:{mode:'all',ids:[]},ready:false,tempReports:[],temporaryMode:false,lastError:''};
 let archiveLoading=null; // Comparte la misma descarga entre inicio e importación; nunca carga dos veces a la vez.
 let recordEdits=readRecordEdits();
 function readRecordEdits(){try{return cleanRecordEdits(JSON.parse(localStorage.getItem(RECORD_EDITS_KEY)||'{}'));}catch(_){return {};}}
@@ -689,16 +689,19 @@ function renderArchiveList(){
   const temporary=archive.temporaryMode;
   for(const radio of document.querySelectorAll('[name=archiveMode]'))radio.checked=radio.value===archive.selection.mode;
   const idSet=new Set(archive.selection.ids),sel=temporary?archive.tempReports:selectedArchiveReports();
-  // Los XLS del invitado permanecen sólo en memoria. Mostrarlos sin fingir que están guardados.
-  const displayed=temporary?archive.tempReports:archive.reports;
+  // Separar catálogo confirmado en PostgreSQL de XLS COMPLETOS para cálculos.
+  const pendingRemote=!temporary&&!archive.ready;
+  const displayed=temporary?archive.tempReports:(pendingRemote?archive.metadata:archive.reports);
   el('archiveList').innerHTML=displayed.length?displayed.map(r=>`<div class="archive-item">
-    ${temporary?'<span class="tiny-pill">Temporal · solo esta sesión</span>':`<label class="archive-choice"><input type="checkbox" data-report-id="${esc(r.id)}" ${archive.selection.mode==='all'||idSet.has(r.id)?'checked':''} ${archive.selection.mode==='all'?'disabled':''}></label>`}
-    <span style="min-width:0"><b title="${esc(r.name)}">${esc(r.name)}</b><small>${r.rows.length} registros · ${new Date(r.addedAt).toLocaleDateString('es-MX')} · ${Math.round((r.size||0)/1024)} KB</small></span>
-    ${temporary?'':`<button class="btn small" type="button" data-delete-report="${esc(r.id)}" aria-label="Eliminar ${esc(r.name)}">Eliminar</button>`}</div>`).join(''):
-    `<div class="archive-empty">${temporary?'No hay XLS temporales en esta sesión.':'No hay XLS guardados.'} Usa «Cargar XLS» para agregarlos.</div>`;
+    ${temporary?'<span class="tiny-pill">Temporal · solo esta sesión</span>':pendingRemote?'<span class="tiny-pill">En Supabase · pendiente de leer</span>':`<label class="archive-choice"><input type="checkbox" data-report-id="${esc(r.id)}" ${archive.selection.mode==='all'||idSet.has(r.id)?'checked':''} ${archive.selection.mode==='all'?'disabled':''}></label>`}
+    <span style="min-width:0"><b title="${esc(r.name||r.id)}">${esc(r.name||'Archivo guardado')}</b><small>${Array.isArray(r.rows)?r.rows.length:(Number.isFinite(Number(r.rowCount))?Number(r.rowCount):'—')} registros · ${r.addedAt?new Date(r.addedAt).toLocaleDateString('es-MX'):'Fecha pendiente'} · ${Math.round((r.size||0)/1024)} KB</small></span>
+    ${temporary||pendingRemote?'':`<button class="btn small" type="button" data-delete-report="${esc(r.id)}" aria-label="Eliminar ${esc(r.name)}">Eliminar</button>`}</div>`).join(''):
+    `<div class="archive-empty">${temporary?'No hay XLS temporales en esta sesión.':pendingRemote?'No se ha recuperado el catálogo completo; usa «Reintentar historial».':'No hay XLS guardados.'} Usa «Cargar XLS» para agregar archivos nuevos.</div>`;
   const n=sel.length,unique=imported.data?.rows.length||0;
-  el('archiveActive').textContent=archive.temporaryMode?`Temporal: ${archive.tempReports.length} XLS solo en memoria · ${number.format(unique)} registros únicos. No se guardan en el historial.`:`${archive.selection.mode==='all'?'Acumulado':'Selección'}: ${n} de ${archive.reports.length} archivos · ${number.format(unique)} registros únicos`;
-  el('archiveClear').disabled=!archive.reports.length;
+  el('archiveActive').textContent=temporary?`Temporal: ${archive.tempReports.length} XLS solo en memoria · ${number.format(unique)} registros únicos.`:
+    pendingRemote?`Supabase confirma ${archive.metadata.length} XLS almacenado(s), pendientes de recuperar para cálculos. Ningún total parcial se considera definitivo.`:
+    `${archive.selection.mode==='all'?'Acumulado':'Selección'}: ${n} de ${archive.reports.length} archivos · ${number.format(unique)} registros únicos`;
+  el('archiveClear').disabled=pendingRemote||!archive.reports.length;
 }
 function refreshArchiveData(forceImportMode=false){
   const files=archive.temporaryMode?archive.tempReports:selectedArchiveReports(),data=combinedArchiveData(files);
@@ -784,8 +787,22 @@ async function importXlsFiles(files){
   importXlsBusy=true;
   const persistent=isAuthorized();
   const currentReports=()=>persistent?archive.reports:archive.tempReports;
-  let added=0,duplicated=0,cancelled=0,failures=[],warnings=[];
+  let added=0,duplicated=0,cancelled=0,failures=[],warnings=[],savedWaiting=0;
   const newReports=[];
+  const markStoredDuplicate=(fileName,fingerprint)=>{
+    duplicated++;
+    const already=archive.reports.find(r=>r.fingerprint===fingerprint);
+    if(archive.ready&&already){
+      // No ocultar el archivo que el usuario intentó subir otra vez.
+      if(archive.selection.mode==='selected'&&!archive.selection.ids.includes(already.id)){
+        archive.selection.ids.push(already.id);archiveSelectionSave();
+      }
+      xlsUploadFeedback(`${fileName}: ya se encontraba guardado en Supabase y está disponible para consultar. No se creó otra copia.`,'info');
+    }else{
+      const msg=`${fileName}: Supabase confirma que este XLS YA ESTÁ GUARDADO, pero aún falta recuperarlo para mostrarlo. No se duplicó. Usa «Reintentar historial».`;
+      failures.push(msg);xlsUploadFeedback(msg,'error');
+    }
+  };
   try{
     for(const file of [...files]){
       try{
@@ -796,19 +813,19 @@ async function importXlsFiles(files){
         // Al estar autenticado, NO bloquear la vista previa esperando GET /files.
         // La lista completa se comprueba después de confirmar y ANTES de guardar.
         if(currentReports().some(r=>r.fingerprint===fingerprint)){
-          if(!persistent||archive.ready){duplicated++;continue;}
+          if(!persistent){duplicated++;continue;}
+          if(archive.ready){markStoredDuplicate(file.name,fingerprint);continue;}
         }
         const data=await parseExcelFile(buffer,file.name);
         xlsUploadFeedback(`Archivo ${file.name} leído. Revisa la vista previa.`);
         const confirmed=await confirmImportPreview(data,file.name,currentReports(),persistent&&!archive.ready);
         if(!confirmed){cancelled++;xlsUploadFeedback('Importación cancelada. No se envió ningún dato.');continue;}
         if(persistent){
-          // Importante: el archivo NUNCA se envía si el historial completo no está verificado.
+          // Verificar primero firmas existentes; el servidor también impide duplicados.
           xlsUploadFeedback('Verificando historial y duplicados en Supabase antes de guardar…');
           if(!await ensureArchiveReady()){
-            // Cuando el historial no puede descargarse, sólo un catálogo
-            // remoto VERIFICADO Y VACÍO permite iniciar la cuenta desde cero.
-            // Con datos históricos presentes no deben mostrarse sumatorias parciales.
+            // Sin descarga completa: aceptar guardados nuevos tras comprobar el
+            // catálogo remoto, pero NO calcular sumatorias hasta leer todo.
             if(window.APP_CLOUD?.provider==='supabase' && typeof window.APP_CLOUD.listFileMetadata==='function'){
               xlsUploadFeedback('Comprobando si existen XLS guardados, sin descargar sus filas…');
               let meta;
@@ -816,29 +833,33 @@ async function importXlsFiles(files){
               catch(error){
                 throw Error('No se pudo verificar el catálogo XLS: '+(error?.message||String(error))+'. Causa del historial: '+(archive.lastError||'sin detalle'));
               }
-              if(meta.length){
-                if(meta.some(r=>r.fingerprint===fingerprint)){
-                  duplicated++;
-                  xlsUploadFeedback('Este XLS ya existe en Supabase. No se duplicó.');
-                  continue;
-                }
-                throw Error(`Supabase tiene ${meta.length} XLS guardado(s), pero no fue posible leerlos para calcular el acumulado. No se guardó ni se borró nada. Detalle: ${archive.lastError||'sin detalle'}. Usa Reintentar historial.`);
+              archive.metadata=meta;
+              renderArchiveList();
+              if(meta.some(r=>r.fingerprint===fingerprint)){
+                markStoredDuplicate(file.name,fingerprint);
+                continue;
               }
-              // Una lista vacía validada por el servidor significa que la
-              // cuenta no tiene archivos anteriores. Es seguro iniciar su historial.
-              archive.reports=[];
-              archive.ready=true;
-              archive.lastError='';
-              const status=el('archiveLoadStatus');
-              if(status)status.textContent='Historial nuevo verificado: 0 XLS en Supabase.';
-              const retry=el('archiveRetry');if(retry)retry.hidden=true;
+              // Guardar XLS NUEVOS es seguro: el servidor valida el usuario y
+              // UNIQUE(owner_id,fingerprint). Aun así NO presentar cálculos parciales
+              // mientras sigan sin recuperarse los XLS antiguos.
+              if(meta.length){
+                xlsUploadFeedback(`Hay ${meta.length} XLS anteriores pendientes de lectura; el archivo nuevo se guardará sin alterar ese historial.`);
+              }else{
+                // Catálogo realmente vacío: se puede construir el primer acumulado.
+                archive.reports=[];
+                archive.ready=true;
+                archive.lastError='';
+                const status=el('archiveLoadStatus');
+                if(status)status.textContent='Historial nuevo verificado: 0 XLS en Supabase.';
+                const retry=el('archiveRetry');if(retry)retry.hidden=true;
+              }
             }else{
               throw Error('No fue posible recuperar el historial completo. No se guardó el XLS. Detalle: '+(archive.lastError||'sin detalle'));
             }
           }
           // ensureArchiveReady() puede REEMPLAZAR archive.reports: consultar lista actual.
           if(currentReports().some(r=>r.fingerprint===fingerprint)){
-            duplicated++;xlsUploadFeedback('Este XLS ya está guardado en tu cuenta. No se duplicó.');continue;
+            markStoredDuplicate(file.name,fingerprint);continue;
           }
         }
         const displayName=await chooseImportArchiveDate(file.name);
@@ -849,11 +870,22 @@ async function importXlsFiles(files){
           headers:data.headers,rows:data.rows.map(r=>r.raw)};
         if(persistent){
           xlsUploadFeedback(`Guardando ${file.name} en Supabase…`);
-          await archivePut(record);
+          try { await archivePut(record); }
+          catch(error){
+            if(error?.status===409){
+              try{archive.metadata=await window.APP_CLOUD.listFileMetadata();}catch(_){/* El servidor ya confirmó el duplicado. */}
+              markStoredDuplicate(file.name,fingerprint);continue;
+            }
+            throw error;
+          }
         }
-        currentReports().push(record);
+        if(persistent&&!archive.ready){
+          // La escritura quedó confirmada, pero nunca calcular con un archivo aislado.
+          archive.metadata.push({id:record.id,name:record.name,fingerprint,rowCount:record.rows.length,size:record.size,addedAt:record.addedAt});
+          savedWaiting++;
+        }else currentReports().push(record);
         newReports.push(record);added++;
-        xlsUploadFeedback(persistent?`Guardado en Supabase: ${file.name}`:`XLS temporal listo: ${file.name}`,'success');
+        xlsUploadFeedback(persistent?(archive.ready?`Guardado en Supabase: ${file.name}`:`Guardado en Supabase: ${file.name}. Pendiente de recuperar el historial completo antes de calcular.`):`XLS temporal listo: ${file.name}`,'success');
       }catch(error){
         const message=file.name+': '+(error?.message||'Error de lectura');
         failures.push(message);
@@ -862,17 +894,26 @@ async function importXlsFiles(files){
       }
     }
     currentReports().sort((a,b)=>a.addedAt-b.addedAt||a.id.localeCompare(b.id));
-    if(added||currentReports().length){
+    if(added||duplicated||currentReports().length){
       archive.temporaryMode=!persistent;
       loadFolioFlags();
-      try{refreshArchiveData(true);window.VISITS?.refreshSources();}
-      catch(error){console.error('La carga se guardó, pero falló su visualización:',error);
-        failures.push('Visualización: '+(error.message||String(error)));}
-      if(persistent){try{await refreshIncidents(true);}catch(error){console.warn('Incidencias: ',error);}}
-      if(newReports.length)requestGoalAudit('import',newReports);
+      if(persistent&&!archive.ready){
+        // Mostrar el catálogo remoto, pero jamás tratar una descarga parcial
+        // como un acumulado completo.
+        renderArchiveList();
+        const notice=el('archiveLoadStatus');
+        if(notice)notice.textContent=`${archive.metadata.length} XLS confirmado(s) en Supabase. Pendiente de recuperar para reportes.`;
+      }else{
+        try{refreshArchiveData(true);window.VISITS?.refreshSources();}
+        catch(error){console.error('La carga se guardó, pero falló su visualización:',error);
+          failures.push('Visualización: '+(error.message||String(error)));}
+        if(persistent){try{await refreshIncidents(true);}catch(error){console.warn('Incidencias: ',error);}}
+        if(newReports.length)requestGoalAudit('import',newReports);
+      }
     }
     const stateText=persistent?
-      `${added} archivo(s) guardado(s) en el historial · ${duplicated} duplicado(s) omitido(s).`:
+      `${added} XLS NUEVO(S) guardado(s) en Supabase · ${duplicated} XLS que YA ESTABAN guardados (sin volver a crearlos).`+
+        (savedWaiting?` ${savedWaiting} XLS nuevo(s) guardado(s) pendiente(s) de lectura para reportes.`:''):
       `${added} archivo(s) temporal(es) · ${duplicated} duplicado(s) omitido(s). No se guardan: al recargar o cerrar esta página se perderán.`;
     const resultText=cancelled?stateText+` ${cancelled} archivo(s) cancelado(s) sin importar.`:stateText;
     if(failures.length){
@@ -880,7 +921,7 @@ async function importXlsFiles(files){
       xlsUploadFeedback('No se completó la carga: '+failures.join('; '),'error');
     }else if(added||duplicated||cancelled){
       statusBox(esc(resultText)+` ${number.format(imported.data?.rows.length||0)} registros únicos en uso.`+(warnings.length?` <span class="muted">Avisos: ${esc(warnings.join('; '))}.</span>`:''),'success');
-      xlsUploadFeedback(added?`${added} XLS procesado(s) correctamente.${persistent?' Guardado en Supabase.':' Temporal, sin guardar en la nube.'}`:resultText,added?'success':'info');
+      xlsUploadFeedback(added?`${added} XLS guardado(s) en Supabase.${savedWaiting?' Historial pendiente de leer: no se mostrarán cálculos parciales.':''}`:resultText,added?'success':'info');
     }
   }finally{
     importXlsBusy=false;
@@ -904,6 +945,7 @@ async function ensureArchiveReady(){
       const reports=await archiveGetAll();
       reports.sort((a,b)=>a.addedAt-b.addedAt||a.id.localeCompare(b.id));
       archive.reports=reports;
+      archive.metadata=reports.map(r=>({id:r.id,name:r.name,size:r.size,fingerprint:r.fingerprint,rowCount:r.rows.length,addedAt:r.addedAt}));
       archive.ready=true; // SOLO después de recuperar todas las páginas.
       archive.lastError='';
       status.textContent=`Historial conectado: ${reports.length} XLS.`;
@@ -915,7 +957,13 @@ async function ensureArchiveReady(){
     }catch(error){
       archive.ready=false;
       archive.lastError=error?.message||String(error);
-      status.textContent='Historial XLS incompleto: '+archive.lastError+'. Los archivos existentes no se modificaron.';
+      // Recuperar nombres y número de filas sin asumir que podemos calcular
+      // sumatorias con XLS cuya descarga todavía está incompleta.
+      if(window.APP_CLOUD?.provider==='supabase'&&window.APP_CLOUD.listFileMetadata){
+        try{archive.metadata=await window.APP_CLOUD.listFileMetadata();renderArchiveList();}
+        catch(metaError){console.warn('No se pudo leer el catálogo XLS:',metaError);}
+      }
+      status.textContent=`Supabase confirma ${archive.metadata.length} XLS. La recuperación completa está pendiente: ${archive.lastError}. No se han modificado los archivos.`;
       statusBox('Historial no disponible: '+esc(error.message||String(error))+'. Revisa la sesión/conexión y usa «Reintentar historial».','error');
       console.error('Error al descargar historial XLS:',error);
       return false;

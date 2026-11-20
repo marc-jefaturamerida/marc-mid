@@ -53,3 +53,63 @@ export async function loadCompleteHistory(requestPage, {
   }
   throw Error(`El historial supera el límite de ${maxFiles} archivos admitidos en la carga.`);
 }
+
+/**
+ * V3.0.4.3: descarga comprobada por archivo y fragmentos de filas.
+ * El catálogo (firmas) se recupera por separado; un archivo nunca se publica
+ * en memoria ni participa en los cálculos hasta tener exactamente todas sus filas.
+ * La adaptación del tamaño del fragmento evita respuestas HTTP excesivas.
+ */
+export async function loadChunkedHistory(requestMetadata, requestInfo, requestRows, {
+  pageSize = 250,
+  maxFiles = 500,
+  maxRowsPerFile = 50000,
+  pause = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  onProgress = () => {}
+} = {}) {
+  if (![requestMetadata, requestInfo, requestRows].every(fn => typeof fn === 'function'))
+    throw Error('Faltan operaciones para descargar los XLS por fragmentos.');
+  const metadata = await requestMetadata();
+  if (!Array.isArray(metadata) || metadata.length > maxFiles)
+    throw Error('El catálogo remoto de XLS es inválido o supera el máximo admitido.');
+  const ids = new Set();
+  for (const meta of metadata) {
+    if (!meta || typeof meta.id !== 'string' || typeof meta.fingerprint !== 'string' || ids.has(meta.id))
+      throw Error('El catálogo remoto contiene identificadores repetidos o incompletos.');
+    ids.add(meta.id);
+  }
+  const reports = [];
+  for (const meta of metadata) {
+    const info = await requestInfo(meta.id);
+    if (!info || info.id !== meta.id || info.fingerprint !== meta.fingerprint ||
+        !Array.isArray(info.headers) || !Number.isInteger(Number(info.rowCount)) ||
+        Number(info.rowCount) < 1 || Number(info.rowCount) > maxRowsPerFile)
+      throw Error(`La ficha de ${meta.id} no coincide con el catálogo o está incompleta.`);
+    const total = Number(info.rowCount), rows = [];
+    let size = Math.max(1, Math.min(500, Math.floor(pageSize) || 250));
+    let singleRetry = 0;
+    while (rows.length < total) {
+      const offset = rows.length, wanted = Math.min(size, total - offset);
+      let part;
+      try { part = await requestRows(meta.id, offset, wanted); }
+      catch (error) {
+        if ([401, 403, 404].includes(error?.status)) throw error;
+        if (size > 1) { size = Math.max(1, Math.floor(size / 2)); singleRetry = 0; continue; }
+        if (singleRetry++ < 1) { await pause(500); continue; }
+        throw Error(`No se pudieron descargar las filas ${offset+1}–${offset+wanted} de ${meta.id}: ${error?.message || String(error)}`);
+      }
+      if (!part || part.id !== meta.id || !Array.isArray(part.rows) ||
+          Number(part.totalRows) !== total || part.rows.length < 1 || part.rows.length > wanted ||
+          Number(part.nextOffset) !== offset + part.rows.length ||
+          part.rows.some(row => !Array.isArray(row)))
+        throw Error(`Fragmento inconsistente de ${meta.id} a partir de la fila ${offset+1}.`);
+      rows.push(...part.rows);
+      singleRetry = 0;
+    }
+    if (rows.length !== total) throw Error(`El XLS ${meta.id} no tiene todas sus filas.`);
+    reports.push({ id: info.id, name: info.name, size: info.size,
+      fingerprint: info.fingerprint, addedAt: info.addedAt, headers: info.headers, rows });
+    onProgress(reports.length, metadata.length);
+  }
+  return reports;
+}

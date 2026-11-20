@@ -25,5 +25,5 @@ for(const key of ['recordEdits','recordBulkMode','initFloatingFilters','initGlob
 assert(app.includes('data-record-select'));assert(app.includes('data-record-uid'));
 assert(app.includes('recordEdits=readRecordEdits()'));
 for(const file of ['src/cloud-boot.js','netlify/functions/settings.js'])assert(fs.readFileSync(file,'utf8').includes(RECORD_EDITS_KEY));
-assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.4.2');
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.4.3');
 console.log('V2.6.1: edición no destructiva, borrado/restauración, menú de filtros, selección múltiple y WhatsApp: OK');

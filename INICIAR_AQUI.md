@@ -1,19 +1,48 @@
-# JEFATURA MID MARC V3.0.4.2
+# INSTALACIÓN COMPLETA V3.0.4.3
 
-## Para Netlify (proyecto actual)
+**Destino:** `marc-jefaturamerida/marc-mid` (rama `main`), GitHub Pages + Supabase.
 
-Sustituye los archivos del repositorio conservando los ajustes actuales del sitio y la base PostgreSQL. Sin `VITE_CLOUD_PROVIDER` configurado, la interfaz utiliza las Functions y Netlify Identity originales. Mantén el despliegue anterior como copia de respaldo hasta validar la versión.
+## Antes de sustituir el repositorio
 
-## Para Supabase + GitHub Pages
+- Conserva una copia del repositorio actual en tu equipo (`git clone` o **Code → Download ZIP**).
+- **No borres el proyecto Supabase, ni sus tablas, ni los XLS guardados.** La sustitución afecta únicamente al código de GitHub.
+- **No borres la carpeta `.git`** de tu repositorio local. Usa un solo commit para quitar y reponer el código, evitando un sitio intermedio sin archivos.
+- No publiques contraseñas, `DASHBOARD_DATABASE_URL`, claves de servicio, tokens o `.env` privados.
 
-Lee `SUPABASE_DESPLIEGUE.md`. Contiene la arquitectura, migración SQL, Edge Function, secretos de servidor y despliegue automático con GitHub Actions. El código de Supabase es **una nueva vía de despliegue que necesita configuración y pruebas en un proyecto real antes de reemplazar Netlify**.
+## Sustitución total con Git (una sola confirmación)
 
-### Mejoras de la interfaz
+En una copia local **ya clonada** del repositorio, desde su carpeta raíz:
 
-- Comparativa diaria como página principal para instalaciones y ajustes de navegación anteriores.
-- Navegación de pestañas con eventos delegados. La ventana de objetivos obligatorios explica el bloqueo de las demás secciones hasta guardar.
-- Detección inicial de metas faltantes y botones de aplicación masiva de cantidades de trámites/ventas a campos pendientes, conservando las metas ya guardadas.
+```bash
+git status --short
+# Verifica primero que no tienes cambios propios sin guardar.
+git rm -r -- .
+# Extrae el contenido del ZIP EN ESTA CARPETA, sin una carpeta envolvente.
+# Asegúrate de incluir los archivos ocultos como .github.
+git add -A
+git commit -m "Jefatura MID MARC V3.0.4.3: historial XLS y deduplicacion"
+git push origin main
+```
 
-### Comprobaciones
+También puedes utilizar GitHub Desktop: abre el repositorio local, elimina sus archivos salvo `.git`, extrae el contenido del ZIP en la raíz y pulsa **Commit to main → Push origin**. No subas únicamente el ZIP como archivo.
 
-`npm run check` y `npm test`. La compilación con `npm run build` requiere instalar dependencias en una máquina con acceso a npm.
+## Publicación y comprobaciones
+
+1. GitHub → Actions: espera a que la publicación de Pages termine correctamente. Se ejecutan `npm run check`, `npm test` y `npm run build`.
+2. Supabase → Project Settings → Integrations → GitHub: comprueba `main`, el directorio `.` y **Deploy to production**; `supabase/config.toml` ya incluye `[remotes.production]` para `feysztaielfexueulqkn`. La nueva `dashboard-api` DEBE publicarse; cambiar únicamente Pages no arregla el historial.
+3. Supabase → Edge Functions → `dashboard-api`: comprueba que la nueva versión está desplegada y consulta los Logs si hay error. No necesitas repetir migraciones de SQL.
+4. Abre `https://marc-jefaturamerida.github.io/marc-mid/`, recarga con Ctrl+Shift+R e inicia sesión.
+5. Ve a Ajustes → Archivos XLS guardados → **Reintentar historial**. Si `filename (3).xls` ya existía, debe verse en el historial; cargarlo de nuevo mostrará «YA ESTÁ GUARDADO», sin copiarlo dos veces.
+6. Carga un XLS realmente distinto, guarda y recarga. Confirma que permanece en la nube y que no faltan filas.
+
+## Si vuelve a fallar
+
+- Un `200` en `/files?offset=0&limit=8` **no** garantiza que todas las filas se hayan leído.
+- En los Logs de `dashboard-api`, el endpoint actualizado ofrece `GET /files?meta=1`, `GET /files?part=info&id=...` y `GET /files?part=rows&id=...&offset=...&limit=...`.
+- Si ves «API anterior, sin lectura XLS por bloques», falta publicar la **Edge Function nueva**.
+- Si el error indica `409`, el XLS ya estaba guardado en la cuenta. Reintenta la recuperación, no borres datos.
+- No compartas contraseñas ni tokens al reportar errores.
+
+## Estado de validación
+
+Pruebas Node locales superadas. No se verifica aquí una sesión real en tu proyecto Supabase, y la compilación final la confirmará GitHub Actions.

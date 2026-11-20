@@ -19,13 +19,40 @@ export default async function handler(request) {
   const {owner,db}=auth;
   try {
     if(request.method==='GET') {
-      if(new URL(request.url).searchParams.get('meta')==='1') {
-        const meta=await db.sql`SELECT id, fingerprint FROM dashboard_reports WHERE owner_id=${owner} ORDER BY id`;
-        return send({reports:meta});
-      }
-      // Hasta 8 XLS por consulta; se limita el tamaño serializado a ~4 MB
-      // para no agotar el máximo de respuesta de Netlify Functions.
       const url=new URL(request.url);
+      const part=url.searchParams.get('part');
+      const reportId=url.searchParams.get('id')||'';
+      if(url.searchParams.get('meta')==='1') {
+        // Metadatos completos, sin traer las filas crudas de los clientes.
+        const meta=await db.sql`SELECT id, fingerprint, file_name, file_size, added_at,
+          jsonb_array_length(rows) AS row_count
+          FROM dashboard_reports WHERE owner_id=${owner} ORDER BY added_at ASC, id ASC`;
+        return send({reports:meta.map(r=>({id:r.id,fingerprint:r.fingerprint,
+          name:r.file_name,size:r.file_size,addedAt:Number(r.added_at),rowCount:Number(r.row_count)})),protocol:2});
+      }
+      if(part==='info'||part==='rows') {
+        if(!/^xls_[\w-]{5,90}$/.test(reportId))return send({error:'Identificador de XLS inválido.'},400);
+        const info=await db.sql`SELECT id,file_name,file_size,fingerprint,headers,added_at,
+          jsonb_array_length(rows) AS row_count
+          FROM dashboard_reports WHERE owner_id=${owner} AND id=${reportId} LIMIT 1`;
+        if(!info.length)return send({error:'No se encontró el XLS en tu cuenta.'},404);
+        const item=info[0],total=Number(item.row_count);
+        if(part==='info')return send({report:{id:item.id,name:item.file_name,size:item.file_size,
+          fingerprint:item.fingerprint,headers:item.headers,addedAt:Number(item.added_at),rowCount:total}});
+        const offset=Math.max(0,Math.min(50000,Math.floor(Number(url.searchParams.get('offset')||0))));
+        const limit=Math.max(1,Math.min(500,Math.floor(Number(url.searchParams.get('limit')||250))));
+        const data=await db.sql`SELECT COALESCE(jsonb_agg(e.value ORDER BY e.ordinality),'[]'::jsonb) AS chunk
+          FROM dashboard_reports r
+          CROSS JOIN LATERAL jsonb_array_elements(r.rows) WITH ORDINALITY AS e(value,ordinality)
+          WHERE r.owner_id=${owner} AND r.id=${reportId}
+          AND e.ordinality > ${offset} AND e.ordinality <= ${offset+limit}`;
+        const chunk=data[0]?.chunk;
+        if(!Array.isArray(chunk))throw Error('No se pudo recuperar el fragmento de XLS.');
+        const nextOffset=offset+chunk.length;
+        return send({id:reportId,rows:chunk,totalRows:total,nextOffset,hasMore:nextOffset<total});
+      }
+      // Compatibilidad con clientes anteriores: páginas completas por XLS.
+      // Los clientes nuevos consumen filas en fragmentos más pequeños.
       const offset=Math.max(0,Math.min(500,Math.floor(Number(url.searchParams.get('offset')||0))));
       const limit=Math.max(1,Math.min(8,Math.floor(Number(url.searchParams.get('limit')||1))));
       const rows=await db.sql`SELECT id, file_name, file_size, fingerprint, headers, rows, added_at

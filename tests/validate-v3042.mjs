@@ -21,14 +21,14 @@ assert(shared.includes('auth.getUser(token)')&&shared.includes("DASHBOARD_DATABA
 const migration=read('supabase/migrations/20261120050000_dashboard_complete.sql');
 for(const table of ['dashboard_reports','dashboard_settings','dashboard_visits','dashboard_incidents','dashboard_audit_events','dashboard_update_requests'])assert(migration.includes(table),table);
 assert(migration.includes('ENABLE ROW LEVEL SECURITY')&&migration.includes('REVOKE ALL'));
-console.log('V3.0.4.2: navegación, metas en lote, backend dual, SQL y autenticación protegida OK');
+console.log('V3.0.4.3: navegación, metas en lote, backend dual, SQL y autenticación protegida OK');
 
 
 // Hotfix: selector XLS nativo independiente de sesión, lista temporal visible y errores trazables.
 assert.match(html,/id="chooseXls"[^>]*for="xlsInput"/,'El botón debe activar el selector nativo');
 assert.match(html,/class="file-picker-input" id="xlsInput"/,'File input visible para el navegador');
 assert(!app.includes("el('chooseXls').addEventListener('click',()=>el('xlsInput').click())"),'No usar activación programática redundante');
-assert(app.includes('const displayed=temporary?archive.tempReports:archive.reports;'),'Mostrar XLS temporales en lista');
+assert(app.includes('const displayed=temporary?archive.tempReports:(pendingRemote?archive.metadata:archive.reports);'),'Mostrar XLS temporales y metadatos pendientes');
 assert(app.includes('const selected=[...event.target.files||[]];'),'Conservar selección durante cargas asíncronas');
 
 
@@ -40,7 +40,7 @@ assert(app.includes('const selected=[...event.target.files||[]];'),'Conservar se
  const events=[];
  let historyReady;
  const nodes={xlsInput:{value:'selected'},xlsUploadFeedback:{hidden:true,textContent:'',dataset:{}}};
- const archive={ready:false,reports:[],tempReports:[],temporaryMode:false};
+ const archive={ready:false,reports:[],metadata:[],tempReports:[],temporaryMode:false};
  const ctx={
   archive,el:id=>nodes[id]||null,number:new Intl.NumberFormat('es-MX'),XLS_LIMIT:30*1024*1024,
   isAuthorized:()=>true,bytesFingerprint:()=> 'test-fingerprint',
@@ -49,7 +49,7 @@ assert(app.includes('const selected=[...event.target.files||[]];'),'Conservar se
   ensureArchiveReady:async()=>{events.push('history');await new Promise(resolve=>historyReady=resolve);archive.ready=true;return true;},
   chooseImportArchiveDate:async()=>{events.push('date');return '2026-11-20';},
   archivePut:async()=>{events.push('save');},
-  loadFolioFlags:()=>{},refreshArchiveData:()=>{},refreshIncidents:async()=>{},
+  loadFolioFlags:()=>{},renderArchiveList:()=>{},refreshArchiveData:()=>{},refreshIncidents:async()=>{},
   requestGoalAudit:()=>{},window:{VISITS:{refreshSources:()=>{}}},
   statusBox:()=>{},esc:String,imported:{data:null},
   console,Math,Date,Error,Number,String,Set,Array,Promise
@@ -70,14 +70,14 @@ assert(app.includes('const selected=[...event.target.files||[]];'),'Conservar se
 assert(html.includes('id="xlsUploadFeedback"'),'Aviso de carga debe ser visible en la barra principal');
 assert(app.includes('if(!await ensureArchiveReady())'),'Sigue verificando el historial antes de guardar XLS autenticados');
 assert(boot.includes('controller.abort(),20000'),'GET /files tiene tiempo máximo para evitar bloqueo indefinido');
-console.log('V3.0.4.2 hotfix XLS con sesión: vista previa antes de historial, sin guardado inseguro: OK');
+console.log('V3.0.4.3 hotfix XLS con sesión: vista previa antes de historial, sin guardado inseguro: OK');
 
 // Falla de GET /files: jamás hacer POST; el error debe quedar visible fuera de otra sección.
 {
  const {runInNewContext}=await import('node:vm');
  const source=app.slice(app.indexOf('function xlsUploadFeedback('),app.indexOf('/** Verifica el historial entero antes de admitir XLS nuevos',app.indexOf('function xlsUploadFeedback(')));
  let writes=0,previewed=false;
- const archive={ready:false,reports:[],tempReports:[],temporaryMode:false};
+ const archive={ready:false,reports:[],metadata:[],tempReports:[],temporaryMode:false};
  const nodes={xlsInput:{value:'selected'},xlsUploadFeedback:{hidden:true,textContent:'',dataset:{}}};
  const ctx={
   archive,el:id=>nodes[id]||null,number:new Intl.NumberFormat('es-MX'),XLS_LIMIT:30*1024*1024,
@@ -87,7 +87,7 @@ console.log('V3.0.4.2 hotfix XLS con sesión: vista previa antes de historial, s
   ensureArchiveReady:async()=>false,
   chooseImportArchiveDate:async()=>{throw Error('No debe solicitar fecha cuando el historial falla');},
   archivePut:async()=>{writes++;},
-  loadFolioFlags:()=>{},refreshArchiveData:()=>{},refreshIncidents:async()=>{},
+  loadFolioFlags:()=>{},renderArchiveList:()=>{},refreshArchiveData:()=>{},refreshIncidents:async()=>{},
   requestGoalAudit:()=>{},window:{VISITS:{refreshSources:()=>{}}},
   statusBox:()=>{},esc:String,imported:{data:null},
   console,Math,Date,Error,Number,String,Set,Array,Promise
@@ -99,7 +99,7 @@ console.log('V3.0.4.2 hotfix XLS con sesión: vista previa antes de historial, s
  assert.equal(nodes.xlsUploadFeedback.dataset.kind,'error','Un error debe mostrarse junto al botón');
  assert.match(nodes.xlsUploadFeedback.textContent,/No se completó la carga/);
 }
-console.log('V3.0.4.2 hotfix XLS con sesión: error visible y cero escrituras si historial falla: OK');
+console.log('V3.0.4.3 hotfix XLS con sesión: error visible y cero escrituras si historial falla: OK');
 
 // Recuperación segura cuando GET /files responde pero el cliente no puede validar
 // su contenido: usar solamente firmas verificadas, nunca asumir historial vacío.
@@ -108,7 +108,7 @@ console.log('V3.0.4.2 hotfix XLS con sesión: error visible y cero escrituras si
  const source=app.slice(app.indexOf('function xlsUploadFeedback('),app.indexOf('/** Verifica el historial entero antes de admitir XLS nuevos',app.indexOf('function xlsUploadFeedback(')));
  const makeContext=(meta,fail=false)=>{
   const events=[];
-  const archive={ready:false,reports:[],tempReports:[],temporaryMode:false,lastError:'El formato de los reportes no es válido'};
+  const archive={ready:false,reports:[],metadata:[],tempReports:[],temporaryMode:false,lastError:'El formato de los reportes no es válido'};
   const nodes={xlsInput:{value:'selected'},xlsUploadFeedback:{hidden:true,textContent:'',dataset:{}},archiveLoadStatus:{textContent:''},archiveRetry:{hidden:false}};
   const ctx={
    archive,el:id=>nodes[id]||null,number:new Intl.NumberFormat('es-MX'),XLS_LIMIT:30*1024*1024,
@@ -117,7 +117,7 @@ console.log('V3.0.4.2 hotfix XLS con sesión: error visible y cero escrituras si
    confirmImportPreview:async()=>true,ensureArchiveReady:async()=>false,
    chooseImportArchiveDate:async()=> '2026-11-20',
    archivePut:async()=>{events.push('post');},
-   loadFolioFlags:()=>{},refreshArchiveData:()=>{},refreshIncidents:async()=>{},
+   loadFolioFlags:()=>{},renderArchiveList:()=>{},refreshArchiveData:()=>{},refreshIncidents:async()=>{},
    requestGoalAudit:()=>{},window:{APP_CLOUD:{provider:'supabase',listFileMetadata:async()=>{
      events.push('meta');if(fail)throw Error('Error en la API metadata');return meta;
    }},VISITS:{refreshSources:()=>{}}},
@@ -136,10 +136,13 @@ console.log('V3.0.4.2 hotfix XLS con sesión: error visible y cero escrituras si
  const duplicate=makeContext([{id:'xls_valid_1',fingerprint:'archivo-firma-123'}]);
  await duplicate.ctx.runImport([file]);
  assert.deepEqual(duplicate.events,['meta'],'Un duplicado remoto no hace POST');
+ assert.match(duplicate.nodes.xlsUploadFeedback.textContent,/YA ESTÁ GUARDADO/,'El usuario sabe que el XLS existe en la nube');
  const existing=makeContext([{id:'xls_valid_1',fingerprint:'otro-archivo-firma'}]);
  await existing.ctx.runImport([file]);
- assert.deepEqual(existing.events,['meta'],'Si existen reportes que no se pueden descargar, no se guardan nuevos');
- assert.match(existing.nodes.xlsUploadFeedback.textContent,/Supabase tiene 1 XLS/);
+ assert.deepEqual(existing.events,['meta','post'],'El catálogo verificado autoriza guardar XLS NUEVOS aunque otro esté pendiente de lectura');
+ assert.equal(existing.archive.ready,false,'No presenta sumatorias parciales como completas');
+ assert.equal(existing.archive.reports.length,0,'No incorpora filas aisladas a los cálculos');
+ assert.equal(existing.archive.metadata.length,2,'Conserva ambos XLS en el catálogo de la cuenta');
  const failure=makeContext([],true);
  await failure.ctx.runImport([file]);
  assert.deepEqual(failure.events,['meta'],'Fallo de metadatos no autoriza escrituras');

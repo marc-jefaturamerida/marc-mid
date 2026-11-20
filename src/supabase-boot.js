@@ -34,7 +34,7 @@ async function updateUser(payload){
  return data.user;
 }
 import { rememberSession, readRememberedSession, isRememberedSessionExpired, clearRememberedSession } from './session-lifetime.js';
-import { loadCompleteHistory } from './history-loading.js';
+import { loadCompleteHistory, loadChunkedHistory } from './history-loading.js';
 
 // 1.9: sin sondeo continuo. Datos remotos por cuenta; cálculos y UI locales.
 // Las ediciones se agrupan y se conservan como pendientes si falla la conexión.
@@ -241,22 +241,47 @@ async function flush(){
   }
 }
 function filesSignature(){return JSON.stringify([...fileSignatures].sort(([a],[b])=>a.localeCompare(b)));}
+async function fileApi(path){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),20000);
+  try {return await api(path,{signal:controller.signal});}
+  catch(error){
+    if(controller.signal.aborted)throw Error('La descarga del XLS agotó 20 segundos. Comprueba dashboard-api en Supabase.');
+    throw error;
+  } finally {clearTimeout(timer);}
+}
 async function listFiles(){
   if(!user)return [];
-  // Las páginas grandes pueden devolver errores 502 por tamaño o espera.
-  // Reducir de 8 a 4/2/1 sin descartar registros ni marcar éxito parcial.
-  const reports=await loadCompleteHistory(
-    async (offset,limit)=>{
-      const controller=new AbortController();
-      const timeout=setTimeout(()=>controller.abort(),20000);
-      try{return await api('files?offset='+offset+'&limit='+limit,{signal:controller.signal});}
-      catch(error){
-        if(controller.signal.aborted)throw Error('La consulta del historial agotó 20 segundos; revisa Edge Functions → dashboard-api → Logs.');
-        throw error;
-      }finally{clearTimeout(timeout);}
-    },
-    {onProgress:count=>{const node=$('archiveLoadStatus');if(node)node.textContent=`Recuperando historial: ${count} XLS…`;}}
-  );
+  let reports;
+  try {
+    // V3.0.4.3: manifiesto ligero + ficha + bloques de filas con validación de integridad.
+    // Esta ruta evita que un XLS de varias MB bloquee todo el historial.
+    reports=await loadChunkedHistory(
+      async()=>{
+        const result=await fileApi('files?meta=1');
+        if(result?.protocol!==2)throw Error('dashboard-api sigue en la versión anterior, sin lectura XLS por bloques.');
+        return result.reports;
+      },
+      async id=>(await fileApi('files?part=info&id='+encodeURIComponent(id))).report,
+      (id,offset,limit)=>fileApi('files?part=rows&id='+encodeURIComponent(id)+'&offset='+offset+'&limit='+limit),
+      {onProgress:(count,total)=>{
+        const node=$('archiveLoadStatus');if(node)node.textContent=`Recuperando historial: ${count} de ${total} XLS completos…`;
+      }}
+    );
+  } catch(chunkError) {
+    console.warn('Recuperación XLS por fragmentos:',chunkError);
+    // El endpoint clásico se mantiene como alternativa hasta que Supabase
+    // publique la nueva Edge Function. Tampoco acepta historias parciales.
+    try {
+      reports=await loadCompleteHistory(
+        (offset,limit)=>fileApi('files?offset='+offset+'&limit='+limit),
+        {onProgress:count=>{const node=$('archiveLoadStatus');if(node)node.textContent=`Recuperando historial anterior: ${count} XLS…`;}}
+      );
+    } catch(legacyError) {
+      throw Error('No se pudo recuperar el historial XLS. Lectura por bloques: '+
+        (chunkError?.message||String(chunkError))+'; lectura anterior: '+(legacyError?.message||String(legacyError))+'.');
+    }
+  }
   fileSignatures=new Map(reports.map(r=>[r.id,r.fingerprint]));
   return reports;
 }

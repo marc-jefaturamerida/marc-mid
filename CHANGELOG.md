@@ -1,3 +1,40 @@
+## V3.0.4.3 — Recuperación verificable de XLS (20/11/2026)
+
+- Corrección de la interpretación de «0 guardados, 1 duplicado»: el archivo ya puede estar almacenado, aunque el historial no haya terminado de recuperarse.
+- Descarga de XLS por metadatos + fichas + fragmentos de filas, con verificación de integridad y adaptación del tamaño de fragmento.
+- Lista de archivos almacenados visible incluso mientras faltan filas; la UI distingue almacenamiento y disponibilidad para cálculos.
+- Los archivos nuevos pueden guardarse mediante validación de firmas autenticadas, sin alterar archivos existentes ni permitir cálculos parciales.
+- Se preservan fórmulas y reglas de comisión, vigencias, objetivos, datos existentes, Supabase Auth, control de acceso y Netlify como respaldo.
+- Nueva prueba `validate-v3043.mjs`; se conservan y actualizan las verificaciones anteriores.
+- No requiere migración SQL adicional; **sí requiere desplegar la Edge Function nueva**.
+
+---
+
+## Hotfix V3.0.4.2 — Verificación segura de metadatos XLS en Supabase
+- La primera importación puede continuar si la API autentica y confirma que el historial remoto está vacío mediante `/files?meta=1`, sin depender del contenido completo de `/files`.
+- Si existen archivos históricos no recuperables, se sigue impidiendo una importación que conduciría a sumatorias parciales; ahora se muestra la causa técnica original.
+- Se mantienen la validación de duplicados, las fórmulas de comisiones y los datos de PostgreSQL. No hay cambios de migraciones ni de Edge Functions.
+
+## Hotfix de XLS con sesión — 20 noviembre 2026
+- Con sesión Supabase, el XLS se lee y la vista previa se presenta antes de esperar al historial remoto.
+- La verificación íntegra de duplicados y el historial se mantiene obligatoria ANTES de enviar el XLS a la nube; al fallar se muestra error junto al botón Cargar XLS.
+- Estados visibles junto al botón: lectura, vista previa, comprobación del historial, guardado y resultado.
+- GET /files usa un tiempo máximo de 20 segundos por consulta y comunica fallos reales de Edge Functions, evitando esperas indefinidas.
+- Se conserva el esquema de objetivos obligatorios, sin alterar ventas, comisiones ni migraciones PostgreSQL.
+
+## Hotfix XLS · Selector y vista temporal (20 noviembre 2026)
+- El selector «Cargar XLS» usa etiqueta HTML nativa accesible y soporte de teclado, sin depender de un click programático de un input oculto.
+- Archivos cargados sin sesión se muestran en el listado como temporales; no se envían a Supabase y se pierden al recargar.
+- Se notifica la selección del archivo y se muestra error de importación si falla un proceso asíncrono.
+- No modifica los cálculos de comisiones ni la base de datos.
+
+## V3.0.4.2 — Hotfix de navegación (20 de noviembre de 2026)
+
+- Corregido error en apertura de secciones `registryActiveAt is not defined` mediante importación de función de vigencia histórica desde `team-registry.js` a `legacy-app.js`.
+- Añadida prueba de regresión en `tests/validate-v3042.mjs` para evitar que se omita esta importación.
+- Sin cambios en fórmulas de comisiones, reglas activo/inactivo, SQL, funciones, secretos, XLS o configuración de hosting.
+- `npm run check` y `npm test` correctos. Pendiente comprobación con sesión de Supabase en GitHub Pages publicado.
+
 ## V3.0.4 — 20 de noviembre de 2026
 
 - **Estados en Objetivos base:** casilla «Perfil activo» junto al botón Guardar para módulos y ejecutivos, conectada al catálogo de estados y al filtro de registros por fecha. No cambia el estado de los ejecutivos al desactivar el módulo ni borra XLS históricos.

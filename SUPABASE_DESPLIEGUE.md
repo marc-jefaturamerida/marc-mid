@@ -1,3 +1,21 @@
+## Actualización obligatoria para V3.0.4.3
+
+La nueva recuperación de XLS requiere **desplegar `supabase/functions/dashboard-api`**, además de publicar GitHub Pages. Si instalaste la integración oficial de GitHub con Supabase, confirma que el despliegue de producción de la Edge Function se ejecutó correctamente. No hace falta ninguna migración SQL nueva ni borrar XLS existentes.
+
+El protocolo 2 agrega `GET /files?meta=1` con `protocol: 2`, `GET /files?part=info&id=...` y `GET /files?part=rows&id=...&offset=...&limit=...`. Estos endpoints exigen sesión Supabase Auth y nunca exponen la contraseña PostgreSQL al cliente.
+
+Si no está habilitada la publicación automática de Edge Functions, despliega desde tu equipo (no pegues credenciales aquí):
+
+```bash
+npx supabase login
+npx supabase link --project-ref TU_PROJECT_REF
+npx supabase functions deploy dashboard-api --no-verify-jwt
+```
+
+La validación del usuario con `auth.getUser(token)` sigue dentro de la función; la autorización de orígenes sigue limitada a `DASHBOARD_ALLOWED_ORIGINS`. No habilites rutas públicas para los XLS.
+
+---
+
 # JEFATURA MID MARC V3.0.4.2 — Supabase + GitHub Pages
 
 > Guía inicial con marcadores. Para concretar las URLs, el repositorio, el traspaso de XLS y los accesos, responder las preguntas del final. **La migración en vivo requiere probarse en el proyecto de Supabase antes de dar de baja Netlify.**
