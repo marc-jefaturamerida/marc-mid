@@ -9,7 +9,7 @@ const legacy=fs.readFileSync('src/legacy-app.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
 const server=fs.readFileSync('netlify/functions/files.js','utf8');
 const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
-assert.equal(pkg.version,'3.0.0');
+assert.equal(pkg.version,'3.0.4');
 for(const term of ['importDateDialog','importDateForm','importDateValue','importDateCancel'])assert(html.includes('id="'+term+'"'),`Falta: ${term}`);
 assert(legacy.includes('const displayName=await chooseImportArchiveDate(file.name)'));
 assert(legacy.includes('name:displayName,size:file.size'));

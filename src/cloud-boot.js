@@ -31,7 +31,7 @@ const KEYS = new Set([
   'wmSamsLeadershipV256',
   'wmSamsRecordEditsV260',
   'wmSamsTeamRegistryV261',
-  'wmSamsRemindersV261'
+  'wmSamsRemindersV261','wmSamsClipboardSettingsV303'
 ]);
 const PENDING_PREFIX = 'wmSamsCloudPendingV19:';
 const SESSION_EXPIRED_FLAG='wmSamsSessionExpiredV249';
@@ -313,6 +313,7 @@ function setupModal(){
 }
 window.APP_CLOUD={
   get user(){return user;},
+  resetAll:async()=>{if(!user)throw Error("Inicia sesión.");await flush();if(pending.size)throw Error("Sincroniza los cambios pendientes primero.");await api("reset",{method:"POST",body:JSON.stringify({confirmation:"RESTABLECER TODO"})});clearDashboardCache();},
   openLogin,logout:signOut,listFiles,putFile,deleteFile,clearFiles,listIncidents,putIncident,deleteIncident,
   registerRefresh:fn=>{refresher=fn;},flush,listTrash,restoreIncident,listAudit,
   listUpdates,createUpdate,changeUpdate,trashUpdate,restoreUpdate,

@@ -1,15 +1,19 @@
-# Jefatura Mid Marc V3.0
+# Jefatura Mid Marc V3.0.4
 
 Proyecto completo de seguimiento operativo y simulación de comisiones para GitHub + Netlify. Actualizado desde la V2.6.1 con el mismo motor de cálculo.
+
+## V3.0.4
+
+Estado activo/inactivo junto a los objetivos de cada módulo o ejecutivo; alerta obligatoria para metas de trámites y ventas ausentes o cero al iniciar/importar XLS; comparativo de ejecutivos por semana o intervalo de fechas, sumando comisiones individuales calculadas por semana y sin prorratear metas parciales. Ver manual actualizado y CHANGELOG.
 
 ## Componentes
 
 - `index.html` y `src/legacy-app.js`: páginas y motor existente. **No se modificaron las reglas de comisiones.**
 - `src/import-preview.js`: diagnóstico previo de XLS/CSV; `src/mobile-tables.js`: experiencia móvil; `src/settings-search.js`: búsqueda y filtro temático; `src/audit-ui.js`: papelera y auditoría; `src/jm-enhancements.js`: inicialización de mejoras.
-- `src/team-registry.js`, `src/base-goals.js`: catálogo, alias, estados y objetivos por vigencia.
+- `src/team-registry.js`, `src/base-goals.js`, `src/goals-workflow.js`: catálogo, alias, estados y objetivos por vigencia.
 - `src/cloud-boot.js` y `netlify/functions/settings.js`: revisiones de sincronización y prevención de sobrescrituras.
 - `netlify/functions/incidents.js`, `netlify/functions/audit.js` y migración V2.7: incidencias recuperables y auditoría.
-- `MANUAL_USUARIO_JEFATURA_MID_MARC_V300.md` y `public/MANUAL_JEFATURA_MID_MARC_V300.pdf`: documentación vigente.
+- `MANUAL_USUARIO_JEFATURA_MID_MARC_V304.md` y `public/MANUAL_JEFATURA_MID_MARC_V304.pdf`: documentación vigente.
 - `netlify/functions/updates.js`, `src/updates-ui.js`, `src/update-request-rules.js` y migración V2.7.1: solicitudes por registro, filtro, historial, resolución y recordatorios lunes a miércoles.
 - `tests`: regresiones antiguas + nuevas verificaciones V3.0.
 
@@ -28,7 +32,7 @@ Publicar `dist` con Netlify. Mantener Netlify Identity y PostgreSQL, comprobar m
 
 El catálogo y las metas se guardan por cuenta como JSON estructurado en la tabla `dashboard_settings` existente (no se ha creado una tabla normalizada independiente de ejecutivos). La información histórica de cuentas anteriores se conserva. Las metas operativas no sustituyen objetivos de pago ni tarifas. Los recordatorios emergentes funcionan con la app abierta. Restaurar una incidencia la deja inactiva para evitar excluir ventas inesperadamente.
 
-**Validación:** `npm run check` y `npm test` completados correctamente. `npm run build` y funcionamiento real de Netlify Identity/PostgreSQL no verificados aquí (instalación de dependencias agotó el tiempo disponible). Haz despliegue de prueba y consulta el manual antes de sustituir producción.
+**Validación:** ejecutar `npm run check` y `npm test`. Para `npm run build` se requiere instalar dependencias de npm; la disponibilidad de Netlify Identity/PostgreSQL debe probarse en el despliegue. Haz despliegue de prueba y consulta el manual antes de sustituir producción.
 
 ## Actualizaciones V2.7.1
 

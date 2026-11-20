@@ -23,7 +23,7 @@ assert.ok(example.includes('Hoy avanzamos 20%'));
 assert.ok(!example.includes('Subimos un poco'));
 const missing=jefaturaDailyProgress({date:'2026-11-18',rows,dentalGoalPct:null,p0GoalPct:null});
 assert.match(jefaturaProgressInline(missing),/sin objetivo semanal/);
-assert.match(jefaturaProgressReport(missing),/Alcance: — \(20 ventas\)\nRequerido hoy: —/);
+assert.match(jefaturaProgressReport(missing),/Alcance: — \(20 ventas\)\nRequerido hoy: Sin objetivo configurado/);
 const start=jefaturaDailyProgress({date:'2026-11-16',rows,weeklySalesGoal:100});assert.equal(start.elapsed,1);assert.equal(start.requiredSalesCount,15);
 const end=jefaturaDailyProgress({date:'2026-11-22',rows,weeklySalesGoal:100});assert.equal(end.elapsed,7);assert.equal(end.sales.required,100);assert.equal(end.requiredSalesCount,100);
 // Caso solicitado: 29/72 = 40.28% y al miércoles (3/7) se requieren 31 ventas enteras.

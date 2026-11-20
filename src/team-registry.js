@@ -26,7 +26,7 @@ export function registryEntry(data,type,name){return (data?.[type]||[]).find(x=>
 export function registryActiveAt(entry,date){
  if(!entry)return true;
  // Antes de su primera baja, los datos originales se conservan como históricos.
- if(!dateOk(date))return entry.active!==false;
+ if(!dateOk(date)||!(entry.statusHistory||[]).length)return entry.active!==false;
  let active=true;for(const e of entry.statusHistory||[]){if(e.from<=date)active=e.active;else break;}
  return active;
 }

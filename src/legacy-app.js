@@ -1,3 +1,4 @@
+import {initClipboardSettings,customizeClipboard} from './clipboard-settings.js';
 import {createPageSettingsModal} from './page-settings-modal.js';
 import {formatIncidentReport,formatCommissionableFolios} from './report-copy.js';
 import {downloadPdfCanvases,pdfSafeName} from './pdf-download.js';
@@ -7,6 +8,7 @@ import {initReminders} from './reminders.js';
 import {initUpdates} from './updates-ui.js';
 import {RECORD_EDITS_KEY,cleanRecordEdits,overlayRecord,validateRecordFields,validateRawRecordFields,EDITABLE_RECORD_FIELDS} from './record-overrides.js';
 import {TEAM_REGISTRY_KEY,cleanTeamRegistry,registryEntry,registryRowEligible,registryNames,registryUpdate,registryGoalAt} from './team-registry.js';
+import {findMissingBaseGoals,saveQuickBaseGoals,recordsForGoalReview} from './goals-workflow.js';
 import {BASE_GOALS_KEY,BASE_METRICS,BASE_TYPES,BASE_RATE_DEFAULTS,isBasePercentage,cleanBaseGoals,upsertBaseGoals,effectiveBaseGoal,headquartersGoal,knownBaseProfiles,mondayISO,normalizeName} from './base-goals.js';
 import {LEADERSHIP_KEY,LEADERSHIP_DEFAULTS,cleanLeadershipSettings,leadershipRange,analyzeLeadership,LEADERSHIP_METRICS,LEADERSHIP_METRIC_LABELS,leadershipTargetGoal,leadershipModuleKey,leadershipWeeklyKey} from './leadership-dashboard.js';
 import {leadershipReportHtml,LEADERSHIP_PRINT_CSS,leadershipPngPages} from './leadership-export.js';
@@ -55,7 +57,7 @@ import {WEEKLY_ADMIN_DEFAULTS,WEEKLY_ADMIN_STORAGE,cleanWeeklyAdminSettings,prel
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='3.0';
+  const APP_VERSION='3.0.4';
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -95,6 +97,7 @@ const isNo=v=>['NO','N','FALSE','FALSO','0'].includes(normalize(v));
 const isNonPayableStatus=v=>['CANCELADA','INCOMPLETA','RECHAZO'].includes(normalize(v));
 let simDirty=false;
   const imported={data:null,week:'',executive:'',flags:new Set(),appDisabled:new Set(),dynamicBonuses:new Set(),recoverManual:0,sourceName:''};
+const teamPeriod={mode:'week',week:'',from:'',to:''};
 const tableView={columns:[],visible:new Set(),showNoCode:false};
 const TABLE_VIEW_STORAGE='wmSamsTablaVisualV18';
 // Filtros operativos: sólo en esta pestaña; nunca se envían a PostgreSQL.
@@ -144,22 +147,22 @@ function persistTeamRegistry(){localStorage.setItem(TEAM_REGISTRY_KEY,JSON.strin
 function readBaseGoals(){try{return cleanBaseGoals(JSON.parse(localStorage.getItem(BASE_GOALS_KEY)||'null'));}catch(_){return cleanBaseGoals(null);}}
 function saveBaseGoals(){localStorage.setItem(BASE_GOALS_KEY,JSON.stringify(baseGoals));}
 function resolveAnalysisGoal(type,name,week,metric='sales',fallback=null){
- const own=type==='headquarters'?headquartersGoal(baseGoals,week,metric,baseModuleNames()):effectiveBaseGoal(baseGoals,type,name,week,metric);
+ const own=type==='headquarters'?headquartersGoal(baseGoals,week,metric,baseModuleNames(week)):effectiveBaseGoal(baseGoals,type,name,week,metric);
  if(own.value!==null)return own;
  return typeof fallback==='function'?fallback():{value:null,source:own.source};
 }
 let moduleProfileCache=null;
-function baseModuleNames(){
+function baseModuleNames(week=''){
  const source=historyData();
  const fingerprint=[source,archive.reports,baseGoals,qualityConfig,supSettings];
- if(moduleProfileCache&&moduleProfileCache.refs.every((v,i)=>v===fingerprint[i]))return moduleProfileCache.names;
+ if(moduleProfileCache&&moduleProfileCache.refs.every((v,i)=>v===fingerprint[i]))return week?moduleProfileCache.names.filter(name=>registryActiveAt(registryEntry(teamRegistry,'modules',name),week)):moduleProfileCache.names;
  const names=knownBaseProfiles(baseGoals,'module',[
   ...moduleNames(source),...Object.keys(qualityConfig.modules||{}),
   ...Object.keys(supSettings.goals||{}),
   ...Object.keys(leadershipPrefs.defaultGoals||{}),
   ...archive.reports.flatMap(r=>{const idx=r.headers.findIndex(h=>normalize(h)==='MODULO');if(idx<0)return [];const seen=new Map();for(const row of r.rows){const name=String(row[idx]||'').trim();if(name&&!seen.has(normalizeName(name)))seen.set(normalizeName(name),name);}return [...seen.values()];})
  ]);
- moduleProfileCache={refs:fingerprint,names};return names;
+ moduleProfileCache={refs:fingerprint,names};return week?names.filter(name=>registryActiveAt(registryEntry(teamRegistry,'modules',name),week)):names;
 }
 function baseExecutiveNames(){return knownBaseProfiles(baseGoals,'executive',[
  ...historyData().map(r=>r.executive),...Object.keys(teamGoals).map(k=>k.includes('::')?k.slice(k.indexOf('::')+2):'')
@@ -183,7 +186,7 @@ let incidentLoaded=false, incidentLoading=false, incidentPageIndex=1;
 
 function loadTeamStore(key){try{const v=JSON.parse(localStorage.getItem(key)||'{}');return v&&typeof v==='object'&&!Array.isArray(v)?v:{}}catch(_){return {}}}
 function teamKey(week,name){return `${week}::${name}`;}
-function executiveGoal(week,name){const n=teamGoals[teamKey(week,name)];if(Number.isInteger(n)&&n>0)return n;const base=effectiveBaseGoal(baseGoals,'executive',name,week,'sales').value;if(base>0)return base;const reg=registryEntry(teamRegistry,'executives',name);return registryGoalAt(reg,week)||qualityConfig.execWeeklyGoal;}
+function executiveGoal(week,name){const base=effectiveBaseGoal(baseGoals,'executive',name,week,'sales').value;if(base!==null)return base;const n=teamGoals[teamKey(week,name)];if(Number.isInteger(n)&&n>0)return n;const reg=registryEntry(teamRegistry,'executives',name);return registryGoalAt(reg,week)||qualityConfig.execWeeklyGoal;}
 function executiveRecovery(week,name){const n=teamRecoveries[teamKey(week,name)];return Number.isFinite(n)&&n>=0?n:0;}
 function setExecutiveGoal(week,name,goal){if(Number.isInteger(goal)&&goal>=1){teamGoals[teamKey(week,name)]=goal;try{localStorage.setItem(TEAM_GOALS_STORAGE,JSON.stringify(teamGoals))}catch(_){}}}
 function setExecutiveRecovery(week,name,recover){if(Number.isFinite(recover)&&recover>=0){teamRecoveries[teamKey(week,name)]=recover;try{localStorage.setItem(TEAM_RECOVERY_STORAGE,JSON.stringify(teamRecoveries))}catch(_){}}}
@@ -609,7 +612,7 @@ function initIncidences(){
   el('incDetailDelete').addEventListener('click',()=>{void deleteIncidentFromDetail();});
   el('incDetailCopy').addEventListener('click',async()=>{
    const report=formatIncidentReport(incidentRecords.get(incidentDetailKey));
-   el('incDetailStatus').textContent=report&&await copyWhatsAppText(report)?'Reporte de incidencia copiado.':'No se pudo copiar. Comprueba los permisos del portapapeles.';
+   el('incDetailStatus').textContent=report&&await copyWhatsAppText(customizeClipboard('incident',report))?'Reporte de incidencia copiado.':'No se pudo copiar. Comprueba los permisos del portapapeles.';
   });
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!el('incDetailOverlay').hidden)el('incDetailOverlay').hidden=true;});
   el('incRefresh').addEventListener('click',()=>{void refreshIncidents(false);});
@@ -701,7 +704,7 @@ function refreshArchiveData(forceImportMode=false){
   if(data){
     inputMode='import';document.body.classList.add('import-mode');
     imported.week=previousWeek;imported.executive=previousExec;simDirty=false;
-    initializeTableView(data);chooseWeekAndExecutive();if(activePage==='daily')renderDaily();
+    initializeTableView(data);chooseWeekAndExecutive();populateTeamPeriods();populateTeamModules();if(activePage==='team')renderTeam();if(activePage==='daily')renderDaily();
     drawImportMeta('');
     el('recordsDisclosure').open=true;
   }else{
@@ -709,7 +712,7 @@ function refreshArchiveData(forceImportMode=false){
     if(forceImportMode||inputMode==='import')resetToManual();
     el('weekSelect').innerHTML='<option value="">Sin semanas disponibles</option>';el('weekSelect').disabled=true;
     el('executiveSelect').innerHTML='<option value="">Sin ejecutivos disponibles</option>';el('executiveSelect').disabled=true;
-    populateTeamModules();if(activePage==='team')renderTeam();if(activePage==='daily')renderDaily();
+    populateTeamPeriods();populateTeamModules();if(activePage==='team')renderTeam();if(activePage==='daily')renderDaily();
     statusBox(archive.temporaryMode?'Sin archivos temporales en esta sesión.':archive.reports.length?'No hay archivos seleccionados. Activa al menos uno desde Ajustes.':'No hay archivos guardados. Usa «Cargar XLS» para importar.');
   }
   renderArchiveList();
@@ -771,6 +774,7 @@ async function importXlsFiles(files){
   if(persistent&&!archive.ready){statusBox('No está disponible el historial en línea. No se pudo guardar el XLS.','error');return;}
   const target=persistent?archive.reports:archive.tempReports;
   let added=0,duplicated=0,cancelled=0,failures=[],warnings=[];
+  const newReports=[];
   for(const file of [...files]){
     try{
       if(!/\.(xls|xlsx|csv|tsv)$/i.test(file.name))throw Error('Selecciona un archivo XLS, XLSX, CSV o TSV.');
@@ -786,7 +790,7 @@ async function importXlsFiles(files){
         name:displayName,size:file.size,addedAt:Date.now(),fingerprint,
         headers:data.headers,rows:data.rows.map(r=>r.raw)};
       if(persistent)await archivePut(record);
-      target.push(record);added++;
+      target.push(record);newReports.push(record);added++;
     }catch(err){failures.push(file.name+': '+(err.message||'Error de lectura'));}
   }
   target.sort((a,b)=>a.addedAt-b.addedAt||a.id.localeCompare(b.id));
@@ -796,6 +800,7 @@ async function importXlsFiles(files){
     loadFolioFlags();
     refreshArchiveData(true);window.VISITS?.refreshSources();
     if(persistent)await refreshIncidents(true);
+    if(newReports.length)requestGoalAudit('import',newReports);
   }
   const stateText=persistent?
     `${added} archivo(s) guardado(s) en el historial · ${duplicated} duplicado(s) omitido(s).`:
@@ -813,7 +818,7 @@ async function initArchive(){
     refreshArchiveData(true);window.VISITS?.refreshSources();
     await refreshIncidents(true);
   }catch(err){archive.ready=false;renderArchiveList();statusBox('No se pudo conectar al historial en línea: '+esc(err.message||String(err))+'. Comprueba la conexión, la sesión y Netlify Database.','error');}
-  finally{if(!incidentLoaded)await refreshIncidents(true);await updatesManager?.refresh(true);}
+  finally{if(!incidentLoaded)await refreshIncidents(true);await updatesManager?.refresh(true);requestGoalAudit('start');}
 }
 // Columnas configurables y filtros visuales (no alteran las métricas por sí mismos).
 function columnLabel(c){return c.key==='dynamicBonus'?'Bono adicional':c.key==='incident'?'Incidencia':c.key==='app'?'APP':c.key==='payment'?'Validación de pago':c.name;}
@@ -1083,31 +1088,65 @@ function renderRecords(){
 function updateImport(){if(!imported.data)return;chooseExecutive();drawImportMeta(imported.sourceName||'Reporte.xls');}
 
 
-// V7: agrupación de toda la semana por ejecutivo; usa exactamente el motor y exclusiones individuales.
+// V3.0.4 · Períodos del comparativo y agregación de comisiones por semana.
+function teamPeriodWindow(){
+ const week=teamPeriod.week||imported.week;
+ if(teamPeriod.mode==='week')return {from:week,to:week?sundayOf(week):'',valid:Boolean(week),label:week?weekLabel(week):'Sin semana'};
+ const from=teamPeriod.from,to=teamPeriod.to;
+ return {from,to,valid:Boolean(from&&to&&isoDate(from)===from&&isoDate(to)===to&&from<=to),label:from&&to?fmtDay(from)+' — '+fmtDay(to):'Selecciona ambas fechas'};
+}
+function populateTeamPeriods(){
+ const pick=el('teamWeek');if(!pick)return;
+ const weeks=[...new Set((imported.data?.rows||[]).map(r=>r.week).filter(Boolean))].sort().reverse();
+ if(!weeks.includes(teamPeriod.week))teamPeriod.week=weeks.includes(imported.week)?imported.week:weeks[0]||'';
+ pick.innerHTML=weeks.map(w=>`<option value="${esc(w)}">${esc(weekLabel(w))}</option>`).join('')||'<option value="">Sin semanas</option>';
+ pick.value=teamPeriod.week;
+ if(!teamPeriod.from&&teamPeriod.week)teamPeriod.from=teamPeriod.week;
+ if(!teamPeriod.to&&teamPeriod.week)teamPeriod.to=sundayOf(teamPeriod.week);
+ el('teamDateMode').value=teamPeriod.mode;
+ el('teamFrom').value=teamPeriod.from;el('teamTo').value=teamPeriod.to;
+ el('teamWeekBox').hidden=teamPeriod.mode!=='week';el('teamFromBox').hidden=teamPeriod.mode!=='range';el('teamToBox').hidden=teamPeriod.mode!=='range';
+}
+function teamPeriodRows(){
+ const p=teamPeriodWindow();return p.valid?(imported.data?.rows||[]).filter(r=>r.fecha&&r.fecha>=p.from&&r.fecha<=p.to):[];
+}
+/** Cada semana ejecuta calculate sin alteraciones; los resúmenes únicamente SUMAN resultados. */
 function teamEntries(){
-  if(!imported.data||!imported.week)return [];
-  const byExecutive=new Map();
-  for(const r of imported.data.rows){
-    if(r.week!==imported.week||!r.executive)continue;
-    let entry=byExecutive.get(r.executive);
-    if(!entry){entry={name:r.executive,modules:new Set(),rows:[]};byExecutive.set(r.executive,entry)}
-    entry.modules.add(r.module||'Sin módulo');entry.rows.push(r);
-  }
-  return [...byExecutive.values()].map(e=>{
-    e.module=[...e.modules].join(', ');
-    e.goal=executiveGoal(imported.week,e.name);
-    e.adjustment=executiveRecovery(imported.week,e.name);
-    e.inputs=buildImportedCounts(e.rows,e.goal,e.adjustment);
-    e.result=calculate(e.inputs);
-    return e;
+ if(!imported.data)return [];
+ const rows=teamPeriodRows(),byExecutive=new Map();
+ const includedWeeks=[...new Set(rows.map(r=>r.week).filter(Boolean))].sort();
+ for(const r of rows){
+  if(!r.executive)continue;
+  const key=normalize(r.executive);
+  let entry=byExecutive.get(key);
+  if(!entry){entry={name:r.executive,modules:new Set(),byWeek:new Map()};byExecutive.set(key,entry);}
+  entry.modules.add(r.module||'Sin módulo');
+  if(!entry.byWeek.has(r.week))entry.byWeek.set(r.week,[]);
+  entry.byWeek.get(r.week).push(r);
+ }
+ return [...byExecutive.values()].map(e=>{
+  e.module=[...e.modules].join(', ');
+  // Incluir objetivo semanal completo aun si el rango contiene sólo parte de esa semana.
+  e.parts=includedWeeks.map(week=>{
+   const rows=e.byWeek.get(week)||[],goal=executiveGoal(week,e.name),adjustment=executiveRecovery(week,e.name);
+   const inputs=buildImportedCounts(rows,goal,adjustment),result=calculate(inputs);
+   return {week,rows,goal,adjustment,inputs,result};
   });
+  e.goal=e.parts.reduce((sum,p)=>sum+p.goal,0);
+  e.adjustment=e.parts.reduce((sum,p)=>sum+p.adjustment,0);
+  const keys=['validReg','validGuar','validSales','validApp','validP0','validDental','inc','net','dynamicBonusCount','dynamicBonus'];
+  const summary=Object.fromEntries(keys.map(k=>[k,e.parts.reduce((sum,p)=>sum+(Number(p.result[k])||0),0)]));
+  e.result={...summary,net:round(summary.net),dynamicBonus:round(summary.dynamicBonus),goal:e.goal,completion:e.goal?100*summary.validSales/e.goal:0,ok:e.parts.every(p=>p.result.ok),tier:e.parts.length===1?e.parts[0].result.tier:null,weeks:e.parts.length};
+  e.inputs={inc:e.parts.reduce((sum,p)=>sum+(p.inputs.inc||0),0)};
+  return e;
+ });
 }
 function populateTeamModules(){
-  const sel=el('teamModule');if(!sel||!imported.data)return;
-  const previous=sel.value;
-  const mods=[...new Set(imported.data.rows.filter(r=>r.week===imported.week).map(r=>r.module).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
-  sel.innerHTML='<option value="">Todos los módulos</option>'+mods.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('');
-  sel.value=mods.includes(previous)?previous:'';
+ const sel=el('teamModule');if(!sel)return;
+ const previous=sel.value;
+ const mods=[...new Set(teamPeriodRows().map(r=>r.module).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+ sel.innerHTML='<option value="">Todos los módulos</option>'+mods.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('');
+ sel.value=mods.includes(previous)?previous:'';
 }
 function filteredTeamEntries(){
   const term=normalize(el('teamSearch').value),module=el('teamModule').value,sort=el('teamSort').value;
@@ -1119,25 +1158,29 @@ function filteredTeamEntries(){
   else list.sort((a,b)=>(b.result.ok?b.result.net:-1e10)-(a.result.ok?a.result.net:-1e10)||cmpName(a,b));
   return list;
 }
-function briefTier(r){if(!r.ok)return 'Revisar';if(!r.tier)return 'Sin pago';return r.tier.min===101?'101%+':r.tier.min===81?'81–100%':r.tier.min===61?'61–80%':'50–60%';}
+function briefTier(r){if(!r.ok)return 'Revisar';if(r.weeks>1)return 'Por semana';if(!r.tier)return 'Sin pago';return r.tier.min===101?'101%+':r.tier.min===81?'81–100%':r.tier.min===61?'61–80%':'50–60%';}
 function renderTeam(){
   if(!el('teamRows'))return;
   if(!imported.data){el('teamSummary').innerHTML='';el('teamRows').innerHTML='<tr><td class="team-empty" colspan="13">Importa un archivo XLS para visualizar a todos los ejecutivos.</td></tr>';el('teamTotals').innerHTML='';return;}
-  el('teamPeriod').textContent=weekLabel(imported.week);
+  const period=teamPeriodWindow();
+  el('teamRangeError').textContent=period.valid?'':'Indica un rango válido, con fecha inicial anterior o igual a la final.';
+  el('teamPeriod').textContent=period.label;
   const group=filteredTeamEntries(),all=teamEntries();
   const totals={reg:0,guar:0,sales:0,app:0,p0:0,dental:0,commission:0,goal:0,inc:0,invalid:0};
   for(const e of group){const r=e.result;if(!r.ok){totals.invalid++;continue;}
     totals.reg+=r.validReg;totals.guar+=r.validGuar;totals.sales+=r.validSales;totals.app+=r.validApp;totals.p0+=r.validP0;totals.dental+=r.validDental;totals.commission+=r.net;totals.goal+=r.goal;totals.inc+=r.inc;
   }
   const teamCompletion=totals.goal?100*totals.sales/totals.goal:0;
-  const cards=[['Ejecutivos visibles',String(group.length),`${all.length} en la semana`],['Ventas comisionables',String(totals.sales),`${totals.reg} regulares · ${totals.guar} garantizadas`],['Cumplimiento conjunto',totals.goal?pct(teamCompletion):'—',`Objetivo conjunto: ${totals.goal} ventas`],['Comisiones estimadas',mx(round(totals.commission)),totals.invalid?`${totals.invalid} ejecutivos por revisar`:'Después de descuentos registrados']];
+  const cards=[['Ejecutivos visibles',String(group.length),`${all.length} en el período`],['Ventas comisionables',String(totals.sales),`${totals.reg} regulares · ${totals.guar} garantizadas`],['Cumplimiento conjunto',totals.goal?pct(teamCompletion):'—',`Objetivo conjunto: ${totals.goal} ventas`],['Comisiones estimadas',mx(round(totals.commission)),totals.invalid?`${totals.invalid} ejecutivos por revisar`:'Después de descuentos registrados']];
   el('teamSummary').innerHTML=cards.map(([label,value,desc])=>`<div class="team-kpi"><span>${esc(label)}</span><b>${esc(value)}</b><small>${esc(desc)}</small></div>`).join('');
-  el('teamHelp').textContent='Metas individuales: '+qualityConfig.execWeeklyGoal+' ventas por defecto (editable en Ajustes); edita cada meta directamente en la tabla. APP activa por venta con código, excepto las desmarcadas. Para marcar incidencias o ajustar recuperaciones, entra a «Detalle» del ejecutivo. Los datos se calculan sobre '+weekLabel(imported.week)+'.';
+  el('teamHelp').textContent='Período: '+period.label+'. Se calcula cada semana con su meta semanal COMPLETA, aunque el rango incluya solo algunos días; después se suman los resultados y las comisiones semanales (escalones, bonos y descuentos independientes). La columna Meta permite editar únicamente cuando hay una sola semana con registros. Para revisar folios e incidencias, abre Detalle.';
   el('teamRows').innerHTML=group.length?group.map(e=>{
     const r=e.result,good=r.ok,completion=good?pct(r.completion):'—';
     const completionBar=good?Math.min(100,Math.max(0,r.completion)):0;
-    return `<tr><td><button type="button" class="base-goal-inline executive-name" data-base-goal-type="executive" data-base-goal-name="${esc(e.name)}">${esc(e.name)}</button><div class="executive-module">${esc(e.module)}</div></td>
-      <td><input class="goal-mini" type="number" min="1" step="1" value="${e.goal}" data-team-goal="${esc(e.name)}" aria-label="Meta semanal de ${esc(e.name)}" title="Objetivo semanal editable" /></td>
+    const detail=e.parts.length>1?`<details class="team-week-details"><summary>Desglose de ${e.parts.length} semanas</summary>${e.parts.map(p=>`<div>${esc(weekLabel(p.week))}: ${p.result.validSales||0}/${p.goal} ventas · ${mx(p.result.net||0)} · ${esc(briefTier(p.result))}</div>`).join('')}</details>`:'';
+    const editable=e.parts.length===1;
+    return `<tr><td><button type="button" class="base-goal-inline executive-name" data-base-goal-type="executive" data-base-goal-name="${esc(e.name)}">${esc(e.name)}</button><div class="executive-module">${esc(e.module)}</div>${detail}</td>
+      <td>${editable?`<input class="goal-mini" type="number" min="1" step="1" value="${e.goal}" data-team-goal="${esc(e.name)}" data-team-week="${esc(e.parts[0].week)}" aria-label="Meta semanal de ${esc(e.name)}" title="Objetivo semanal editable"/>`:`<b title="Suma de objetivos semanales completos">${e.goal}</b>`}</td>
       <td><span class="progress-value">${completion}</span><span class="progress-meter"><i style="width:${completionBar}%"></i></span></td>
       <td>${good?r.validReg:'—'}</td><td>${good?r.validGuar:'—'}</td><td><strong>${good?r.validSales:'—'}</strong></td>
       <td>${good?r.validApp:'—'}</td><td>${good?r.validP0:'—'}</td><td>${good?r.validDental:'—'}</td><td class="inc-count">${e.inputs.inc||'—'}</td>
@@ -1360,7 +1403,7 @@ function historyAnalyze(){
  // recuperar la meta semanal guardada con la grafía de esa misma semana.
  const goalFor=(week)=>{
    const value=resolveAnalysisGoal('executive',name,week,'sales');
-   return value.value!==null?value.value:executiveGoal(week,byWeek.get(week)||name);
+   return value.value;
  };
  return analyzeHistory({rows:records,name,kind,module:el('histModule').value,
     weekday:el('histWeekday').value,from:el('histFrom').value,to:el('histTo').value,
@@ -1370,7 +1413,7 @@ function historyWeekdayLabel(){const value=el('histWeekday').value;return value=
 function historyGoalForm(p){
  const name=el('histExecutive').value,kind=el('histPeriod').value;
  const key=overrideKey(name,kind,p.key),edited=Object.hasOwn(historyPrefs.periodGoals,key);
- return `<input type="number" data-history-goal="${esc(p.key)}" step="0.01" min="0.01" max="99999" value="${p.goal.toFixed(2)}" title="Objetivo ${edited?'personalizado':'automático'}; vacía el campo para restaurarlo" aria-label="Objetivo ${esc(p.key)}"><small>${edited?' Excepción de período':' Objetivo base/automático'}</small>`;
+ return `<input type="number" data-history-goal="${esc(p.key)}" step="0.01" min="0.01" max="99999" value="${p.goal===null?'':p.goal.toFixed(2)}" title="Objetivo ${edited?'personalizado':'automático'}; vacía el campo para restaurarlo" aria-label="Objetivo ${esc(p.key)}"><small>${edited?' Excepción de período':p.goal===null?' Sin objetivo configurado':' Objetivo base/automático'}</small>`;
 }
 function historyGraph(data){
  const host=el('histChart'),list=data.periods.slice(-24),key=historyPrefs.chartMetric;
@@ -1394,7 +1437,7 @@ function renderHistory(){
  el('histTableHead').closest('.history-detail').hidden=!historyPrefs.showTable;
  if(!results)return;
  const summary=results.summary;
- el('histSummary').innerHTML=historyPrefs.metrics.map(k=>`<div class="history-kpi"><span>${esc(HISTORY_LABEL_MAP.get(k))}</span><b>${k==='quality'?(summary.periods?pct(summary.quality):'—'):k==='global'?(summary.periods?pct(summary.global):'—'):historyFormat(summary.counts[k])}</b><small>${k==='quality'||k==='global'?'Recalculado con objetivos':'Acumulado del período'}</small></div>`).join('')+`<div class="history-kpi"><span>Objetivo acumulado</span><b>${historyFormat(summary.goal)}</b><small>${summary.periods} períodos con datos</small></div>`;
+ el('histSummary').innerHTML=historyPrefs.metrics.map(k=>`<div class="history-kpi"><span>${esc(HISTORY_LABEL_MAP.get(k))}</span><b>${k==='quality'?(summary.periods?pct(summary.quality):'—'):k==='global'?(summary.periods?pct(summary.global):'—'):historyFormat(summary.counts[k])}</b><small>${k==='quality'||k==='global'?'Recalculado con objetivos':'Acumulado del período'}</small></div>`).join('')+`<div class="history-kpi"><span>Objetivo acumulado</span><b>${(summary.goal===null?'Sin objetivo configurado':historyFormat(summary.goal))}</b><small>${summary.periods} períodos con datos</small></div>`;
  const averageCards=[['Promedio de '+historyWeekdayLabel(),results.sameWeekday],['Promedio por semana',results.weekly],['Promedio por mes',results.monthly]];
  const avrText=(c,k)=>!c.periods?'—':k==='quality'?pct(c.quality):k==='global'?pct(c.global):historyFormat(c.averages[k]);
  el('histAverages').innerHTML=averageCards.map(([label,c])=>`<article class="history-average"><strong>${esc(label)}</strong><b>${c.periods?historyFormat(c.averages.sales):'—'} ventas</b><small>${c.periods} períodos con registros · Calidad ${c.periods?pct(c.quality):'—'} · Global ${c.periods?pct(c.global):'—'}</small><div class="history-average-metrics">${historyPrefs.metrics.map(k=>`<div style="display:flex;justify-content:space-between;gap:7px;padding-top:5px;font-size:11px"><span>${esc(HISTORY_LABEL_MAP.get(k))}</span><b style="font-size:11px;margin:0">${avrText(c,k)}</b></div>`).join('')}</div></article>`).join('');
@@ -1405,7 +1448,7 @@ function renderHistory(){
  el('histTableHead').innerHTML='<tr><th>'+({day:'Día',week:'Semana',month:'Mes'}[kind])+'</th>'+(historyPrefs.showGoalColumn?'<th>Objetivo editable</th>':'')+metrics.map(k=>`<th>${esc(HISTORY_LABEL_MAP.get(k))}</th>`).join('')+(historyPrefs.showModuleColumn?'<th>Módulos</th>':'')+'</tr>';
  const colspan=1+metrics.length+(historyPrefs.showGoalColumn?1:0)+(historyPrefs.showModuleColumn?1:0);
  el('histTableBody').innerHTML=visible.length?visible.map(p=>`<tr><td><b>${esc(p.key)}</b></td>${historyPrefs.showGoalColumn?`<td>${historyGoalForm(p)}</td>`:''}${metrics.map(k=>`<td>${historyMetricValue(p,k)}</td>`).join('')}${historyPrefs.showModuleColumn?`<td>${esc(p.modules.join(', '))}</td>`:''}</tr>`).join(''):`<tr><td colspan="${colspan}">Sin períodos con registros.</td></tr>`;
- el('histRowsSummary').textContent=`${results.periods.length} períodos · ${historyFormat(summary.counts.sales)} ventas · Objetivo ${historyFormat(summary.goal)}`;
+ el('histRowsSummary').textContent=`${results.periods.length} períodos · ${historyFormat(summary.counts.sales)} ventas · Objetivo ${(summary.goal===null?'Sin objetivo configurado':historyFormat(summary.goal))}`;
  el('histPageStatus').textContent=`${historyView.page} de ${pages}`;
  el('histPrev').disabled=historyView.page<=1;el('histNext').disabled=historyView.page>=pages;
 }
@@ -1496,10 +1539,7 @@ function moduleHistoryAnalyze(){
  const actualName=moduleNames(raw).find(m=>moduleKey(m)===moduleKey(module))||module;
  const weeklyGoal=(week)=>{
    const goal=resolveAnalysisGoal('module',actualName,week,'sales');
-   if(goal.value!==null)return goal.value;
-   return resolveModuleWeeklyGoal({week,module:actualName,achievementGoals:achievementGoalStore,
-   configuredGoal:moduleQualityOptions(actualName).weeklySales,
-   supervisorGoal:supSettings.goals[actualName],rows:raw,getExecutiveGoal:executiveGoal,isSupervisor:supervisorRow});
+   return goal.value;
  };
  const rules=baseRulesForHistory('module',actualName,Object.fromEntries(['completion','purchase','p0','app'].map(k=>[k,qualityRule(k,actualName,'module')])));
  return analyzeModuleHistory({rows,module:actualName,kind:el('mhPeriod').value,weekday:el('mhWeekday').value,
@@ -1510,7 +1550,7 @@ function moduleWeekdayLabel(){const value=el('mhWeekday').value;return value==='
 function moduleGoalForm(p){
  const name=el('mhExecutive').value,kind=el('mhPeriod').value;
  const key=overrideKey(name,kind,p.key),edited=Object.hasOwn(moduleHistoryPrefs.periodGoals,key);
- return `<input type="number" data-module-goal="${esc(p.key)}" step="0.01" min="0.01" max="99999" value="${p.goal.toFixed(2)}" title="Objetivo ${edited?'personalizado':'automático'}; vacía el campo para restaurarlo" aria-label="Objetivo ${esc(p.key)}"><small>${edited?' Excepción de período':' Objetivo base/automático'}</small>`;
+ return `<input type="number" data-module-goal="${esc(p.key)}" step="0.01" min="0.01" max="99999" value="${p.goal===null?'':p.goal.toFixed(2)}" title="Objetivo ${edited?'personalizado':'automático'}; vacía el campo para restaurarlo" aria-label="Objetivo ${esc(p.key)}"><small>${edited?' Excepción de período':p.goal===null?' Sin objetivo configurado':' Objetivo base/automático'}</small>`;
 }
 function moduleGraph(data){
  const host=el('mhChart'),list=data.periods.slice(-24),key=moduleHistoryPrefs.chartMetric;
@@ -1535,7 +1575,7 @@ function renderModuleHistory(){
  el('mhTableHead').closest('.history-detail').hidden=!moduleHistoryPrefs.showTable;
  if(!results)return;
  const summary=results.summary;
- el('mhSummary').innerHTML=moduleHistoryPrefs.metrics.map(k=>`<div class="history-kpi"><span>${esc(HISTORY_LABEL_MAP.get(k))}</span><b>${k==='quality'?(summary.periods?pct(summary.quality):'—'):k==='global'?(summary.periods?pct(summary.global):'—'):historyFormat(summary.counts[k])}</b><small>${k==='quality'||k==='global'?'Recalculado con objetivos':'Acumulado del período'}</small></div>`).join('')+`<div class="history-kpi"><span>Objetivo acumulado del módulo</span><b>${historyFormat(summary.goal)}</b><small>${summary.periods} períodos con datos</small></div>`;
+ el('mhSummary').innerHTML=moduleHistoryPrefs.metrics.map(k=>`<div class="history-kpi"><span>${esc(HISTORY_LABEL_MAP.get(k))}</span><b>${k==='quality'?(summary.periods?pct(summary.quality):'—'):k==='global'?(summary.periods?pct(summary.global):'—'):historyFormat(summary.counts[k])}</b><small>${k==='quality'||k==='global'?'Recalculado con objetivos':'Acumulado del período'}</small></div>`).join('')+`<div class="history-kpi"><span>Objetivo acumulado del módulo</span><b>${(summary.goal===null?'Sin objetivo configurado':historyFormat(summary.goal))}</b><small>${summary.periods} períodos con datos</small></div>`;
  const averageCards=[['Promedio de '+moduleWeekdayLabel(),results.sameWeekday],['Promedio por semana',results.weekly],['Promedio por mes',results.monthly]];
  const avrText=(c,k)=>!c.periods?'—':k==='quality'?pct(c.quality):k==='global'?pct(c.global):historyFormat(c.averages[k]);
  el('mhAverages').innerHTML=averageCards.map(([label,c])=>`<article class="history-average"><strong>${esc(label)}</strong><b>${c.periods?historyFormat(c.averages.sales):'—'} ventas</b><small>${c.periods} períodos con registros · Calidad ${c.periods?pct(c.quality):'—'} · Global ${c.periods?pct(c.global):'—'}</small><div class="history-average-metrics">${moduleHistoryPrefs.metrics.map(k=>`<div style="display:flex;justify-content:space-between;gap:7px;padding-top:5px;font-size:11px"><span>${esc(HISTORY_LABEL_MAP.get(k))}</span><b style="font-size:11px;margin:0">${avrText(c,k)}</b></div>`).join('')}</div></article>`).join('');
@@ -1546,7 +1586,7 @@ function renderModuleHistory(){
  el('mhTableHead').innerHTML='<tr><th>'+({day:'Día',week:'Semana',month:'Mes'}[kind])+'</th>'+(moduleHistoryPrefs.showGoalColumn?'<th>Objetivo editable</th>':'')+metrics.map(k=>`<th>${esc(HISTORY_LABEL_MAP.get(k))}</th>`).join('')+(moduleHistoryPrefs.showModuleColumn?'<th>Ejecutivos</th>':'')+'</tr>';
  const colspan=1+metrics.length+(moduleHistoryPrefs.showGoalColumn?1:0)+(moduleHistoryPrefs.showModuleColumn?1:0);
  el('mhTableBody').innerHTML=visible.length?visible.map(p=>`<tr><td><b>${esc(p.key)}</b></td>${moduleHistoryPrefs.showGoalColumn?`<td>${moduleGoalForm(p)}</td>`:''}${metrics.map(k=>`<td>${historyMetricValue(p,k)}</td>`).join('')}${moduleHistoryPrefs.showModuleColumn?`<td>${esc(p.executives.join(', '))}</td>`:''}</tr>`).join(''):`<tr><td colspan="${colspan}">Sin períodos con registros.</td></tr>`;
- el('mhRowsSummary').textContent=`${results.periods.length} períodos · ${historyFormat(summary.counts.sales)} ventas · Objetivo ${historyFormat(summary.goal)}`;
+ el('mhRowsSummary').textContent=`${results.periods.length} períodos · ${historyFormat(summary.counts.sales)} ventas · Objetivo ${(summary.goal===null?'Sin objetivo configurado':historyFormat(summary.goal))}`;
  el('mhPageStatus').textContent=`${moduleHistoryView.page} de ${pages}`;
  el('mhPrev').disabled=moduleHistoryView.page<=1;el('mhNext').disabled=moduleHistoryView.page>=pages;
 }
@@ -1670,10 +1710,10 @@ function achReadGoals(){
    return [k,Number.isFinite(goal.value)&&goal.value>0?goal.value:null];
   }
   if(!configured('headquarters','Jefatura',metric)){
-   const modules=baseModuleNames();
+   const modules=baseModuleNames(week);
    if(!modules.length||modules.some(name=>!configured('module',name,metric)))return [k,null];
   }
-  const goal=headquartersGoal(baseGoals,week,metric,baseModuleNames());
+  const goal=headquartersGoal(baseGoals,week,metric,baseModuleNames(week));
   return [k,Number.isFinite(goal.value)&&goal.value>0?goal.value:null];
  }));
 }
@@ -2092,8 +2132,8 @@ function renderDaily(){
 // No se inventan cantidades ni se consideran porcentajes predeterminados no capturados.
 function configuredJefaturaDailyGoal(week,metric){
  const configured=(type,name)=>baseGoals.profiles?.[type==='headquarters'?'headquarters|JEFATURA':`module|${normalizeName(name)}`]?.versions?.some(v=>v.from<=week&&Object.hasOwn(v.goals||{},metric))===true;
- if(configured('headquarters','Jefatura'))return headquartersGoal(baseGoals,week,metric,baseModuleNames()).value;
- const modules=baseModuleNames();
+ if(configured('headquarters','Jefatura'))return headquartersGoal(baseGoals,week,metric,baseModuleNames(week)).value;
+ const modules=baseModuleNames(week);
  if(!modules.length||!modules.every(name=>configured('module',name)))return null;
  return headquartersGoal(baseGoals,week,metric,modules).value;
 }
@@ -2148,7 +2188,7 @@ async function copyDailyWhatsApp(){
   const button=el('dailyCopyWhatsApp');
   try{
     const report=dailyWhatsAppText();
-    if(!await copyWhatsAppText(report))throw new Error('El navegador bloqueó la copia. Permite el portapapeles o usa HTTPS.');
+    if(!await copyWhatsAppText(customizeClipboard('daily',report)))throw new Error('El navegador bloqueó la copia. Permite el portapapeles o usa HTTPS.');
     dailyCopyFeedback('Reporte copiado. Pégalo en WhatsApp conservando las tres comillas invertidas.');
   }catch(error){dailyCopyFeedback(error?.message||'No se pudo copiar el reporte.');}
   finally{button.blur();}
@@ -2160,7 +2200,7 @@ async function copyDailyJefaturaProgress(){
   if(!imported.data)throw Error('Importa registros para generar el avance de Jefatura.');
   const dates=dailyDates();if(!dates)throw Error('Selecciona una fecha válida para el reporte.');
   const report=jefaturaProgressReport(dailyJefaturaSnapshot(dates.latest));
-  if(!await copyWhatsAppText(report))throw Error('El navegador bloqueó la copia. Comprueba los permisos del portapapeles.');
+  if(!await copyWhatsAppText(customizeClipboard('progress',report)))throw Error('El navegador bloqueó la copia. Comprueba los permisos del portapapeles.');
   dailyCopyFeedback('Avance y objetivo de Jefatura copiados al portapapeles.');
  }catch(error){dailyCopyFeedback(error?.message||'No se pudo copiar el avance.');}
  finally{button?.blur();}
@@ -2232,10 +2272,10 @@ function weeklyMetricValue(metrics,rows,key){
   if(key==='purchase')return countQualityRows(rows).purchase;
   return metrics[key]??0;
 }
-function weeklyTargetPct(key){return qualityPercentText(qualityRule(key,'TOTAL','module').required);}
+function weeklyTargetPct(key,week){return qualityPercentText(resolveAnalysisGoal('headquarters','Jefatura',week,key==='app'?'apps':key).value);}
 function weeklyGoalMarkup(week,key,primaryWeek,metrics){
   if(key==='reg'||key==='guar')return '<td class="no-goal" title="Sin objetivo">—</td>';
-  if(key==='app'||key==='purchase')return `<td class="weekly-rule-goal" title="Porcentaje requerido en Ajustes (puede variar por módulo)">${weeklyTargetPct(key)}</td>`;
+  if(key==='app'||key==='purchase')return `<td class="weekly-rule-goal" title="Porcentaje requerido en Ajustes (puede variar por módulo)">${weeklyTargetPct(key,week)}</td>`;
   return weeklyGoalInput(week,key,primaryWeek,metrics);
 }
 function weeklyFactorValues(week,primaryWeek,data,q){
@@ -2271,7 +2311,7 @@ function hasWeeklyGoalOverride(week,key){
 function weeklyGoalFor(week,key,primaryWeek,metrics){
   if(hasWeeklyGoalOverride(week,key))return weeklyGoals[week][key];
   const metricName={reg:'regular',guar:'guaranteed',app:'apps',p0:'p0',purchase:'purchase',dental:'dental',records:'records',sales:'sales'}[key];
-  if(metricName){const base=resolveAnalysisGoal('headquarters','Jefatura',week,metricName);if(base.value!==null)return base.value;}
+  if(metricName){const base=resolveAnalysisGoal('headquarters','Jefatura',week,metricName);if(base.value!==null){if(key==='p0'||key==='dental'){const totals=metrics||weeklyGroups(week).totals.metrics;return base.value*(totals[key==='p0'?'reg':'sales']||0)/100;}return base.value;}}
   // Cada semana usa el total logrado en su propia tabla como objetivo base de Plan Cero (regulares) y Dental (ventas).
   if(key==='p0'||key==='dental'){
     const totals=metrics||weeklyGroups(week).totals.metrics;
@@ -2279,28 +2319,27 @@ function weeklyGoalFor(week,key,primaryWeek,metrics){
   }
   if(['sales','records'].includes(key)){
     const rows=weeklyGroups(week).rows;const names=[...new Set(rows.map(r=>r.module).filter(Boolean))];
-    const configured=names.reduce((sum,name)=>sum+(Number(moduleQualityOptions(name)[key==='sales'?'weeklySales':'weeklyRecords'])||0),0);
-    if(configured>0)return configured;
+    // No sustituir una meta base faltante con configuraciones antiguas.
   }
   // Sin objetivos capturados, regulares y garantizadas comienzan en cero.
   if(key==='reg'||key==='guar')return 0;
   // Registros y ventas requieren captura manual. La segunda semana conserva
   // la herencia opcional de estas dos metas hasta que se edite individualmente.
-  return primaryWeek&&week!==primaryWeek?weeklyGoalFor(primaryWeek,key):0;
+  return null;
 }
 function weeklyGoalInput(week,key,primaryWeek,metrics){
   const val=weeklyGoalFor(week,key,primaryWeek,metrics);
   const saved=hasWeeklyGoalOverride(week,key);
   const automatic=key==='p0'||key==='dental';
-  const blankManual=(key==='records'||key==='sales')&&!saved&&val===0;
+  const blankManual=val===null;
   const label=`Objetivo de ${WEEKLY_LABELS[key]} para ${weekLabel(week)}`;
   const origin=automatic?(saved?'Meta manual; borra el valor para volver al objetivo automático':key==='p0'?'Automático: total de ventas regulares de esta semana':'Automático: total de ventas de esta semana'):'Meta editable';
   const status=automatic?`<span class="weekly-goal-auto${saved?' manual':''}">${saved?'Manual':key==='p0'?'Auto total':'Auto total'}</span>`:'';
-  return `<td><div class="weekly-goal-control"><input class="weekly-goal-input" type="number" inputmode="decimal" min="0" step="${automatic?'0.01':'1'}" value="${blankManual?'':val}" placeholder="${blankManual?'Ingresar':''}" data-weekly-week="${esc(week)}" data-weekly-metric="${key}" aria-label="${esc(label)}" title="${esc(origin)}. ${esc(label)}" />${status}</div></td>`;
+  return `<td><div class="weekly-goal-control"><input class="weekly-goal-input" type="number" inputmode="decimal" min="0" step="${automatic?'0.01':'1'}" value="${blankManual?'':val}" placeholder="${blankManual?'Sin objetivo configurado':''}" data-weekly-week="${esc(week)}" data-weekly-metric="${key}" aria-label="${esc(label)}" title="${esc(origin)}. ${esc(label)}" />${status}</div></td>`;
 }
 function weeklyGoalExport(week,key,primaryWeek,metrics){
   const val=weeklyGoalFor(week,key,primaryWeek,metrics);
-  return (key==='records'||key==='sales')&&!hasWeeklyGoalOverride(week,key)&&val===0?'':val;
+  return val===null?'Sin objetivo configurado':val;
 }
 function weeklyGroups(week){
   const data=combinedArchiveData(isAuthorized()?archive.reports:archive.tempReports);
@@ -2322,7 +2361,7 @@ function weeklyPanelMarkup(week,primaryWeek){
   const overall=totalQuality.global;
   const metricCells=g=>WEEKLY_DISPLAY_METRICS.map(k=>`<td>${number.format(weeklyMetricValue(g.metrics,g.rows,k))}</td>`).join('');
   const rowMarkup=g=>`<tr><td><button class="base-goal-inline" type="button" data-base-goal-type="module" data-base-goal-name="${esc(g.name)}">${esc(g.name)}</button></td>${metricCells(g)}<td class="quality-global">${qualityPercentText(qualityFor(g))}</td></tr>`;
-  const inputRow=`<tr class="goal-row"><td>OBJETIVOS</td>${WEEKLY_DISPLAY_METRICS.map(k=>weeklyGoalMarkup(week,k,primaryWeek,data.totals.metrics)).join('')}<td class="weekly-rule-goal" title="Porcentaje requerido de Calidad en Ajustes">${weeklyTargetPct('quality')}</td></tr>`;
+  const inputRow=`<tr class="goal-row"><td>OBJETIVOS</td>${WEEKLY_DISPLAY_METRICS.map(k=>weeklyGoalMarkup(week,k,primaryWeek,data.totals.metrics)).join('')}<td class="weekly-rule-goal" title="Porcentaje requerido de Calidad en Ajustes">${weeklyTargetPct('quality',week)}</td></tr>`;
   const totalRow=`<tr class="weekly-total"><td>TOTAL ACUMULADO</td>${metricCells(data.totals)}<td class="quality-global">${qualityPercentText(overall)}</td></tr>`;
   const progressRow=`<tr class="weekly-progress"><td>CUMPLIMIENTO</td>${WEEKLY_DISPLAY_METRICS.map(k=>{
     if(k==='reg'||k==='guar')return '<td class="no-goal">—</td>';
@@ -2802,14 +2841,14 @@ function leadershipMetricGoal(week,module,metric){
 function leadershipHeadquartersGoal(week,metric){
  return resolveAnalysisGoal('headquarters','Jefatura',week,metric);
 }
-function leadershipKnownModules(){
+function leadershipKnownModules(week=el('leaderWeek')?.value||mondayOf(dateIso(new Date()))){
  const available=new Map();
  for(const name of [...baseModuleNames(),...moduleNames(historyData()),...Object.keys(qualityConfig.modules),...Object.keys(supSettings.goals||{}),
    ...Object.keys(leadershipPrefs.defaultGoals||{}),
    ...Object.keys(leadershipPrefs.weeklyGoals||{}).map(k=>{try{return JSON.parse(k)[1]}catch(_){return ''}})]){
   const text=String(name||'').trim();if(text&&!available.has(moduleKey(text)))available.set(moduleKey(text),text);
  }
- return [...available.values()].sort((a,b)=>a.localeCompare(b,'es'));
+ return [...available.values()].filter(name=>registryActiveAt(registryEntry(teamRegistry,'modules',name),week)).sort((a,b)=>a.localeCompare(b,'es'));
 }
 
 function leadershipRows(){return historyData().map(r=>({fecha:r.fecha,module:r.module,executive:r.executive,
@@ -2913,13 +2952,16 @@ function renderLeadership(){
 function baseGoalList(){
  const host=el('baseGoalsProfiles');if(!host)return;
  const section=(type,names)=>`<div class="base-profile-section"><h4>${esc(BASE_TYPES[type])}</h4><div class="base-profile-choices">${names.map(n=>`<button class="base-profile-choice" type="button" data-base-goal-type="${type}" data-base-goal-name="${esc(n)}"><span>${esc(n)}</span><small>Configurar objetivos →</small></button>`).join('')||'<p class="settings-help">Sin perfiles detectados. Puedes crear uno manualmente.</p>'}</div></div>`;
- host.innerHTML=section('headquarters',['Jefatura'])+section('module',baseModuleNames())+section('executive',baseExecutiveNames());
+ host.innerHTML=section('headquarters',['Jefatura'])+section('module',registryNames(teamRegistry,'modules',{detected:baseModuleNames()}))+section('executive',registryNames(teamRegistry,'executives',{detected:baseExecutiveNames()}));
 }
 function baseGoalOpen(type,name){
  if(!BASE_TYPES[type]||!name)return;
  const modal=el('baseGoalOverlay');modal.dataset.type=type;modal.dataset.name=name;
  el('baseGoalTitle').textContent=`${BASE_TYPES[type]} · ${name}`;
  el('baseGoalEffective').value=mondayOf(dateIso(new Date()));
+ const registryType=type==='module'?'modules':'executives',entry=registryEntry(teamRegistry,registryType,name);
+ el('baseGoalActiveBox').hidden=type==='headquarters';
+ el('baseGoalActive').checked=entry?.active!==false;
  baseGoalLoadValues();modal.hidden=false;
  el('baseGoalEffective').focus();
 }
@@ -2931,7 +2973,7 @@ function baseGoalLoadValues(){
  const existing=profile?.versions?.find(v=>v.from===week);
  for(const input of modal.querySelectorAll('[data-base-input]')){
   const metric=input.dataset.baseInput;
-  const resolved=type==='headquarters'?headquartersGoal(baseGoals,week,metric,baseModuleNames()):effectiveBaseGoal(baseGoals,type,name,week,metric);
+  const resolved=type==='headquarters'?headquartersGoal(baseGoals,week,metric,baseModuleNames(week)):effectiveBaseGoal(baseGoals,type,name,week,metric);
   if(type==='headquarters'){
    input.value=existing?.goals?.[metric]??'';
    input.placeholder=resolved.value===null?'Automático: falta objetivo':`Automático/vigente: ${resolved.value}${isBasePercentage(metric)?'%':''}`;
@@ -2953,10 +2995,25 @@ function baseGoalSaveProfile(){
    el('baseGoalStatus').textContent='Trámites y Ventas: cantidades enteras; demás indicadores: porcentajes de 0 a 100.';input.focus();return;
   }goals[input.dataset.baseInput]=value;
  }
- try{const updated=upsertBaseGoals(baseGoals,{type,name,from,goals});
-  localStorage.setItem(BASE_GOALS_KEY,JSON.stringify(updated));baseGoals=updated;
-  baseGoalList();refreshBaseGoalDependentViews();baseGoalLoadValues();
-  el('baseGoalStatus').textContent='Objetivos guardados. Vigencias anteriores intactas. Sincronización automática al iniciar sesión.';modal.hidden=true;if(el('settingsPanel').open)toggleSettings(false);
+ try{
+  const updated=upsertBaseGoals(baseGoals,{type,name,from,goals});
+  const oldRegistry=teamRegistry,oldGoals=baseGoals;
+  const registryType=type==='module'?'modules':'executives';
+  const nextRegistry=type==='headquarters'?teamRegistry:registryUpdate(teamRegistry,registryType,{
+   name,weeklyGoal:registryEntry(teamRegistry,registryType,name)?.weeklyGoal??'',
+   active:el('baseGoalActive').checked,module:registryEntry(teamRegistry,registryType,name)?.module??''
+  },registryEntry(teamRegistry,registryType,name)?.name||'',dateIso(new Date()));
+  try{
+   localStorage.setItem(BASE_GOALS_KEY,JSON.stringify(updated));
+   if(nextRegistry!==teamRegistry)localStorage.setItem(TEAM_REGISTRY_KEY,JSON.stringify(nextRegistry));
+  }catch(error){
+   localStorage.setItem(BASE_GOALS_KEY,JSON.stringify(oldGoals));
+   localStorage.setItem(TEAM_REGISTRY_KEY,JSON.stringify(oldRegistry));throw error;
+  }
+  baseGoals=updated;teamRegistry=nextRegistry;
+  combinedArchiveCache.clear();moduleProfileCache=null;
+  renderTeamRegistryEditor();baseGoalList();refreshArchiveData(true);refreshBaseGoalDependentViews();baseGoalLoadValues();
+  modal.hidden=true;if(el('settingsPanel').open)toggleSettings(false);
  }catch(error){el('baseGoalStatus').textContent=error.message;}
 }
 function refreshBaseGoalDependentViews(){
@@ -2968,6 +3025,7 @@ function refreshBaseGoalDependentViews(){
  if(activePage==='weekly')renderWeekly();
  if(activePage==='daily')renderDaily();
  if(activePage==='accumulated')renderAccumulated();
+ if(activePage==='team')renderTeam();
 }
 function initBaseGoals(){
  el('settingsBaseGoalsV258').addEventListener('toggle',()=>{if(el('settingsBaseGoalsV258').open)baseGoalList();});
@@ -2991,6 +3049,73 @@ function initBaseGoals(){
  el('leadGoalProfileHead')?.addEventListener('click',()=>baseGoalOpen('headquarters','Jefatura'));
  el('achGoalProfile')?.addEventListener('click',()=>{const module=el('achModule')?.value; if(module&&module!=='*')baseGoalOpen('module',module);else baseGoalOpen('headquarters','Jefatura');});
 }
+// V3.0.4 · Obligatorio al inicio o al aceptar un nuevo XLS, sin ocultar historiales.
+let goalAuditItems=[],goalAuditKind='',pendingGoalAuditReports=[];
+function requestGoalAudit(kind='start',reports=[]){
+ const overlay=el('goalAuditOverlay');if(!overlay)return;
+ if(!overlay.hidden){
+  // Si llega otro XLS con el diálogo abierto, incluirlo en la siguiente revisión.
+  if(kind==='import')pendingGoalAuditReports.push(...reports);
+  return;
+ }
+ const todayWeek=mondayOf(dateIso(new Date()));
+ const rows=kind==='import'?recordsForGoalReview(reports,isoDate):
+   (imported.data?.rows||[]).filter(r=>r.week===todayWeek);
+ const knownModules=kind==='start'?[...baseModuleNames(),...(teamRegistry.modules||[]).map(x=>x.name)]:[];
+ const knownExecutives=kind==='start'?[...baseExecutiveNames(),...(teamRegistry.executives||[]).map(x=>x.name)]:[];
+ const fallbackSales=(type,name,week)=>{
+  const reg=registryGoalAt(registryEntry(teamRegistry,type==='module'?'modules':'executives',name),week);
+  return reg>0?reg:type==='executive'&&Number.isInteger(teamGoals[teamKey(week,name)])&&teamGoals[teamKey(week,name)]>0?teamGoals[teamKey(week,name)]:null;
+ };
+ const items=findMissingBaseGoals({store:baseGoals,registry:teamRegistry,kind,todayWeek,todayDate:dateIso(new Date()),knownModules,knownExecutives,rows,fallbackSales});
+ if(!items.length)return;
+ goalAuditItems=items;goalAuditKind=kind;
+ el('goalAuditRows').innerHTML=items.map(item=>`<tr data-audit-key="${esc(item.key)}"><td>${esc(item.name)}</td><td>${item.type==='module'?'Módulo':'Ejecutivo'}</td><td>${esc(weekLabel(item.week))}</td>${['records','sales'].map(metric=>`<td><input data-audit-metric="${metric}" type="number" min="1" max="1000000" step="1" ${item['missing'+metric[0].toUpperCase()+metric.slice(1)]?`placeholder="Obligatorio" required`:`value="${item[metric]}" readonly title="Objetivo ya configurado"`} aria-label="${metric==='records'?'Trámites':'Ventas'} de ${esc(item.name)}, semana ${esc(item.week)}" /></td>`).join('')}</tr>`).join('');
+ el('goalAuditDescription').textContent=`${items.length} perfil(es) o vigencia(s) con trámites o ventas faltantes. Completa todas las cantidades mayores que cero para continuar. Los objetivos ya configurados son de solo lectura.`;
+ el('goalAuditStatus').textContent='';
+ overlay.hidden=false;el('baseGoalOverlay').hidden=true;
+ (el('goalAuditRows').querySelector('input:not([readonly])')||el('goalAuditSave')).focus();
+}
+function saveGoalAudit(){
+ const button=el('goalAuditSave'),status=el('goalAuditStatus'),values={};
+ for(const tr of el('goalAuditRows').querySelectorAll('[data-audit-key]')){
+  values[tr.dataset.auditKey]={};
+  for(const input of tr.querySelectorAll('[data-audit-metric]')){
+   values[tr.dataset.auditKey][input.dataset.auditMetric]=input.value;
+  }
+ }
+ try{
+  const next=saveQuickBaseGoals(baseGoals,goalAuditItems,values);
+  button.disabled=true;
+  localStorage.setItem(BASE_GOALS_KEY,JSON.stringify(next));baseGoals=next;
+  const remaining=goalAuditItems.filter(item=>['records','sales'].some(metric=>{
+   if(!item['missing'+metric[0].toUpperCase()+metric.slice(1)])return false;
+   const resolved=effectiveBaseGoal(baseGoals,item.type,item.name,item.week,metric).value;
+   return !(Number.isInteger(resolved)&&resolved>0);
+  }));
+  if(remaining.length)throw Error('Persisten objetivos pendientes. Revisa la captura.');
+  el('goalAuditOverlay').hidden=true;goalAuditItems=[];
+  baseGoalList();refreshBaseGoalDependentViews();if(importActive()){computeImportedBase();renderRecords();}
+  if(activePage==='team')renderTeam();if(activePage==='leadership')renderLeadership();
+  const nextReports=pendingGoalAuditReports.slice();pendingGoalAuditReports=[];
+  if(nextReports.length)requestGoalAudit('import',nextReports);
+ }catch(error){status.textContent=error.message||String(error);}
+ finally{button.disabled=false;}
+}
+function initGoalAudit(){
+ el('goalAuditSave').addEventListener('click',saveGoalAudit);
+ // Bloquear Escape, navegación de foco y cierre externo durante la asignación.
+ el('goalAuditOverlay').addEventListener('keydown',event=>{
+  if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();}
+  if(event.key==='Tab'){
+   const focusable=[...el('goalAuditOverlay').querySelectorAll('input:not([readonly]),button:not([disabled])')];
+   if(!focusable.length)return;
+   if(event.shiftKey&&document.activeElement===focusable[0]){event.preventDefault();focusable.at(-1).focus();}
+   else if(!event.shiftKey&&document.activeElement===focusable.at(-1)){event.preventDefault();focusable[0].focus();}
+  }
+ },true);
+}
+
 function initLeadershipCollapse(){
  const ids=['leaderSummarySection','leaderModulesSection','leaderTargetsSection','leaderPeopleSection','leaderQualitySection','leaderTrendSection','leaderProjectionSection','leaderAlertsSection','leaderActionsSection'];
  for(const id of ids){const section=el(id),head=section?.querySelector('.leadership-block-head');if(!head)continue;
@@ -3298,7 +3423,7 @@ function initFloatingExport(){
  action('achCopyCommissionable',async()=>{
   const report=formatCommissionableFolios(achFilteredRecords().filter(payable));
   if(!report){alert('No hay folios comisionables con los filtros actuales de Logros semanales.');return;}
-  const ok=await copyWhatsAppText(report);
+  const ok=await copyWhatsAppText(customizeClipboard('folios',report));
   if(!ok)alert('No se pudo copiar el reporte. Comprueba los permisos del portapapeles.');
   else alert('Reporte de folios comisionables copiado al portapapeles.');
  });
@@ -3345,7 +3470,7 @@ function initFloatingFilters(){
   for(const [id,value] of [['jmToolsFilters','filters'],['jmToolsExport','export']])el(id).classList.toggle('active',value===which);
  }
  function hide(){popup.hidden=true;toggle.setAttribute('aria-expanded','false');}
- toggle.addEventListener('click',()=>{const open=popup.hidden;popup.hidden=!open;toggle.setAttribute('aria-expanded',String(open));if(open)mode('filters');});
+ toggle.addEventListener('click',()=>{const open=popup.hidden;popup.hidden=!open;toggle.setAttribute('aria-expanded',String(open));if(open)mode('export');});
  el('jmToolsFilters').addEventListener('click',()=>mode('filters'));
  el('jmToolsExport').addEventListener('click',()=>mode('export'));
  el('jmToolsSettings').addEventListener('click',()=>{
@@ -3645,18 +3770,29 @@ for(const id of ['dailyCurrentDate','dailyPreviousDate'])el(id).addEventListener
 for(const id of ['accumulatedFrom','accumulatedTo'])el(id).addEventListener('change',renderAccumulated);
 el('accumulatedClearDates').addEventListener('click',()=>{el('accumulatedFrom').value='';el('accumulatedTo').value='';renderAccumulated();});
 for(const id of ['teamModule','teamSort'])el(id).addEventListener('change',renderTeam);
+ el('teamDateMode').addEventListener('change',event=>{teamPeriod.mode=event.target.value;populateTeamPeriods();populateTeamModules();renderTeam();});
+ el('teamWeek').addEventListener('change',event=>{teamPeriod.week=event.target.value;populateTeamModules();renderTeam();});
+ for(const id of ['teamFrom','teamTo'])el(id).addEventListener('change',event=>{teamPeriod[id==='teamFrom'?'from':'to']=event.target.value;populateTeamModules();renderTeam();});
 el('teamSearch').addEventListener('input',renderTeam);
 el('teamTable').addEventListener('change',e=>{
   if(!e.target.matches('input[data-team-goal]'))return;
-  const n=Number(e.target.value),person=e.target.dataset.teamGoal;
-  if(!Number.isInteger(n)||n<1){alert('La meta semanal debe ser un número entero mayor o igual a 1.');e.target.value=executiveGoal(imported.week,person);return;}
-  setExecutiveGoal(imported.week,person,n);
-  if(imported.executive===person&&importActive()){computeImportedBase();renderRecords();}
-  renderTeam();
+  const n=Number(e.target.value),person=e.target.dataset.teamGoal,week=e.target.dataset.teamWeek;
+  if(!Number.isInteger(n)||n<1||n>1000000){alert('La meta semanal debe ser un entero entre 1 y 1,000,000.');e.target.value=executiveGoal(week,person);return;}
+  try{
+   const previous=baseGoals.profiles?.[`executive|${normalizeName(person)}`]?.versions?.find(v=>v.from===week);
+   baseGoals=upsertBaseGoals(baseGoals,{type:'executive',name:person,from:week,goals:{...(previous?.goals||{}),sales:n}});
+   saveBaseGoals();setExecutiveGoal(week,person,n);
+   if(imported.executive===person&&importActive()){computeImportedBase();renderRecords();}
+   renderTeam();
+  }catch(err){alert('No fue posible guardar la meta: '+err.message);}
 });
 el('teamTable').addEventListener('click',e=>{
   const button=e.target.closest('[data-open-exec]');if(!button||!imported.data)return;
   imported.executive=button.dataset.openExec;
+  const entry=teamEntries().find(e=>e.name===imported.executive);
+  const relevant=entry?.parts.find(p=>p.rows.length);
+  if(relevant)imported.week=relevant.week;
+  el('weekSelect').value=imported.week;
   chooseExecutive();drawImportMeta(imported.sourceName||'Reporte.xls');
   switchPage('individual');el('sec-records').open=true;el('recordsDisclosure').open=true;
   el('sec-records').scrollIntoView({block:'start',behavior:'smooth'});
@@ -3943,7 +4079,7 @@ el('teamTable').addEventListener('click',e=>{
       for(const [week,data] of [[primary,main],[previous,older]]){
         const value=(g,k)=>weeklyMetricValue(g.metrics,g.rows,k);
         const q=qualityResult(data.rows,'module','TOTAL','weekly',weeklyGoalFor(week,'sales',primary,data.totals.metrics)||null);
-        lines.push(['OBJETIVOS',week,'TOTAL',...WEEKLY_DISPLAY_METRICS.map(k=>k==='reg'||k==='guar'?'':k==='app'||k==='purchase'?weeklyTargetPct(k):weeklyGoalExport(week,k,primary,data.totals.metrics)),weeklyTargetPct('quality')]);
+        lines.push(['OBJETIVOS',week,'TOTAL',...WEEKLY_DISPLAY_METRICS.map(k=>k==='reg'||k==='guar'?'':k==='app'||k==='purchase'?weeklyTargetPct(k,week):weeklyGoalExport(week,k,primary,data.totals.metrics)),weeklyTargetPct('quality',week)]);
         for(const item of data.entries)lines.push(['MÓDULO',week,item.name,...WEEKLY_DISPLAY_METRICS.map(k=>value(item,k)),qualityPercentText(qualityResult(item.rows,'module',item.name,'weekly').global)]);
         lines.push(['TOTAL',week,'TOTAL',...WEEKLY_DISPLAY_METRICS.map(k=>value(data.totals,k)),qualityPercentText(q.global)]);
         lines.push(['CUMPLIMIENTO %',week,'TOTAL',...WEEKLY_DISPLAY_METRICS.map(k=>{
@@ -3981,9 +4117,14 @@ el('teamTable').addEventListener('click',e=>{
     }
     if(activePage==='team'&&imported.data){
       const items=filteredTeamEntries();
-      const lines=[['Ejecutivo','Módulo','Semana','Meta','Cumplimiento %','Ventas regulares','Ventas garantizadas','Ventas totales','APP','Programa Cero','Plan Dental','Incidencias','Escalón','Folios dinámica','Bono por dinámica MXN','Comisión estimada MXN'],...items.map(e=>{const r=e.result;return [e.name,e.module,weekLabel(imported.week),e.goal,r.ok?r.completion:'',r.ok?r.validReg:'',r.ok?r.validGuar:'',r.ok?r.validSales:'',r.ok?r.validApp:'',r.ok?r.validP0:'',r.ok?r.validDental:'',e.inputs.inc,briefTier(r),r.ok?r.dynamicBonusCount:'',r.ok?r.dynamicBonus:'',r.ok?r.net:'Revisar']})];
+      const lines=[['Tipo','Ejecutivo','Módulo','Periodo/semana','Meta','Cumplimiento %','Ventas regulares','Ventas garantizadas','Ventas totales','APP','Programa Cero','Plan Dental','Incidencias','Escalón','Folios dinámica','Bono por dinámica MXN','Comisión estimada MXN']];
+      for(const e of items){
+       const toLine=(type,label,goal,r,inc)=>[type,e.name,e.module,label,goal,r.ok?r.completion:'',r.ok?r.validReg:'',r.ok?r.validGuar:'',r.ok?r.validSales:'',r.ok?r.validApp:'',r.ok?r.validP0:'',r.ok?r.validDental:'',inc,briefTier(r),r.ok?r.dynamicBonusCount:'',r.ok?r.dynamicBonus:'',r.ok?r.net:'Revisar'];
+       lines.push(toLine('TOTAL',teamPeriodWindow().label,e.goal,e.result,e.inputs.inc));
+       if(e.parts.length>1)for(const part of e.parts)lines.push(toLine('SEMANA',weekLabel(part.week),part.goal,part.result,part.inputs.inc));
+      }
       const csv='\ufeff'+lines.map(row=>row.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
-      saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),`comparativo_ejecutivos_${imported.week}.csv`);return;
+      const period=teamPeriodWindow();saveBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),`comparativo_ejecutivos_${period.from||'sin_inicio'}_${period.to||'sin_fin'}.csv`);return;
     }
     const a=calculate(state.base),b=calculate(state.sim);
     if(!a.ok||!b.ok){alert('Corrige los datos antes de exportar.');return;}
@@ -4317,9 +4458,9 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     const sums=valid.reduce((v,e)=>{const r=e.result;v.sales+=r.validSales;v.goal+=r.goal;v.net+=r.net;return v},{sales:0,goal:0,net:0});
     const tr=entries.map(e=>{const r=e.result;return `<tr><td>${esc(e.name)}</td><td>${esc(e.module)}</td><td>${e.goal}</td><td>${r.ok?pct(r.completion):'—'}</td><td>${r.ok?r.validReg:'—'}</td><td>${r.ok?r.validGuar:'—'}</td><td>${r.ok?r.validSales:'—'}</td><td>${r.ok?r.validApp:'—'}</td><td>${r.ok?r.validP0:'—'}</td><td>${r.ok?r.validDental:'—'}</td><td>${r.inc||0}</td><td>${briefTier(r)}</td><td>${r.ok?r.dynamicBonusCount:0}</td><td>${r.ok?mx(r.dynamicBonus):'—'}</td><td>${r.ok?mx(r.net):'Revisar'}</td></tr>`}).join('');
     const headers=['Ejecutivo','Módulo','Meta','Cumpl.','Reg.','Gar.','Ventas','APP','P0','Dental','Inc.','Escalón','Folios din.','Dinámica','Comisión'];
-    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("team",`Semana: ${esc(weekLabel(imported.week))} · Calculo manual desde google forms · ${entries.length} ejecutivos visibles · ${new Date().toLocaleString('es-MX')}`)}
+    const html=`<div id="printPage" class="report-page" style="--raccent:${accent};--rdeep:${deep};--rpale:#edf4fc">${reportHeaderMarkup("team",`Período: ${esc(teamPeriodWindow().label)} · Calculo manual desde google forms · ${entries.length} ejecutivos visibles · ${new Date().toLocaleString('es-MX')}`)}
       <section class="report-section report-section-team-summary" data-report-section="team-summary"><h2>Resumen del equipo</h2><div class="report-kpis"><div class="report-kpi"><div class="rlabel">Ejecutivos</div><div class="rval">${entries.length}</div></div><div class="report-kpi"><div class="rlabel">Ventas válidas</div><div class="rval">${sums.sales}</div></div><div class="report-kpi"><div class="rlabel">Comisiones estimadas</div><div class="rval">${mx(round(sums.net))}</div></div></div></section>
-      <section class="report-section report-section-team" data-report-section="team"><h2>Comparativo por ejecutivo</h2><table class="team-export-table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${tr||'<tr><td colspan="15">Sin registros para los filtros seleccionados.</td></tr>'}</tbody></table><p class="report-note">Metas individuales editables. APP considerada por cada venta válida, excepto desactivaciones manuales. Incidencias, estatus no pagables, descuentos y penalización de Programa Cero aplicados por ejecutivo. Los objetivos se presuponen en 10 salvo modificación.</p></section>${reportFootMarkup("team")}</div>`;
+      <section class="report-section report-section-team" data-report-section="team"><h2>Comparativo por ejecutivo</h2><table class="team-export-table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${tr||'<tr><td colspan="15">Sin registros para los filtros seleccionados.</td></tr>'}</tbody></table><p class="report-note">Metas individuales editables. APP considerada por cada venta válida, excepto desactivaciones manuales. Incidencias, estatus no pagables, descuentos y penalización de Programa Cero aplicados por ejecutivo. Las comisiones se calculan por cada semana y se suman sin volver a aplicar escalones. No se prorratean metas en semanas parciales.</p></section>${reportFootMarkup("team")}</div>`;
     el('reportHost').innerHTML=`<style id="reportCss">${REPORT_CSS}</style>${html}`;
     return el('printPage');
   }
@@ -4369,10 +4510,10 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
       const value=(g,k)=>weeklyMetricValue(g.metrics,g.rows,k);
       const goalRow=`<tr class="goal-row"><td>OBJETIVOS</td>${WEEKLY_DISPLAY_METRICS.map(k=>{
         if(k==='reg'||k==='guar')return '<td>—</td>';
-        if(k==='app'||k==='purchase')return `<td>${weeklyTargetPct(k)}</td>`;
+        if(k==='app'||k==='purchase')return `<td>${weeklyTargetPct(k,week)}</td>`;
         const v=weeklyGoalExport(week,k,primary,data.totals.metrics);
-        return `<td>${v===''?'—':number.format(v)}</td>`;
-      }).join('')}<td>${weeklyTargetPct('quality')}</td></tr>`;
+        return `<td>${typeof v==='string'?esc(v):number.format(v)}</td>`;
+      }).join('')}<td>${weeklyTargetPct('quality',week)}</td></tr>`;
       const body=data.entries.map(g=>`<tr><td>${esc(g.name)}</td>${WEEKLY_DISPLAY_METRICS.map(k=>`<td>${value(g,k)}</td>`).join('')}<td>${qualityPercentText(qualityResult(g.rows,'module',g.name,'weekly').global)}</td></tr>`).join('')||'<tr><td colspan="10">Sin registros</td></tr>';
       const sum=`<tr class="daily-total-row"><td>TOTAL</td>${WEEKLY_DISPLAY_METRICS.map(k=>`<td>${value(data.totals,k)}</td>`).join('')}<td>${qualityPercentText(q.global)}</td></tr>`;
       const achievement=`<tr class="daily-total-row"><td>CUMPLIMIENTO</td>${WEEKLY_DISPLAY_METRICS.map(k=>{
@@ -4666,7 +4807,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     y+=8;
     y=paragraph(reportTexts.subtitle,margin,y,content,16,21,accent)+6;
     y=paragraph(reportTexts.description,margin,y,content,12,18,deep)+8;
-    const selection=activePage==='incidents'?`${incidentRecords.size} incidencias permanentes · ${new Date().toLocaleString('es-MX')}`:activePage==='supervisor'?`${supView.week?weekLabel(supView.week):'Sin semana'} · ${supReadSelection()?.name||'Sin supervisor'} · ${supReadSelection()?.module||''}`:activePage==='achievements'?`${achValue('achWeek')?weekLabel(achValue('achWeek')):'Sin semana'} · ${achValue('achModule')||'Todos los módulos'} · ${achFilteredRecords().length} folios filtrados`:activePage==='allrecords'?`${getAllRecordsFiltered().length} registros · Módulo ${allRecordsFilterValue('allRecordsModule')||'Todos'} · Ejecutivo ${allRecordsFilterValue('allRecordsExecutive')||'Todos'}`:activePage==='weekly'?`${weekLabel(weeklySelection().primary)} vs. ${weekLabel(weeklySelection().previous)} · Calculo manual desde google forms`:activePage==='accumulated'?`${accumulatedPeriodText()} · ${isAuthorized()?archive.reports.length:archive.tempReports.length} registros manuales ${isAuthorized()?'guardados':'temporales'} · Calculo manual desde google forms`:activePage==='daily'&&imported.data?`Día principal ${fmtDay(dailyDates().latest)} · Día comparado ${fmtDay(dailyDates().previous)} · Calculo manual desde google forms`:activePage==='team'&&imported.data?`Semana ${weekLabel(imported.week)} · ${filteredTeamEntries().length} ejecutivos · Calculo manual desde google forms`:importActive()?`Semana ${weekLabel(imported.week)} · ${imported.executive} · Objetivo ${state.base.goal}`:`Modo manual · Objetivo ${state.base.goal}`;
+    const selection=activePage==='incidents'?`${incidentRecords.size} incidencias permanentes · ${new Date().toLocaleString('es-MX')}`:activePage==='supervisor'?`${supView.week?weekLabel(supView.week):'Sin semana'} · ${supReadSelection()?.name||'Sin supervisor'} · ${supReadSelection()?.module||''}`:activePage==='achievements'?`${achValue('achWeek')?weekLabel(achValue('achWeek')):'Sin semana'} · ${achValue('achModule')||'Todos los módulos'} · ${achFilteredRecords().length} folios filtrados`:activePage==='allrecords'?`${getAllRecordsFiltered().length} registros · Módulo ${allRecordsFilterValue('allRecordsModule')||'Todos'} · Ejecutivo ${allRecordsFilterValue('allRecordsExecutive')||'Todos'}`:activePage==='weekly'?`${weekLabel(weeklySelection().primary)} vs. ${weekLabel(weeklySelection().previous)} · Calculo manual desde google forms`:activePage==='accumulated'?`${accumulatedPeriodText()} · ${isAuthorized()?archive.reports.length:archive.tempReports.length} registros manuales ${isAuthorized()?'guardados':'temporales'} · Calculo manual desde google forms`:activePage==='daily'&&imported.data?`Día principal ${fmtDay(dailyDates().latest)} · Día comparado ${fmtDay(dailyDates().previous)} · Calculo manual desde google forms`:activePage==='team'&&imported.data?`Período ${teamPeriodWindow().label} · ${filteredTeamEntries().length} ejecutivos · Calculo manual desde google forms`:importActive()?`Semana ${weekLabel(imported.week)} · ${imported.executive} · Objetivo ${state.base.goal}`:`Modo manual · Objetivo ${state.base.goal}`;
     y=paragraph(selection,margin,y,content,10,15)+6;
     line(margin,y,content,accent);y+=9;
     for(const section of sections){
@@ -4817,7 +4958,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
       else paintReportCanvas(ctx,true);
       canvas.toBlob(blob=>{
         button.disabled=false;button.textContent=before;
-        if(blob)saveBlob(blob,activePage==='supervisor'?`calculadora_supervisor_${supView.week||'sin_semana'}.png`:activePage==='achievements'?`logros_semanales_${achValue('achWeek')||'sin_semana'}.png`:activePage==='incidents'?`historial_incidencias_${dateIso(new Date())}.png`:activePage==='allrecords'?`registros_manuales_${dateIso(new Date())}.png`:activePage==='weekly'?`comparativa_semanal_${weeklySelection().primary}_vs_${weeklySelection().previous}.png`:activePage==='accumulated'?`acumulado_general_${el('accumulatedFrom').value||'todo'}_${el('accumulatedTo').value||'todo'}.png`:activePage==='daily'?`comparativa_diaria_${imported.data?dailyDates().latest:'sin_datos'}.png`:activePage==='team'?`comisiones_equipo_${imported.week}.png`:`comisiones_simuladas_${importActive()?imported.week:'manual'}.png`);
+        if(blob)saveBlob(blob,activePage==='supervisor'?`calculadora_supervisor_${supView.week||'sin_semana'}.png`:activePage==='achievements'?`logros_semanales_${achValue('achWeek')||'sin_semana'}.png`:activePage==='incidents'?`historial_incidencias_${dateIso(new Date())}.png`:activePage==='allrecords'?`registros_manuales_${dateIso(new Date())}.png`:activePage==='weekly'?`comparativa_semanal_${weeklySelection().primary}_vs_${weeklySelection().previous}.png`:activePage==='accumulated'?`acumulado_general_${el('accumulatedFrom').value||'todo'}_${el('accumulatedTo').value||'todo'}.png`:activePage==='daily'?`comparativa_diaria_${imported.data?dailyDates().latest:'sin_datos'}.png`:activePage==='team'?`comisiones_equipo_${teamPeriodWindow().from}_${teamPeriodWindow().to}.png`:`comisiones_simuladas_${importActive()?imported.week:'manual'}.png`);
         else alert('No se pudo guardar la imagen PNG. Prueba un periodo con menos folios.');
       },'image/png');
     }catch(err){button.disabled=false;button.textContent=before;alert('No se pudo generar el PNG: '+err.message);}
@@ -4827,7 +4968,7 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
   window.addEventListener('beforeprint',()=>{try{if(activePage!=='achievements'||cachedWeeklyAdminAssets())buildReport();}catch(error){console.warn('Reporte de impresión:',error);}});
   window.CALC_REPORT={buildReport,layout:uiLayout};
 
-  updatesManager=initUpdates({cloud:window.APP_CLOUD,copyText:copyWhatsAppText,
+  updatesManager=initUpdates({cloud:window.APP_CLOUD,copyText:text=>copyWhatsAppText(customizeClipboard('update',text)),
    getRow:key=>historyData().find(row=>(row.overrideKey||recordEditKey(row))===key)||null,
    getFields:originalUpdateFields,
    getKey:row=>row.overrideKey||recordEditKey(row),
@@ -4835,13 +4976,14 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
    afterChange:()=>{if(imported.data)renderRecords();if(activePage==='allrecords')renderAllRecords();},
    openPage:switchPage
   });
-  initReminders();initSettingsTransfer();
-  initAllRecordsPage();initAchievements();initTeamRegistry();initWeeklyAdminSettings();initQualitySettings();initBaseGoals();initSupervisorCalculator();initIncidences();initHistory();initModuleHistory();initLeadership();initNavOrder();initFloatingExport();initFloatingFilters();pageSettingsController=createPageSettingsModal({getActivePage:()=>activePage});initRecordManagement();initGlobalCollapses();initMondayReminder();
+  initReminders();initSettingsTransfer();initClipboardSettings();
+  initAllRecordsPage();initAchievements();initTeamRegistry();initWeeklyAdminSettings();initQualitySettings();initBaseGoals();initGoalAudit();initSupervisorCalculator();initIncidences();initHistory();initModuleHistory();initLeadership();initNavOrder();initFloatingExport();initFloatingFilters();pageSettingsController=createPageSettingsModal({getActivePage:()=>activePage});initRecordManagement();initGlobalCollapses();initMondayReminder();
   restore();setForm('base');setForm('sim');render();initializeWeeklyDates();refreshAuthorizedPages();switchPage(pageNavigation.home);initArchive();
   window.APP_CLOUD?.registerRefresh(async()=>{
     if(!isAuthorized())return;
     archive.reports=await archiveGetAll();archive.temporaryMode=false;
     archiveSelectionRestore();loadFolioFlags();teamRegistry=readTeamRegistry();renderTeamRegistryEditor();recordEdits=readRecordEdits();selectedRecordUids.clear();combinedArchiveCache.clear();loadCommissionRates();
+    for(const key of Object.keys(weeklyGoals))delete weeklyGoals[key];Object.assign(weeklyGoals,loadTeamStore(WEEKLY_GOALS_KEY));
     for(const key of Object.keys(teamGoals))delete teamGoals[key];Object.assign(teamGoals,loadTeamStore(TEAM_GOALS_STORAGE));
     qualityConfig=cleanQualityConfig(storedJson(QUALITY_STORAGE_V22));
     leadershipPrefs=readLeadershipPrefs();baseGoals=readBaseGoals();baseGoalList();refreshLeadershipSettingsEditor();leaderGoalSettingsEditor();
@@ -4849,7 +4991,8 @@ el('resetTableSettings').addEventListener('click',()=>{resetTableView();saveTabl
     pageNavigation=loadNavSettings();activeGroup=pageNavigation.groupBy[activePage]||pageNavigation.groupOrder[0];applyNavOrder();renderNavOrderEditor();window.INVEX_REMINDERS?.refresh();
     if(firstCloudNavigation){firstCloudNavigation=false;el('histPeriod').value=historyPrefs.defaultPeriod;el('histWeekday').value=historyPrefs.defaultWeekday==='today'?String(new Date().getDay()):historyPrefs.defaultWeekday;el('mhPeriod').value=moduleHistoryPrefs.defaultPeriod;el('mhWeekday').value=moduleHistoryPrefs.defaultWeekday==='today'?String(new Date().getDay()):moduleHistoryPrefs.defaultWeekday;el('mhIncludeSupervisors').value=moduleHistoryPrefs.includeSupervisors?'yes':'no';switchPage(pageNavigation.home);}
     dynamicBonusConfig=loadDynamicBonus();if(el('dynamicBonusAmount'))el('dynamicBonusAmount').value=dynamicBonusAmount();
-    refreshArchiveData(true);await refreshIncidents(true);await updatesManager?.refresh(true);refreshAuthorizedPages();if(activePage==='leadership')renderLeadership();render();window.VISITS?.refreshSources();
+    el('goalAuditOverlay').hidden=true;goalAuditItems=[];pendingGoalAuditReports=[];
+    refreshArchiveData(true);await refreshIncidents(true);await updatesManager?.refresh(true);refreshAuthorizedPages();if(activePage==='leadership')renderLeadership();render();window.VISITS?.refreshSources();requestGoalAudit('start');
   });
   // Carga anticipada de logotipos y firma para evitar esperas al exportar.
   preloadWeeklyAdminAssets().catch(err=>console.warn('Recursos semanales:',err));

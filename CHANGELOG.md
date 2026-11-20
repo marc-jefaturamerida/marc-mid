@@ -1,3 +1,13 @@
+## V3.0.4 — 20 de noviembre de 2026
+
+- **Estados en Objetivos base:** casilla «Perfil activo» junto al botón Guardar para módulos y ejecutivos, conectada al catálogo de estados y al filtro de registros por fecha. No cambia el estado de los ejecutivos al desactivar el módulo ni borra XLS históricos.
+- **Captura rápida obligatoria:** revisión de trámites y ventas faltantes (cero o sin configurar), en la semana actual al abrir y en las semanas de cada nuevo XLS. Diálogo con nombre, tipo, semana y dos cantidades; validación integral; guardado por vigencia sin reescribir otras metas y sincronización con la infraestructura existente.
+- **Comparativo de ejecutivos:** selector de semana laboral o rango de fechas; cálculo independiente por semana, metas semanales completas en rangos parciales y suma final de comisiones; desglose semanal y CSV adaptado, PDF/PNG conforme a la selección.
+- **Consolidados por semana:** exclusión de módulos dados de baja en períodos posteriores al corte, conservando semanas históricas anteriores a la baja.
+- **Regresión:** prueba V3.0.4 para detección, perfiles activos, históricas, metas heredadas y controles; `calculate()` no cambió, se conservaron tablas/Functions y claves de datos.
+
+---
+
 ## V3.0 · Cantidades de Ventas en el reporte de avance de Jefatura (19 de noviembre de 2026)
 
 - **Comparativa diaria → Exportar → Copiar avance y objetivo de Jefatura:** en Ventas se agrega la cantidad real de ventas comisionables acumuladas junto al porcentaje de alcance, y el número mínimo de ventas requeridas al corte junto al porcentaje esperado.
@@ -381,3 +391,10 @@ No se requiere nueva migración PostgreSQL: se reutiliza la clave existente `wmS
 - Nuevo ajuste de selección **Plan Cero de módulo vs ventas propias** para la penalización sobre las comisiones personales; no cambia el descuento P0 del bono del módulo.
 - El reporte muestra la base y el porcentaje usado en la penalización.
 - No se requieren migraciones de base de datos.
+
+## 3.0.3 — Configuración de reportes y restablecimiento
+- Ajustes de portapapeles por reporte: encabezados, etiquetas, visibilidad, orden, textos adicionales y formato. Sincronización por cuenta mediante settings y respaldo JSON.
+- Restablecimiento de ajustes conservando objetivos base, registros y equipo; restablecimiento completo de la cuenta mediante función autenticada y confirmación escrita. No elimina la cuenta de Identity.
+- Comparativa semanal e históricos utilizan metas base vigentes; las excepciones existentes siguen disponibles. Los objetivos faltantes se indican explícitamente en estos controles y exportaciones; P0 y Dental convierten tasas en cantidades para las comparativas de conteos.
+- El botón flotante abre Exportar primero.
+- Validación de sintaxis y pruebas Node; el build y la operación real de Netlify requieren dependencias y despliegue.

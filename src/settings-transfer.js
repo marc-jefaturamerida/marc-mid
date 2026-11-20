@@ -7,7 +7,7 @@ export const TRANSFER_KEYS=Object.freeze([
  'wmSamsMeridaQualityConfigV22','wmSamsMeridaSupervisorsV22','wmSamsMeridaAchievementGoalsV232',
  'wmSamsMeridaSupervisorCommissionV24','wmSamsNavOrderV250','wmSamsWeeklyAdminReportV252',
  'wmSamsHistoricalIndividualV253','wmSamsHistoricalModuleV254','wmSamsBaseGoalsV258',
- 'wmSamsLeadershipV256','wmSamsRecordEditsV260','wmSamsTeamRegistryV261','wmSamsRemindersV261'
+ 'wmSamsLeadershipV256','wmSamsRecordEditsV260','wmSamsTeamRegistryV261','wmSamsRemindersV261','wmSamsClipboardSettingsV303'
 ]);
 const allowed=new Set(TRANSFER_KEYS);
 export function exportSettings(store=localStorage){const entries={};for(const key of TRANSFER_KEYS){const value=store.getItem(key);if(value!==null&&value!=='')entries[key]=value;}return {format:'INVEX_SETTINGS',version:'3.0',exportedAt:new Date().toISOString(),entries};}
@@ -24,6 +24,22 @@ export function validateSettingsImport(data){
 }
 export function initSettingsTransfer(){
  const $=id=>document.getElementById(id),status=$('settingsTransferStatus');if(!status)return;
+ const reset=async full=>{
+ const status=$('resetStatusV303');const cloud=window.APP_CLOUD;
+ if(!cloud?.user?.id){status.textContent='Inicia sesión para restablecer tu cuenta.';return;}
+ if(!confirm(full?'Se eliminarán permanentemente XLS, visitas, incidencias, solicitudes y ajustes de esta cuenta. ¿Continuar?':'Se restaurarán los ajustes originales, conservando registros, objetivos históricos, equipo y correcciones. ¿Continuar?'))return;
+ if(full&&prompt('Escribe RESTABLECER TODO para confirmar')!=='RESTABLECER TODO')return;
+ const buttons=[$('resetSettingsV303'),$('resetAllV303')];buttons.forEach(b=>b.disabled=true);
+ try{await cloud.flush();if(cloud.pendingCount)throw Error('Hay cambios pendientes de sincronización.');
+ if(full){await cloud.resetAll();}else{
+ const preserve=new Set(['wmSamsBaseGoalsV258','wmSamsRecordEditsV260','wmSamsTeamRegistryV261','wmSamsRemindersV261','wmSamsFolioFlagsV9','wmSamsComisionesMetasEquipoV1','wmSamsComisionesRecuperacionesEquipoV1','wmSamsMeridaAchievementGoalsV232']);
+ for(const key of TRANSFER_KEYS)if(!preserve.has(key))localStorage.removeItem(key);
+ await cloud.flush();if(cloud.pendingCount)throw Error('Restablecimiento pendiente de sincronizar.');}
+ for(const key of ['wmSamsMeridaAchievementPrintLocalV232','wmSamsMeridaSupPrintV241'])localStorage.removeItem(key);
+ status.textContent='Restablecimiento completado.';location.reload();
+ }catch(e){status.textContent=e.message;buttons.forEach(b=>b.disabled=false);}
+ };
+ $('resetSettingsV303')?.addEventListener('click',()=>reset(false));$('resetAllV303')?.addEventListener('click',()=>reset(true));
  $('settingsExportBtn').addEventListener('click',()=>{
   const result=exportSettings(),blob=new Blob([JSON.stringify(result,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;a.download='Jefatura_Mid_Marc_configuraciones_v300_'+new Date().toISOString().slice(0,10)+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);

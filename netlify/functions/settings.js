@@ -25,7 +25,7 @@ const ALLOWED = new Set([
   'wmSamsLeadershipV256',
   'wmSamsRecordEditsV260',
   'wmSamsTeamRegistryV261',
-  'wmSamsRemindersV261'
+  'wmSamsRemindersV261','wmSamsClipboardSettingsV303'
 ]);
 const MAX_ENTRIES=12;
 const MAX_TOTAL_BYTES=2_200_000;

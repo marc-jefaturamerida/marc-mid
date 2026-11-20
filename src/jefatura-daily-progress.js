@@ -52,13 +52,13 @@ export function jefaturaProgressReport(snapshot){
   const section=(name,values)=>[
     `*${name}*`,
     `Alcance: ${fmtValue(values.actual)}`,
-    `Requerido hoy: ${fmtValue(values.required)}`,
+    `Requerido hoy: ${values.required===null?'Sin objetivo configurado':fmtValue(values.required)}`,
     `Diferencia: ${fmtGap(values.difference)}`
   ].join('\n');
   const salesSection=[
     '*Ventas*',
     `Alcance: ${fmtValue(snapshot.sales.actual)} (${fmtUnits(snapshot.counts?.sales)} ventas)`,
-    `Requerido hoy: ${fmtValue(snapshot.sales.required)}${Number.isFinite(snapshot.requiredSalesCount)?` (${fmtUnits(snapshot.requiredSalesCount)} requeridas)`:''}`,
+    `Requerido hoy: ${snapshot.sales.required===null?'Sin objetivo configurado':fmtValue(snapshot.sales.required)}${Number.isFinite(snapshot.requiredSalesCount)?` (${fmtUnits(snapshot.requiredSalesCount)} requeridas)`:''}`,
     `Diferencia: ${fmtGap(snapshot.sales.difference)}`
   ].join('\n');
   return [

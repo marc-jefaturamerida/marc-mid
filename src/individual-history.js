@@ -75,11 +75,11 @@ export function qualityFor(c,goal,rules){
 }
 function basicGoal(name,kind,key,weeklyGoal,settings){
  const factor=settings.goalMultiplier;
- const weekly=week=>Math.max(0,Number(weeklyGoal(week,name))||0)*factor;
+ const weekly=week=>{const v=weeklyGoal(week,name);return v==null?null:Math.max(0,Number(v)||0)*factor;};
  if(kind==='week')return weekly(key);
- if(kind==='day')return weekly(monday(key))/7;
+ if(kind==='day'){const v=weekly(monday(key));return v===null?null:v/7;}
  const [year,month]=key.split('-').map(Number),end=new Date(year,month,0).getDate();let result=0;
- for(let d=1;d<=end;d++)result+=weekly(monday(`${key}-${String(d).padStart(2,'0')}`))/7;
+ for(let d=1;d<=end;d++){const v=weekly(monday(`${key}-${String(d).padStart(2,'0')}`));if(v===null)return null;result+=v/7;}
  return result;
 }
 export function makePeriods(rows,name,kind,weeklyGoal,settings,rules){
@@ -95,7 +95,7 @@ export function makePeriods(rows,name,kind,weeklyGoal,settings,rules){
 }
 export function summarizePeriods(periods,rules){
  const counter=periods.reduce((a,p)=>plus(a,p),blank());
- const goal=periods.reduce((sum,p)=>sum+p.goal,0),n=periods.length;
+ const goal=periods.some(p=>p.goal===null)?null:periods.reduce((sum,p)=>sum+p.goal,0),n=periods.length;
  const summaryRules=typeof rules==='function'?rules({kind:'summary',periods}):rules;
  const quality=qualityFor(counter,goal,summaryRules);
  const averages=Object.fromEntries(Object.entries(counter).map(([k,v])=>[k,n?v/n:0]));

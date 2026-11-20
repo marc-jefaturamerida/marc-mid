@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import {upsertBaseGoals,effectiveBaseGoal,headquartersGoal} from '../src/base-goals.js';
 import {canvasesToPdf,pdfSafeName} from '../src/pdf-download.js';
 const app=fs.readFileSync('src/legacy-app.js','utf8'),html=fs.readFileSync('index.html','utf8'),pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
-assert.equal(pkg.version,'3.0.0');assert(app.includes("APP_VERSION='3.0'"));
+assert.equal(pkg.version,'3.0.4');assert(app.includes("APP_VERSION='3.0.4'"));
 assert(html.includes('id="leaderWeek"'));assert(html.includes('Semana de trabajo (lunes a domingo)'));
 assert(app.includes('const start=el(\'leaderWeek\')?.value||mondayOf(dateIso(new Date()))'));
 assert(app.includes('el(\'leaderWeek\').addEventListener(\'change\''));

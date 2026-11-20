@@ -1,3 +1,7 @@
+# Actualización V3.0.4
+
+Esta entrega actualiza el ZIP V3.0.3 con estados activos junto a objetivos, asignación rápida obligatoria y período por semanas o fechas para el comparativo. **Conserva la carpeta `netlify/` y los datos de PostgreSQL sin reinicializar tablas.** Antes de publicar, ejecuta `npm install`, `npm run check`, `npm test` y `npm run build`, y revisa CHANGELOG y manual.
+
 # Jefatura Mid Marc V3.0 · GitHub + Netlify
 
 **Proyecto base:** V2.7.1 corregida, versión de Netlify (no el servidor Termux/SQLite).
@@ -32,7 +36,7 @@ En cada página pulsa **☰ Menú → Exportar → Descargar PDF**. El archivo s
 
 - No uses archivos de la edición local Wi-Fi ni migres a SQLite: son proyectos diferentes.
 - Las metas antiguas capturadas en la sección retirada de Logros semanales quedan respaldadas bajo su clave existente, pero ya no participan en el cálculo de Logros.
-- El motor de comisiones permanece sin cambios; revisa el manual `MANUAL_USUARIO_JEFATURA_MID_MARC_V300.md`.
+- El motor de comisiones permanece sin cambios; revisa el manual `MANUAL_USUARIO_JEFATURA_MID_MARC_V304.md` (con actualización V3.0.4 al inicio).
 - Sintaxis y pruebas automatizadas completadas; build completo y funcionamiento real en Netlify pendientes por falta de acceso al registro npm durante esta entrega.
 
 
