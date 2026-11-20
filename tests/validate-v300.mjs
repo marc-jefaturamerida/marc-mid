@@ -12,7 +12,7 @@ assert(html.includes('id="achGoalsSection" hidden aria-hidden="true"'));
 const achievements=app.slice(app.indexOf('function achReadGoals(){'),app.indexOf('function achPrintEnabled('));
 assert(!achievements.includes('achievementGoalStore['));
 assert(achievements.includes('effectiveBaseGoal('));assert(achievements.includes('headquartersGoal('));assert(achievements.includes("baseGoals.profiles?.[key]"));
-assert(app.includes('layoutVersion:3,home:'));
+assert(app.includes('layoutVersion:4,home:'));
 for(const id of ['jmToolsFilters','jmToolsSettings','jmToolsExport','floatingFiltersToggle','floatPdf'])assert(html.includes('id="'+id+'"'),id);
 assert(!html.includes('id="floatingExportToggle" type="button" aria-expanded="false" aria-controls="floatingExportMenu"'));
 assert(app.includes('el(\'print\').addEventListener(\'click\',exportPdfV30)'));
