@@ -1,10 +1,8 @@
-# Jefatura Mid Marc V3.0.4.1
+> **V3.0.4.2:** El nuevo modo Supabase está documentado en [SUPABASE_DESPLIEGUE.md](SUPABASE_DESPLIEGUE.md). Para conservar Netlify actual, no establezcas `VITE_CLOUD_PROVIDER=supabase`. Antes de migrar historiales, confirma el mapeo de cuentas.
+
+# Jefatura Mid Marc V3.0.4
 
 Proyecto completo de seguimiento operativo y simulación de comisiones para GitHub + Netlify. Actualizado desde la V2.6.1 con el mismo motor de cálculo.
-
-## Corrección V3.0.4.1 — historial XLS
-
-Se corrige el bloqueo que impedía guardar XLS cuando la carga inicial del historial no había terminado. Se espera a la consulta, se reintentan páginas grandes con lotes más pequeños y se muestra «Reintentar historial» en Ajustes → Archivos XLS guardados. Un error de incidencias o visualización ya no marca los archivos XLS como desconectados. No se borra ni modifica ningún archivo remoto; no requiere migración de base de datos.
 
 ## V3.0.4
 
@@ -17,7 +15,7 @@ Estado activo/inactivo junto a los objetivos de cada módulo o ejecutivo; alerta
 - `src/team-registry.js`, `src/base-goals.js`, `src/goals-workflow.js`: catálogo, alias, estados y objetivos por vigencia.
 - `src/cloud-boot.js` y `netlify/functions/settings.js`: revisiones de sincronización y prevención de sobrescrituras.
 - `netlify/functions/incidents.js`, `netlify/functions/audit.js` y migración V2.7: incidencias recuperables y auditoría.
-- `MANUAL_USUARIO_JEFATURA_MID_MARC_V3041.md` y `public/MANUAL_JEFATURA_MID_MARC_V3041.pdf`: documentación vigente.
+- `MANUAL_USUARIO_JEFATURA_MID_MARC_V304.md` y `public/MANUAL_JEFATURA_MID_MARC_V304.pdf`: documentación vigente.
 - `netlify/functions/updates.js`, `src/updates-ui.js`, `src/update-request-rules.js` y migración V2.7.1: solicitudes por registro, filtro, historial, resolución y recordatorios lunes a miércoles.
 - `tests`: regresiones antiguas + nuevas verificaciones V3.0.
 

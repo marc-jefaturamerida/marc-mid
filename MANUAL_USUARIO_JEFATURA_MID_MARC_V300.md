@@ -1,3 +1,44 @@
+# Actualización V3.0.4 — Objetivos activos, captura rápida y comparativo por fechas
+
+Esta actualización conserva el manual de las versiones anteriores; las funciones nuevas se describen aquí.
+
+## 1. Definir perfil activo o inactivo desde sus objetivos
+
+1. Abre el perfil de un módulo o de un ejecutivo desde **Objetivos base**, o toca su nombre donde se ofrezca configurar objetivos.
+2. Ajusta los indicadores y la fecha de vigencia semanal como antes.
+3. **Junto a «Guardar objetivos y vigencia»** marca o desmarca **«Perfil activo»** y guarda.
+4. La baja usa la fecha del dispositivo de la operación: las filas con fecha anterior a la baja permanecen en el histórico; las de la baja y posteriores se excluyen de métricas, comparativos y sus exportaciones. Al reactivar, los nuevos registros vuelven a participar desde la fecha de reactivación. No se eliminan ni reescriben los XLS originales.
+5. El estado de un módulo es independiente del estado de sus ejecutivos. Desactivar un módulo no cambia sus casillas de estado. Sin embargo, las filas producidas dentro del módulo inactivo dejan de participar a partir de su fecha de baja; si un ejecutivo trabaja en otro módulo activo, sus filas allí sí participan.
+6. El selector no aparece para el perfil agregado **Jefatura**. Las metas se guardan por semana; el estado activo se aplica desde la fecha en que se registra el cambio, no desde la vigencia de objetivos seleccionada.
+
+## 2. Pantalla obligatoria «Asignación rápida de objetivos»
+
+- **Al iniciar:** comprueba la **semana en curso** de los perfiles detectados o creados que todavía están activos.
+- **Al cargar nuevos XLS:** revisa las semanas presentes **solo en los archivos aceptados en esa importación**. No rehace automáticamente todas las vigencias del historial antiguo.
+- La tabla muestra **Nombre, Tipo (módulo/ejecutivo), Semana, Trámites y Ventas**. Los objetivos ya configurados se muestran en solo lectura; se capturan los faltantes.
+- Un objetivo de cantidad **vacío o igual a cero** se considera pendiente. Captura números enteros de **1 a 1,000,000**. No es posible cerrar el aviso sin completar todas las metas faltantes.
+- Pulsa **Guardar todos los objetivos**; se guardan por perfil y vigencia, preservando porcentajes y demás metas preexistentes. Un objetivo real de ventas almacenado en el catálogo antiguo sigue siendo válido; no se confunde con el valor predeterminado de la calculadora.
+- En sesiones con cuenta se mantiene la sincronización de ajustes mediante las claves y funciones existentes de Netlify; las importaciones sin sesión siguen siendo **temporales** y sus cambios locales no migran automáticamente a otra cuenta.
+
+## 3. Comparativo de ejecutivos por semanas o fechas
+
+En la página **Comparativo de ejecutivos**, selecciona **Tipo de período**:
+
+- **Semana laboral**: elige una semana completa de lunes a domingo, independiente del selector de la calculadora individual.
+- **Rango personalizado**: selecciona día inicial y final. La aplicación considera exclusivamente registros dentro del intervalo.
+- Cada semana se procesa por separado con **el motor de comisiones vigente sin modificaciones** y con su **meta semanal completa**, aunque se haya elegido una fracción de esa semana. Se aplican el escalón, Plan Cero, incidencias, recuperación y bonos por semana; solo después se suman las comisiones resultantes por ejecutivo.
+- **Cumplimiento del intervalo** = suma de ventas válidas / suma de metas semanales incluidas. Una semana del rango que tenga registros de otros ejecutivos también aporta el objetivo semanal completo a un ejecutivo que aparece en el intervalo, aunque no haya vendido esa semana.
+- En varios períodos, despliega el **detalle por semanas** dentro de cada fila. La meta total es de solo lectura para evitar editar varias vigencias a la vez; con una sola semana puedes editar la meta semanal en la tabla.
+- PDF, PNG y CSV usan el mismo intervalo; el **CSV incluye desgloses por semana** cuando se seleccionan varias. El botón **Ver folios** abre la calculadora individual en la primera semana con registros de esa persona.
+
+## 4. Validaciones y resguardo
+
+- La fórmula `calculate()` y los archivos SQL/Functions de Netlify **no cambiaron**.
+- No borrar XLS de PostgreSQL, no limpiar la base de datos, ni cambiar las claves existentes de ajustes.
+- Ejecutar `npm run check`, `npm test` y `npm run build` antes de publicar; verificar la sincronización con sesión en un despliegue de prueba. El ZIP incluye los archivos originales completos, no únicamente un parche.
+
+---
+
 # Manual de usuario y administración
 
 **Jefatura Mid Marc**  
@@ -751,3 +792,12 @@ Diferencia: -2.58%
 ```
 
 La cantidad requerida es `redondear hacia arriba(objetivo semanal × días transcurridos / 7)`. Los porcentajes se calculan con los valores exactos antes del redondeo de la cantidad. Si falta la meta semanal, la cantidad requerida no se muestra como un dato inventado. Plan Dental y Plan Cero mantienen el formato de porcentajes vigente.
+
+## Actualización 3.0.3
+En Ajustes > Reportes del portapapeles selecciona el reporte. Edita el título, etiquetas, texto inicial/final y marca los indicadores que deseas ver. Usa ↑ para mover un indicador hacia arriba. Guarda el reporte para aplicar el formato y consultar una vista previa ilustrativa; Restaurar plantilla elimina la personalización de ese reporte. El reporte de folios admite encabezado y textos adicionales, conservando las fechas y folios. Los cambios se sincronizan por cuenta con el mecanismo existente; verifica el estado de sincronización antes de cambiar de dispositivo. El respaldo JSON incluye estas preferencias.
+
+En Ajustes > Restablecer sistema, Restablecer ajustes devuelve las preferencias originales sin borrar XLS, visitas, incidencias, solicitudes, objetivos base, equipo ni correcciones de registros. Las excepciones de metas de históricos y comparativa semanal se restauran. Descarga primero un respaldo desde Importar / exportar configuraciones. Restablecimiento completo elimina permanentemente los datos de la cuenta (incluida la papelera y auditoría), no la identidad ni las cuentas de otros usuarios. Requiere sesión activa, confirmación escrita RESTABLECER TODO y sincronización previa. No existe recuperación desde el sistema después de confirmar.
+
+Para los históricos y la comparativa semanal, toca el nombre del elemento para configurar el objetivo base vigente. Puedes introducir una excepción en los campos de objetivo; vaciarla recupera la meta base. Las excepciones se guardan hasta eliminarlas. Si falta una cantidad base, la meta se muestra como Sin objetivo configurado. Los porcentajes predeterminados del catálogo siguen vigentes. Las calculadoras conservan sus controles y fórmulas de comisión. El avance diario indica las metas faltantes. El menú flotante abre Exportar; Filtros y Configuración siguen disponibles.
+
+Despliegue: reemplaza el contenido del repositorio con este paquete, conserva la conexión a Netlify y ejecuta npm run build mediante el despliegue habitual. No requiere migraciones adicionales. GitHub Pages por sí solo no ejecuta las funciones ni la base de datos de esta versión.

@@ -133,6 +133,7 @@ function render(){
 }
 function sourceRefresh(){allRows=source.rows();if(!active)return;render();}
 async function request(path,options={}){
+ if(window.APP_CLOUD?.provider==='supabase')return window.APP_CLOUD.api('visits'+path,options);
  const response=await fetch('/api/visits'+path,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json',...(options.body?{'Content-Type':'application/json'}:{})},...options});
  const data=await response.json().catch(()=>({error:`Respuesta inesperada (${response.status}).`}));
  if(!response.ok)throw Error(data.error||`Error ${response.status}`);return data;

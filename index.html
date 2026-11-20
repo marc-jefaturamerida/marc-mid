@@ -1600,7 +1600,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
 </section>
 <footer class="foot">Final de la presentacion · Versión 3.0.4.1</footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
-<script type="module" src="/src/cloud-boot.js"></script>
+<script type="module" src="/src/start-app.js"></script>
 
 
 <div class="floating-filters jm-tools" id="floatingFilters">
@@ -1686,11 +1686,18 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
  <section class="base-goal-dialog goal-audit-dialog" role="dialog" aria-modal="true" aria-labelledby="goalAuditTitle" aria-describedby="goalAuditDescription" tabindex="-1">
   <div class="base-dialog-header"><h2 id="goalAuditTitle">Asignación rápida de objetivos</h2></div>
   <p class="settings-help" id="goalAuditDescription">Se detectaron objetivos de trámites o ventas sin asignar. Para continuar, completa todas las cantidades pendientes. Se conserva la vigencia histórica y los objetivos ya guardados.</p>
+  <p class="goal-audit-locked">Esta pantalla es obligatoria: las demás secciones se habilitarán después de guardar los objetivos faltantes.</p>
+  <div class="goal-audit-bulk"><label>Trámites para todos los pendientes<input type="number" id="goalAuditBulkRecords" min="1" max="1000000" step="1" placeholder="Cantidad de trámites"></label><label>Ventas para todos los pendientes<input type="number" id="goalAuditBulkSales" min="1" max="1000000" step="1" placeholder="Cantidad de ventas"></label><button class="btn" type="button" id="goalAuditFill">Aplicar cantidades a todos los pendientes</button></div>
   <div class="goal-audit-scroll"><table class="goal-audit-table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Semana</th><th>Trámites</th><th>Ventas</th></tr></thead><tbody id="goalAuditRows"></tbody></table></div>
   <div class="goal-audit-actions"><span role="status" id="goalAuditStatus"></span><button class="btn primary" type="button" id="goalAuditSave">Guardar todos los objetivos</button></div>
  </section>
 </div>
 <style>
+.goal-audit-locked{font-size:12px;color:#8c4c12;border-left:3px solid #d99833;background:#fff9ed;padding:8px 11px;border-radius:5px;margin:9px 0}
+.goal-audit-bulk{display:flex;align-items:end;flex-wrap:wrap;gap:9px;margin:12px 0;padding:11px;border:1px solid #bfd7ed;border-radius:10px;background:#f2f8ff}
+.goal-audit-bulk label{min-width:160px;flex:1}
+.goal-audit-bulk button{min-height:39px;white-space:normal}
+@media(max-width:580px){.goal-audit-bulk label,.goal-audit-bulk button{flex:1 1 100%}}
 .base-status-toggle{display:inline-flex!important;align-items:center;gap:8px!important;color:#003b7a!important;font-size:13px!important;cursor:pointer}
 .base-status-toggle[hidden]{display:none!important}
 .base-status-toggle input{width:18px!important;height:18px!important;accent-color:#005daa}

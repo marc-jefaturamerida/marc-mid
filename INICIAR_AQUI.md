@@ -1,61 +1,19 @@
-# Corrección V3.0.4.1 · Historial XLS de Netlify
+# JEFATURA MID MARC V3.0.4.2
 
-Sustituye los archivos del repositorio GitHub por el contenido íntegro de este ZIP. Conserva Netlify Identity, PostgreSQL y todas las migraciones; **NO borres XLS, base de datos ni ajustes existentes**. Tras publicar, inicia sesión, comprueba que el historial esté disponible y carga un archivo de prueba nuevo. Si una consulta falla, abre **Ajustes → Archivos XLS guardados → Reintentar historial**. El importador espera la recuperación del historial y no guarda archivos con historial incompleto.
+## Para Netlify (proyecto actual)
 
-Verificación previa a publicar: `npm install`, `npm run check`, `npm test` y `npm run build`. La última ejecución depende de las dependencias npm y no se verificó aquí. Documento vigente: `MANUAL_USUARIO_JEFATURA_MID_MARC_V3041.md`.
+Sustituye los archivos del repositorio conservando los ajustes actuales del sitio y la base PostgreSQL. Sin `VITE_CLOUD_PROVIDER` configurado, la interfaz utiliza las Functions y Netlify Identity originales. Mantén el despliegue anterior como copia de respaldo hasta validar la versión.
 
----
+## Para Supabase + GitHub Pages
 
-# Actualización V3.0.4
+Lee `SUPABASE_DESPLIEGUE.md`. Contiene la arquitectura, migración SQL, Edge Function, secretos de servidor y despliegue automático con GitHub Actions. El código de Supabase es **una nueva vía de despliegue que necesita configuración y pruebas en un proyecto real antes de reemplazar Netlify**.
 
-Esta entrega actualiza el ZIP V3.0.3 con estados activos junto a objetivos, asignación rápida obligatoria y período por semanas o fechas para el comparativo. **Conserva la carpeta `netlify/` y los datos de PostgreSQL sin reinicializar tablas.** Antes de publicar, ejecuta `npm install`, `npm run check`, `npm test` y `npm run build`, y revisa CHANGELOG y manual.
+### Mejoras de la interfaz
 
-# Jefatura Mid Marc V3.0 · GitHub + Netlify
+- Comparativa diaria como página principal para instalaciones y ajustes de navegación anteriores.
+- Navegación de pestañas con eventos delegados. La ventana de objetivos obligatorios explica el bloqueo de las demás secciones hasta guardar.
+- Detección inicial de metas faltantes y botones de aplicación masiva de cantidades de trámites/ventas a campos pendientes, conservando las metas ya guardadas.
 
-**Proyecto base:** V2.7.1 corregida, versión de Netlify (no el servidor Termux/SQLite).
+### Comprobaciones
 
-## Publicación
-
-1. Realiza un respaldo de configuraciones e históricos antes de actualizar.
-2. Descomprime el ZIP completo en la raíz de tu repositorio GitHub, reemplazando los archivos anteriores.
-3. Conserva Netlify Identity y Database PostgreSQL y confirma que están aplicadas las migraciones anteriores:
-   - `20261116080000_jefatura_v27_audit_trash.sql`
-   - `20261116190000_jefatura_v271_record_updates.sql`
-4. Ejecuta donde tengas Internet:
-
-```bash
-npm install
-npm run check
-npm test
-npm run build
-git add -A
-git commit -m "Jefatura Mid Marc V3.0.4.1 historial XLS"
-git push origin HEAD
-```
-
-5. Netlify debe usar `npm run build` y publicar la carpeta `dist`. No hay migraciones SQL nuevas en V3.0.
-6. Verifica antes de trabajar en producción: principal Dashboard Jefatura, selector semanal lunes-domingo, metas de Logros del perfil, menú flotante unificado, PDF descargado y nombre correcto, sincronización de otra sesión y fórmulas de comisión.
-
-## Descargar PDF
-
-En cada página pulsa **☰ Menú → Exportar → Descargar PDF**. El archivo se descarga con nombre automático construido desde el título de página, módulo o ejecutivo si existe filtro, y la fecha/semana consultada. La carpeta final la decide el navegador del equipo, normalmente Descargas; revisa sus ajustes si pide elegir destino.
-
-## Notas
-
-- No uses archivos de la edición local Wi-Fi ni migres a SQLite: son proyectos diferentes.
-- Las metas antiguas capturadas en la sección retirada de Logros semanales quedan respaldadas bajo su clave existente, pero ya no participan en el cálculo de Logros.
-- El motor de comisiones permanece sin cambios; revisa el manual `MANUAL_USUARIO_JEFATURA_MID_MARC_V3041.md` (con actualización V3.0.4 al inicio).
-- Sintaxis y pruebas automatizadas completadas; build completo y funcionamiento real en Netlify pendientes por falta de acceso al registro npm durante esta entrega.
-
-
-**Menú de configuración:** desde cualquier página, pulsa **Menú → Configuración**. Se abrirá una ventana con opciones relacionadas con esa página; selecciona **Guardar y volver a la página** para cerrar. No se modifica la base de datos ni hace falta migración adicional.
-
-
-### Mejoras del menú V3.0 (actualización)
-
-Dashboard de Jefatura cuenta con filtros ampliados y porcentajes mínimos individuales de alerta en Menú → Configuración. Incidencias y Actualizaciones tienen botón Copiar reporte en sus detalles. Logros semanales ofrece Menú → Exportar → Copiar folios comisionables. Consulta el apartado 31 del manual para conocer el alcance de cada filtro y los formatos de texto.
-
-
-### Verificación de actualizaciones al 19 de noviembre de 2026
-
-Después del despliegue, prueba desde la Comparativa diaria los dos botones de copia del menú Exportar, usando una semana con objetivos configurados y ventas comisionables. Comprueba también el guardado de una visita desde el celular. Los registros y las fórmulas de comisión no se migran. Ejecuta `npm run check` y `npm test` en el repositorio antes de publicar.
+`npm run check` y `npm test`. La compilación con `npm run build` requiere instalar dependencias en una máquina con acceso a npm.

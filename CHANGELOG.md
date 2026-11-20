@@ -1,14 +1,3 @@
-## V3.0.4.1 — 20 de noviembre de 2026 · Corrección del historial XLS
-
-- **Corregido el bloqueo al importar:** el mensaje «No está disponible el historial en línea» podía aparecer si se elegía un archivo antes de que terminase la carga inicial. La importación ahora espera una verificación completa del historial antes de guardar.
-- **Descarga robusta y segura:** recuperación paginada de los XLS con reducción progresiva de lotes de 8 a 4, 2 y 1 ante errores; reintento final de red. No se considera completo ni se borra un historial truncado. Se conservan la comprobación de duplicados y todas las filas existentes.
-- **Reintento desde Ajustes → Archivos XLS guardados:** botón «Reintentar historial» y estado de recuperación. Si ocurre un problema real de red, se informa el error en lugar de ocultarlo; se puede volver a intentar sin borrar ni reiniciar datos.
-- **Fallos aislados:** errores de visualización, incidencias y actualizaciones no marcan el historial XLS como desconectado cuando la lectura de archivos fue exitosa.
-- **Sin cambios de backend:** Netlify Functions, migraciones PostgreSQL, cálculo de comisiones, reglas de calidad, metas y estados de perfiles permanecen idénticos a V3.0.4.
-- **Validación:** suite completa y nueva prueba de recuperación de páginas, fallos de red, paginación incompleta y carrera de importación. Compilación Vite no verificada en este entorno por falta de dependencias npm. Validar en despliegue Netlify de prueba.
-
----
-
 ## V3.0.4 — 20 de noviembre de 2026
 
 - **Estados en Objetivos base:** casilla «Perfil activo» junto al botón Guardar para módulos y ejecutivos, conectada al catálogo de estados y al filtro de registros por fecha. No cambia el estado de los ejecutivos al desactivar el módulo ni borra XLS históricos.
@@ -409,3 +398,11 @@ No se requiere nueva migración PostgreSQL: se reutiliza la clave existente `wmS
 - Comparativa semanal e históricos utilizan metas base vigentes; las excepciones existentes siguen disponibles. Los objetivos faltantes se indican explícitamente en estos controles y exportaciones; P0 y Dental convierten tasas en cantidades para las comparativas de conteos.
 - El botón flotante abre Exportar primero.
 - Validación de sintaxis y pruebas Node; el build y la operación real de Netlify requieren dependencias y despliegue.
+
+## V3.0.4.2 — Navegación, inicio y alternativa Supabase (20 noviembre 2026)
+- Se migra la página principal a **Comparativa diaria**; el usuario aún puede personalizarla después desde Ajustes > Páginas.
+- Navegación con delegación de eventos y errores visibles al seleccionar otra vista. Se aclara que la captura obligatoria de objetivos impide cambiar de página hasta guardar.
+- Asignación rápida con dos entradas masivas independientes y botón que escribe en todos los campos **faltantes y editables**, preservando los objetivos preexistentes.
+- Se incorpora `src/start-app.js` para seleccionar proveedor Netlify o Supabase mediante `VITE_CLOUD_PROVIDER`, y cliente de Supabase Auth/Edge Functions sin sustituir los mecanismos Netlify originales.
+- Se incluyen SQL consolidado, Edge Functions con validación de JWT y CORS, guía de despliegue, plantilla `.env.example` y workflow de GitHub Pages.
+- La migración de cuentas, históricos XLS e incidencias **no es automática**: requiere confirmación de propietarios. Las fórmulas de comisiones y calidad permanecen sin alterar.

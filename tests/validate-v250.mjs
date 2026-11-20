@@ -121,7 +121,7 @@ assert.equal(capped.net,Math.round((capped.afterPenalty-capped.recover+capped.dy
 const html=fs.readFileSync('index.html','utf8');
 assert(!html.includes('Versión 2.4.2</footer>'));
 assert.equal((html.match(/Versión 3\.0\.4\.1<\/footer>/g)||[]).length,5);
-assert(source.includes("APP_VERSION='3.0.4.1'"));
+assert(source.includes("APP_VERSION='3.0.4.2'"));
 assert(source.includes('write(\'Versión \'+APP_VERSION'));
 assert(source.includes('data-sup-include-sales'));
 assert(source.includes('data-dynamic-bonus-id'));
@@ -141,7 +141,7 @@ assert(source.includes("from './supervisor-statement.js'"));
 assert(source.includes('supervisorStatementHtml(model)'));
 assert(source.includes('paintSupervisorStatement(ctx,true,supModel)'));
 for(const term of ['Estado de comisión · Supervisor','Nómina semanal','ALCANCE GLOBAL','Bono por dinámica','Folios propios','ss-pay','@page{size:A4 portrait'])assert(statement.includes(term),`No aparece elemento de diseño: ${term}`);
-assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.4.1');
+assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'3.0.4.2');
 console.log('OK: plantilla de supervisor y motores de exportación vinculados a los mismos cálculos.');
 
 // Contrato real de la exportación: una sola fuente de cifras para PDF y PNG.
@@ -245,7 +245,7 @@ assert(source.includes('incidentRecords.get(key)'),'reconciliación por folio');
 assert(source.includes('await migrateLegacyIncidents()'),'migración marcas previas');
 assert(source.includes('initMondayReminder()'),'recordatorio de lunes');
 assert(source.includes('switchPage(pageNavigation.home)'),'página principal configurable');
-assert(source.includes("DEFAULT_PAGE_ORDER=['leadership'"),'Dashboard de Jefatura como inicio predeterminado');
+assert(source.includes("DEFAULT_PAGE_ORDER=['leadership'"),'Dashboard de Jefatura disponible en el orden predeterminado');
 assert(html.includes('id="incidencePage"')&&html.includes('id="incComment"')&&html.includes('id="incResolved"'));
 assert(html.includes('id="floatingExport"')&&html.includes('id="pageOrderList"'));
 assert(!html.includes('Versión 2.4.9</footer>'),'pies actualizados');
@@ -259,7 +259,7 @@ vm.runInContext(excerpt('function validNavSettings(', 'let pageNavigation='),ctx
 vm.runInContext(excerpt('const normalizeIncidentFolio=', 'let incidentLoaded='),ctxInc);
 vm.runInContext(excerpt('const selectedIncident=', 'const appEnabled='),ctxInc);
 assert.equal(vm.runInContext('normalizeIncidentFolio(" 2063-7784 ")',ctxInc),'20637784');
-assert.equal(vm.runInContext('validNavSettings(null).home',ctxInc),'leadership');
+assert.equal(vm.runInContext('validNavSettings(null).home',ctxInc),'daily');
 assert.equal(vm.runInContext('validNavSettings({order:["incidents","incidents","xxx"],home:"xxx"}).order.length',ctxInc),5);
 ctxInc.incidentRecords.set('20637784',{folio_key:'20637784',active:true});
 ctxInc.row={folio:'2063-7784',uid:'nuevo-identificador'};

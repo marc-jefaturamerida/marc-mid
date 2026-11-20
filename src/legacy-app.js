@@ -57,7 +57,7 @@ import {WEEKLY_ADMIN_DEFAULTS,WEEKLY_ADMIN_STORAGE,cleanWeeklyAdminSettings,prel
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='3.0.4.1';
+  const APP_VERSION='3.0.4.2';
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -130,8 +130,7 @@ function validNavSettings(value){
  if(value?.groupBy&&typeof value.groupBy==='object')for(const page of DEFAULT_PAGE_ORDER){if(groupOrder.includes(value.groupBy[page])&&value.groupBy[page]!=='settings')groupBy[page]=value.groupBy[page];}
  const groupTitles={};for(const g of groupOrder){const n=value?.groupTitles?.[g];if(typeof n==='string'&&n.trim()&&n.trim().length<=80)groupTitles[g]=n.trim();}
  const pageTitles={};for(const p of DEFAULT_PAGE_ORDER){const n=value?.pageTitles?.[p];if(typeof n==='string'&&n.trim()&&n.trim().length<=80)pageTitles[p]=n.trim();}
- const oldDefault=Array.isArray(value?.order)&&!value.order.includes('leadership')&&value?.home==='daily';
- return {order,groupOrder,groupBy,groupTitles,pageTitles,deletedGroups:deleted,layoutVersion:3,home:value?.layoutVersion===3&&DEFAULT_PAGE_ORDER.includes(value?.home)?value.home:'leadership'};
+  return {order,groupOrder,groupBy,groupTitles,pageTitles,deletedGroups:deleted,layoutVersion:4,home:value?.layoutVersion===4&&DEFAULT_PAGE_ORDER.includes(value?.home)?value.home:'daily'};
 }
 function navGroupLabel(g){return pageNavigation.groupTitles?.[g]||GROUP_LABELS[g]||'Nueva sección';}
 function navPageLabel(p){return pageNavigation.pageTitles?.[p]||PAGE_LABELS[p]||p;}
@@ -3117,6 +3116,7 @@ function requestGoalAudit(kind='start',reports=[]){
  el('goalAuditRows').innerHTML=items.map(item=>`<tr data-audit-key="${esc(item.key)}"><td>${esc(item.name)}</td><td>${item.type==='module'?'Módulo':'Ejecutivo'}</td><td>${esc(weekLabel(item.week))}</td>${['records','sales'].map(metric=>`<td><input data-audit-metric="${metric}" type="number" min="1" max="1000000" step="1" ${item['missing'+metric[0].toUpperCase()+metric.slice(1)]?`placeholder="Obligatorio" required`:`value="${item[metric]}" readonly title="Objetivo ya configurado"`} aria-label="${metric==='records'?'Trámites':'Ventas'} de ${esc(item.name)}, semana ${esc(item.week)}" /></td>`).join('')}</tr>`).join('');
  el('goalAuditDescription').textContent=`${items.length} perfil(es) o vigencia(s) con trámites o ventas faltantes. Completa todas las cantidades mayores que cero para continuar. Los objetivos ya configurados son de solo lectura.`;
  el('goalAuditStatus').textContent='';
+ el('goalAuditBulkRecords').value='';el('goalAuditBulkSales').value='';
  overlay.hidden=false;el('baseGoalOverlay').hidden=true;
  (el('goalAuditRows').querySelector('input:not([readonly])')||el('goalAuditSave')).focus();
 }
@@ -3148,6 +3148,22 @@ function saveGoalAudit(){
 }
 function initGoalAudit(){
  el('goalAuditSave').addEventListener('click',saveGoalAudit);
+ el('goalAuditFill').addEventListener('click',()=>{
+  const records=el('goalAuditBulkRecords').value.trim(),sales=el('goalAuditBulkSales').value.trim();
+  const status=el('goalAuditStatus');
+  if(!records&&!sales){status.textContent='Ingresa al menos una cantidad en trámites o ventas.';return;}
+  if((records&&!Number.isInteger(Number(records)))||(sales&&!Number.isInteger(Number(sales)))||
+     (records&&Number(records)<=0)||(sales&&Number(sales)<=0)||
+     (records&&Number(records)>1000000)||(sales&&Number(sales)>1000000)){
+   status.textContent='Los objetivos deben ser enteros entre 1 y 1,000,000.';return;
+  }
+  let count=0;
+  for(const input of el('goalAuditRows').querySelectorAll('input[data-audit-metric]:not([readonly])')){
+   const value=input.dataset.auditMetric==='records'?records:sales;
+   if(value){input.value=String(Number(value));count++;}
+  }
+  status.textContent=`${count} campo(s) pendiente(s) completado(s). Verifica los valores y guarda todos los objetivos.`;
+ });
  // Bloquear Escape, navegación de foco y cierre externo durante la asignación.
  el('goalAuditOverlay').addEventListener('keydown',event=>{
   if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();}
@@ -3394,7 +3410,7 @@ function renderNavOrderEditor(){
  }).join('');
 }
 function saveNavSettings(){
- try{pageNavigation.layoutVersion=3;localStorage.setItem(PAGE_NAV_KEY,JSON.stringify(pageNavigation));}catch(error){el('pageOrderStatus').textContent='No se pudo guardar: '+error.message;return;}
+ try{pageNavigation.layoutVersion=4;localStorage.setItem(PAGE_NAV_KEY,JSON.stringify(pageNavigation));}catch(error){el('pageOrderStatus').textContent='No se pudo guardar: '+error.message;return;}
  applyNavOrder();renderNavOrderEditor();if(el('settingsPanel').open)toggleSettings(false);el('pageOrderStatus').textContent='Categorías, páginas y principal guardadas'+(isAuthorized()?' · sincronización en cola.':'. Inicia sesión para sincronizar.');
 }
 function initNavOrder(){
@@ -3403,8 +3419,12 @@ function initNavOrder(){
   const btn=event.target.closest('[data-group-nav]');if(!btn)return;
   const group=btn.dataset.groupNav;
   if(group==='settings'){el('toggleSettings').click();return;}
+  if(!el('goalAuditOverlay').hidden){
+   el('goalAuditStatus').textContent='Completa y guarda los objetivos pendientes para desbloquear las demás secciones.';
+   return;
+  }
   const first=pageNavigation.order.find(k=>pageNavigation.groupBy[k]===group);
-  if(first)switchPage(first);
+  if(first){try{switchPage(first);}catch(error){console.error('Error de navegación:',error);el('cloudSessionLabel').textContent='Error al abrir sección: '+(error?.message||String(error));}}
  });
  el('groupOrderList').addEventListener('click',event=>{
   const deletion=event.target.closest('[data-group-delete]');
@@ -3807,7 +3827,18 @@ function switchPage(page){
   updateFloatingExport();updateFloatingFilters();
   if(el('settingsPanel').open){el('settingsPanel').open=false;el('toggleSettings').setAttribute('aria-expanded','false');}
 }
-for(const b of document.querySelectorAll('[data-page-tab]'))b.addEventListener('click',()=>switchPage(b.dataset.pageTab));
+// Delegación de eventos: sigue funcionando si el menú cambia de sección o se reordena.
+ document.querySelector('.app-navigation').addEventListener('click',event=>{
+  const tab=event.target.closest('[data-page-tab]');if(!tab)return;
+  if(!el('goalAuditOverlay').hidden){
+   el('goalAuditStatus').textContent='Completa y guarda los objetivos pendientes para desbloquear las páginas.';
+   return;
+  }
+  try{switchPage(tab.dataset.pageTab);}catch(error){
+   console.error('Error al cambiar de página:',error);
+   el('cloudSessionLabel').textContent='No se pudo mostrar '+navPageLabel(tab.dataset.pageTab)+': '+(error?.message||String(error));
+  }
+ });
 el('dailyCopyWhatsApp').addEventListener('click',copyDailyWhatsApp);
 el('dailyDateMode').addEventListener('change',()=>{renderDaily();});
 for(const id of ['dailyCurrentDate','dailyPreviousDate'])el(id).addEventListener('change',()=>renderDaily());
