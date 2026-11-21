@@ -10,6 +10,9 @@ function addScope(scope,type,name,week,registry,date){
  if(!['module','executive'].includes(type)||!validName(name)||!mondayISO(week))return;
  const entry=registryEntry(registry,type==='module'?'modules':'executives',name);
  if(!registryActiveAt(entry,date||week))return;
+ // Si el módulo se dio de baja, no solicitar en la semana actual objetivos
+ // para ejecutivos que dependan de ese módulo; no modifica metas históricas.
+ if(type==='executive'&&entry?.module&&!registryActiveAt(registryEntry(registry,'modules',entry.module),date||week))return;
  const key=[week,type,normalizeName(name)].join('|');
  if(!scope.has(key))scope.set(key,{key,type,name:name.trim(),week});
 }

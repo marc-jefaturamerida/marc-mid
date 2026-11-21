@@ -1,0 +1,12 @@
+Parche JEFATURA MID MARC V4.1.3
+
+1. Extrae el ZIP en una carpeta temporal.
+2. Abre tu repositorio clonado marc-mid en GitHub Desktop > Repository > Show in Explorer.
+3. Copia y sustituye solamente los archivos y carpetas del parche, sin borrar el resto del proyecto.
+4. Conserva la carpeta .git y el workflow corregido .github/workflows/github-pages.yml.
+5. Commit y Push origin en main.
+6. Comprueba que GitHub Actions termina con SUCCESS.
+7. Comprueba https://marc-jefaturamerida.github.io/marc-mid/version.json (debe mostrar 4.1.3).
+8. Recarga la aplicación forzando caché con Ctrl+F5; comprueba pies 4.1.3 y exclusión de perfiles inactivos de la semana actual.
+
+No hay migraciones SQL nuevas ni cambios en Supabase. Los históricos se conservan.

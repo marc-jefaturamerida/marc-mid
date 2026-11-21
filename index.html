@@ -5,7 +5,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="light" name="color-scheme"/>
-<title>Jefatura Mid Marc V3.0</title>
+<title>Jefatura Mid Marc</title>
 <link rel="stylesheet" href="/assets/jm-v27.css"/>
 <link rel="stylesheet" href="/assets/jm-updates-v271.css"/>
 <style>
@@ -1490,7 +1490,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="all-records-help">Las columnas se muestran según <strong>Ajustes → Tabla de folios</strong>. Incidencia y APP permanecen a la vista para validarlas. Desliza horizontalmente para ver más columnas.</div>
   <div class="table-wrap all-records-table-wrap"><table id="allRecordsTable" class="record-table all-records-table"><thead id="allRecordsHead"></thead><tbody id="allRecordsBody"><tr><td>Importa un XLS para mostrar registros.</td></tr></tbody></table></div>
   <div class="all-records-pagination"><span id="allRecordsPageStatus">0 registros</span><div class="all-records-page-actions"><label for="allRecordsPageSize">Filas por página</label><select id="allRecordsPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" type="button" id="allRecordsPrev">Anterior</button><button class="btn small" type="button" id="allRecordsNext">Siguiente</button></div></div>
-  <footer class="foot">Consulta de registros manuales · Versión 4.1.1</footer>
+  <footer class="foot">Consulta de registros manuales · Versión <span data-app-version>4.1.3</span></footer>
 </section>
 
 
@@ -1516,7 +1516,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
     </div></details>
   </div>
   <p class="sup-footnote">Cálculo informativo. Configura el bono base en Ajustes → 12; los bonos adicionales comienzan en $1,000, $1,500 y $2,000, editables y no acumulables. Guarda los ajustes para sincronizarlos con Netlify; consultar semanas y supervisores no genera escrituras.</p>
-  <footer class="foot">Calculadora de supervisor · Versión 4.1.1</footer>
+  <footer class="foot">Calculadora de supervisor · Versión <span data-app-version>4.1.3</span></footer>
 </section>
 <section id="achievementsPage" class="achievements-page" hidden aria-label="Logros semanales por módulo">
   <div class="achievements-hero">
@@ -1579,7 +1579,7 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
       <div class="achievements-pager"><span id="achRecordStatus">0 registros</span><div class="achievements-pager-options"><label for="achPageSize">Filas</label><select id="achPageSize"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select><button class="btn small" id="achPrev" type="button">Anterior</button><button class="btn small" id="achNext" type="button">Siguiente</button></div></div>
     </div>
   </details>
-  <footer class="foot">Logros semanales · Versión 4.1.1</footer>
+  <footer class="foot">Logros semanales · Versión <span data-app-version>4.1.3</span></footer>
 </section>
 
 
@@ -1628,14 +1628,14 @@ body[data-page="supervisor"] #printRecordsSection{display:none!important}
   <div class="visit-toolbar"><button type="button" id="visitNew" class="btn">Nueva visita</button><button type="button" id="visitSave" class="btn primary">Guardar visita</button><button type="button" id="visitPdf" class="btn">PDF · Carta</button><button type="button" id="visitPng" class="btn">PNG</button></div>
   <div id="visitForm" class="visit-main"></div>
   <details class="visit-history" id="visitHistoryPanel"><summary>Visitas guardadas en la nube <span id="visitHistoryCount"></span></summary><div class="visit-history-inner"><button type="button" id="visitRefresh" class="btn small">Actualizar historial</button><div id="visitHistoryList"></div></div></details>
-  <footer class="foot">Acuse de coordinación · Versión 4.1.1</footer>
+  <footer class="foot">Acuse de coordinación · Versión <span data-app-version>4.1.3</span></footer>
 </section>
 <div class="print-only print-context" id="printContext"></div>
 <section class="section-card print-only" hidden="" id="printRecordsSection">
 <div class="section-title"><h2>Tabla filtrada de folios</h2><p id="printRecordSummary">—</p></div>
 <div class="table-wrap"><table id="printRecordsTable"><thead id="printRecordsHead"></thead><tbody id="printRecordRows"></tbody></table></div>
 </section>
-<footer class="foot">Final de la presentacion · Versión 4.1.1</footer>
+<footer class="foot">Final de la presentacion · Versión <span data-app-version>4.1.3</span></footer>
 </main><div aria-hidden="true" class="report-host" id="reportHost"></div>
 <script type="module" src="/src/start-app.js"></script>
 

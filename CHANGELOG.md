@@ -1,3 +1,13 @@
+## V4.1.3 — Identidad de versión y ocultamiento de perfiles inactivos (2026-11-21)
+
+- Se retira V3.0 del título de pestaña del navegador.
+- Todos los pies de página muestran la versión activa 4.1.3; el identificador se establece de forma centralizada desde el código.
+- `public/version.json` permite comprobar qué compilación está publicada en GitHub Pages.
+- Doble verificación de perfiles inactivos al consultar los registros: todas las visualizaciones usan datos filtrados de la semana actual.
+- Un ejecutivo asociado a un módulo inactivo no figura en los listados de la semana actual; los históricos se mantienen.
+- Los filtros del Dashboard de Jefatura y Análisis del día respetan el rango activo y los perfiles inactivos; también se excluyen incidencias de perfiles inactivos en la semana actual y se omite la solicitud de metas pendientes de ejecutivos ligados a módulos inactivos.
+- Se conserva el workflow de publicación corregido de V4.1.2.1, la importación XLS, Supabase y el motor de comisiones.
+
 ## V4.1.2
 - Nueva exportación **Exportar captura Sheets** en JPEG con apariencia realista de hoja de cálculo.
 - Disponible en las 16 páginas exportables sin reemplazar PDF, PNG ni CSV.

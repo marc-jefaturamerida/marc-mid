@@ -1,4 +1,4 @@
-# Novedades V4.1.2
+# Novedades V4.1.3
 
 Actualiza el código conservando el repositorio Git, el proyecto Supabase y los datos existentes. **No hay migración SQL nueva.** La ruta del manual en la aplicación es `/manual-usuario.html` relativa a la página. Verifica que el botón del manual abra el contenido y que las pruebas finalicen.
 
@@ -53,6 +53,11 @@ Ejecuta `DIAGNOSTICO_SUPABASE_V400_SOLO_LECTURA.sql` en SQL Editor. Solo muestra
 **No uses Reset all para intentar recuperar el XLS anterior.** La versión V4 conserva las tablas heredadas, pero esa acción en la interfaz sigue siendo una operación administrativa destructiva confirmada.
 
 
-### Nuevo en V4.1.2
+### Nuevo en V4.1.3
 - Exportación adicional **Exportar captura Sheets** en JPEG.
 - Disponible en barra principal, menú flotante y en **Análisis del día**.
+
+
+### Identificación de publicación
+
+Tras el éxito de GitHub Actions, comprueba `https://marc-jefaturamerida.github.io/marc-mid/version.json`. Debe indicar `4.1.3`. Si sigue mostrando otra versión, la nueva compilación todavía no está publicada.

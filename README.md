@@ -1,4 +1,4 @@
-# V4.1.2 · Ajustes, perfiles inactivos y manual de usuario
+# V4.1.3 · Ajustes, perfiles inactivos y manual de usuario
 
 Esta actualización mantiene la estructura de Supabase, las políticas de Storage y las fórmulas de comisiones.
 
@@ -42,3 +42,8 @@ La verificación final del guardado y lectura debe hacerse contra tu propio proy
 ## Novedad V4.1.2
 
 Se agregó **Exportar captura Sheets** en las 16 páginas exportables. Esta opción crea un **JPEG** con apariencia de hoja de cálculo realista usando los filtros y cálculos activos de cada página.
+
+
+## Ajustes V4.1.3
+
+Título sin versión, versión sincronizada en los pies, comprobación opcional en `/marc-mid/version.json` y exclusión de los módulos/ejecutivos inactivos durante la semana actual. Histórico preservado.

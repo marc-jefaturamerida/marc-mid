@@ -61,7 +61,8 @@ import {WEEKLY_ADMIN_DEFAULTS,WEEKLY_ADMIN_STORAGE,cleanWeeklyAdminSettings,prel
   const mx=v=>money.format(v);
   const pct=v=>`${number.format(v)}%`;
   const round=v=>Math.round((v+Number.EPSILON)*100)/100;
-  const APP_VERSION='4.1.2';
+  const APP_VERSION='4.1.3';
+  document.querySelectorAll('[data-app-version]').forEach(node=>{node.textContent=APP_VERSION;});
 const DYNAMIC_BONUS_KEY='wmSamsMeridaBonusDinamicaV245';
 function loadDynamicBonus(){
   try{const config=JSON.parse(localStorage.getItem(DYNAMIC_BONUS_KEY)||'null');
@@ -1491,10 +1492,18 @@ const HISTORY_LABEL_MAP=new Map(HISTORY_METRICS);
 const historyFormat=n=>number.format(Number.isFinite(n)?n:0);
 const historyMetricValue=(p,k)=>k==='quality'?pct(p.quality):k==='global'?pct(p.global):historyFormat(p[k]);
 const historyWeekdays=['Domingos','Lunes','Martes','Miércoles','Jueves','Viernes','Sábados'];
+let historyDataViewCache=null;
 function historyData(){
   const available=archive.temporaryMode?archive.tempReports:archive.reports;
   const data=available.length?combinedArchiveData(available):imported.data;
-  return data?.rows||[];
+  const todayWeek=mondayOf(dateIso(new Date()));
+  if(historyDataViewCache?.source===data&&historyDataViewCache.registry===teamRegistry&&historyDataViewCache.week===todayWeek)
+    return historyDataViewCache.rows;
+  // Filtro de seguridad visual adicional: aplica también si se reutiliza una
+  // importación preparada antes de inactivar un perfil. Jamás altera los XLS.
+  const rows=(data?.rows||[]).filter(row=>registryRowEligible(teamRegistry,row));
+  historyDataViewCache={source:data,registry:teamRegistry,week:todayWeek,rows};
+  return rows;
 }
 function historyNames(){
   const names=new Map();
@@ -3025,7 +3034,9 @@ function leadershipSelectedRange(){
  return {from:start,to:dateIso(endDate)};
 }
 function populateLeadershipExtraFilters(){
- const rows=historyData();
+ const {from,to}=leadershipSelectedRange();
+ const rows=historyData().filter(row=>row.fecha>=from&&row.fecha<=to);
+ const week=from;
  const options=(id,values,caption)=>{
   const node=el(id),old=node.value;
   const choices=[...new Set(values.map(x=>String(x||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
@@ -3034,7 +3045,7 @@ function populateLeadershipExtraFilters(){
  };
  options('leaderFilterModule',leadershipKnownModules(),'Todos los módulos');
  const mod=el('leaderFilterModule').value;
- options('leaderFilterExecutive',rows.filter(r=>!mod||normalize(r.module)===normalize(mod)).map(r=>r.executive),'Todos los ejecutivos');
+ options('leaderFilterExecutive',rows.filter(r=>(!mod||normalize(r.module)===normalize(mod))&&registryVisibleInWeek(teamRegistry,'executives',r.executive,week)).map(r=>r.executive),'Todos los ejecutivos');
 }
 function leadershipCalc(){
  const {from,to}=leadershipSelectedRange(),today=dateIso(new Date());
@@ -3044,7 +3055,9 @@ function leadershipCalc(){
   if(!goalCache.has(key))goalCache.set(key,leadershipMetricGoal(week,module,metric));return goalCache.get(key);};
  const rulesFor=module=>key=>qualityRule(key,module,module?'module':'executive');
  return analyzeLeadership({rows:leadershipRows().filter(r=>!moduleFilter||normalize(r.module)===normalize(moduleFilter)),from,to,today,weeklyGoal:cachedGoal,rulesFor,
-  permanentIncidents:[...incidentRecords.values()].filter(x=>!moduleFilter||normalize(x.module)===normalize(moduleFilter)),includeSupervisors:el('leaderSupervisor').value==='yes',
+  permanentIncidents:[...incidentRecords.values()].filter(x=>(!moduleFilter||normalize(x.module)===normalize(moduleFilter))
+   &&registryVisibleInWeek(teamRegistry,'modules',x.module,from)
+   &&registryVisibleInWeek(teamRegistry,'executives',x.executive,from)),includeSupervisors:el('leaderSupervisor').value==='yes',
   minConversion:leadershipPrefs.minConversion,minProjectedCompletion:leadershipPrefs.minProjectedCompletion,
   staleDays:leadershipPrefs.staleDays,actions:leadershipPrefs.actions.filter(a=>!moduleFilter||!a.module||normalize(a.module)===normalize(moduleFilter)),
   projectionMode:leadershipPrefs.projectionMode,weekdayWeights:leadershipPrefs.weekdayWeights,
@@ -3212,10 +3225,19 @@ function saveDayPrefs(){try{localStorage.setItem(DAY_ANALYSIS_KEY,JSON.stringify
 function daySelection(type){return [...el(type==='module'?'dayModules':'dayExecutives').querySelectorAll('input:checked')].map(n=>n.value);}
 function dayFilterMarkup(names,selected,type){const chosen=new Set(selected.map(sameName));return names.map(n=>`<label class="day-choice"><input type="checkbox" data-day-option="${type}" value="${esc(n)}" ${chosen.has(sameName(n))?'checked':''}> ${esc(n)}</label>`).join('')||'<span class="muted">Sin perfiles en los XLS disponibles.</span>';}
 function renderDayFilters(){
- const rows=historyData(),moduleNames=[...new Set(rows.map(r=>String(r.module||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
- const executives=[...new Set(rows.filter(r=>!dayPrefs.modules.length||dayPrefs.modules.some(m=>sameName(m)===sameName(r.module))).map(r=>String(r.executive||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+ const rows=historyData(),todayWeek=mondayOf(dateIso(new Date()));
+ const from=el('dayFrom')?.value||dayPrefs.from,to=el('dayTo')?.value||dayPrefs.to;
+ const onlyCurrentWeek=Boolean(from&&to&&from>=todayWeek&&to<=weekShift(todayWeek,6));
+ const moduleNames=[...new Set(rows.map(r=>String(r.module||'').trim()).filter(Boolean))]
+  .filter(name=>!onlyCurrentWeek||registryVisibleInWeek(teamRegistry,'modules',name,todayWeek))
+  .sort((a,b)=>a.localeCompare(b,'es'));
  const oldModules=dayPrefs.modules,oldExecs=dayPrefs.executives;
  dayPrefs.modules=oldModules.filter(m=>moduleNames.some(n=>sameName(n)===sameName(m)));
+ const executives=[...new Set(rows.filter(r=>(!dayPrefs.modules.length||dayPrefs.modules.some(m=>sameName(m)===sameName(r.module)))
+  &&(!onlyCurrentWeek||registryVisibleInWeek(teamRegistry,'modules',r.module,todayWeek)))
+  .map(r=>String(r.executive||'').trim()).filter(Boolean))]
+  .filter(name=>!onlyCurrentWeek||registryVisibleInWeek(teamRegistry,'executives',name,todayWeek))
+  .sort((a,b)=>a.localeCompare(b,'es'));
  dayPrefs.executives=oldExecs.filter(e=>executives.some(n=>sameName(n)===sameName(e)));
  el('dayModules').innerHTML=dayFilterMarkup(moduleNames,dayPrefs.modules,'module');
  el('dayExecutives').innerHTML=dayFilterMarkup(executives,dayPrefs.executives,'executive');
@@ -3262,7 +3284,10 @@ function initDayAnalysis(){
  const filter=()=>{dayPrefs.modules=daySelection('module');dayPrefs.executives=dayPrefs.executives.filter(e=>[...el('dayExecutives').querySelectorAll('input')].some(n=>n.value===e));renderDayFilters();renderDayAnalysis();};
  el('dayModules').addEventListener('change',filter);
  el('dayExecutives').addEventListener('change',()=>{dayPrefs.executives=daySelection('executive');renderDayAnalysis();});
- for(const id of ['dayFrom','dayTo','dayWeekday','dayGoal'])el(id).addEventListener('change',()=>renderDayAnalysis());
+ for(const id of ['dayFrom','dayTo','dayWeekday','dayGoal'])el(id).addEventListener('change',()=>{
+  if(id==='dayFrom'||id==='dayTo'){dayPrefs.from=el('dayFrom').value;dayPrefs.to=el('dayTo').value;renderDayFilters();}
+  renderDayAnalysis();
+ });
  for(const [id,type] of [['dayCopy','copy'],['dayPdf','pdf'],['dayPng','png'],['daySheet','sheet']])el(id).addEventListener('click',()=>dayExport(type));
  el('daySettingsOpen').addEventListener('click',()=>{el('daySettingsTitle').value=dayPrefs.title;el('daySettingsNote').value=dayPrefs.note;el('daySettingsModules').checked=dayPrefs.showModules;el('daySettingsExecutives').checked=dayPrefs.showExecutives;el('daySettingsDates').checked=dayPrefs.showDates;el('daySettingsOverlay').hidden=false;});
  el('daySettingsClose').addEventListener('click',()=>{el('daySettingsOverlay').hidden=true;});

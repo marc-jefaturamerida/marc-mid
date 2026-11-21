@@ -37,7 +37,14 @@ export function registryActiveAt(entry,date){
  */
 export function registryVisibleInWeek(data,type,name,week,today=new Date()){
  const date=localISO(today),currentWeek=mondayLocal(date),entry=registryEntry(data,type,name);
- if(week===currentWeek&&entry?.active===false)return false;
+ // La semana vigente debe respetar la opción Activo/Inactivo ACTUAL,
+ // no el estado que tenía el perfil el lunes de esa semana.
+ if(week===currentWeek){
+  if(entry?.active===false)return false;
+  // Cuando un módulo se desactiva, sus ejecutivos tampoco figuran en
+  // listados semanales de la semana en curso aunque su perfil siga activo.
+  if(type==='executives'&&entry?.module&&registryEntry(data,'modules',entry.module)?.active===false)return false;
+ }
  return registryActiveAt(entry,week);
 }
 const localISO=(d)=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
