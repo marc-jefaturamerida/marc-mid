@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"><title>Manual de usuario | JEFATURA MID MARC V4.1.2</title>
+<style>
+:root{--navy:#003b7a;--blue:#0066b3;--ink:#24394b;--muted:#5d7287;--line:#d9e4ed;--bg:#f4f7fb}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+header{background:linear-gradient(120deg,#003b7a,#0066b3);color:#fff;padding:38px clamp(16px,4vw,60px)}header p{margin:3px 0 0;opacity:.9}.layout{display:grid;grid-template-columns:255px minmax(0,860px);justify-content:center;gap:24px;padding:24px}
+nav{position:sticky;top:18px;align-self:start;border:1px solid var(--line);border-radius:12px;background:#fff;padding:13px;max-height:90vh;overflow:auto}nav strong{display:block;color:var(--navy);margin:0 0 6px}nav a{display:block;padding:6px 9px;color:#28547d;text-decoration:none;border-radius:7px;font-size:13px}nav a:hover,nav a:focus{background:#eaf2f9}main{background:#fff;border-radius:14px;padding:25px clamp(17px,3vw,48px);box-shadow:0 5px 22px #10395a0b;min-width:0}
+h1{font-size:29px;margin:0 0 5px}h2{margin:36px 0 12px;font-size:23px;color:var(--navy);padding-bottom:8px;border-bottom:1px solid var(--line);scroll-margin-top:18px}h3{color:#075b93;margin-top:24px;font-size:18px}p,li{overflow-wrap:anywhere}li{margin-bottom:5px}table{width:100%;border-collapse:collapse;line-height:1.4;font-size:13px}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f0f5fa;color:var(--navy)}blockquote{border-left:4px solid #d68f30;background:#fff8eb;margin:16px 0;padding:9px 18px;border-radius:6px}a{color:#065f9b}code{background:#eef3f9;padding:2px 4px;border-radius:4px}.table-wrap{overflow-x:auto}.top{display:inline-block;margin:28px 0;color:var(--blue)}.only-print{display:none}
+@media(max-width:800px){.layout{grid-template-columns:1fr;padding:12px}nav{position:static;max-height:none}nav div{display:grid;grid-template-columns:1fr 1fr}main{padding:19px}header{padding:22px}}
+@media print{body{background:#fff;font:11px/1.5 Arial,sans-serif}header{color:var(--navy);background:#fff;padding:6px}nav{display:none}.layout{display:block;padding:0}main{box-shadow:none;padding:0}h2{break-after:avoid}table,blockquote{break-inside:avoid}.top{display:none}}
+</style></head><body><header><h1>Manual de usuario</h1><p>JEFATURA MID MARC · Versión 4.1.2 · Guía de funciones y configuración</p></header><div class="layout"><nav aria-label="Índice del manual"><strong>Contenido</strong><div><a href="#1-inicio-de-sesion-y-pantalla-principal">1. Inicio de sesión y pantalla principal</a><a href="#2-importacion-y-administracion-de-xls">2. Importación y administración de XLS</a><a href="#3-objetivos-de-jefatura-modulos-y-ejecutivos">3. Objetivos de Jefatura, módulos y ejecutivos</a><a href="#4-analisis-y-resultados">4. Análisis y resultados</a><a href="#5-comisiones">5. Comisiones</a><a href="#6-administracion-y-control">6. Administración y control</a><a href="#7-ajustes-de-la-aplicacion">7. Ajustes de la aplicación</a><a href="#8-exportar-informacion">8. Exportar información</a><a href="#9-guardado-de-preferencias-y-respaldo">9. Guardado de preferencias y respaldo</a><a href="#10-mensajes-habituales-y-recomendaciones">10. Mensajes habituales y recomendaciones</a></div></nav><main><h1 id="manual-de-usuario-jefatura-mid-marc-v4-1-2">Manual de usuario · JEFATURA MID MARC V4.1.2</h1>
+<p><strong>Guía de uso diario y configuración de la aplicación.</strong> Este documento está dirigido a las personas que consultan, importan y administran resultados. Las opciones visibles pueden variar según los datos cargados y los permisos de la cuenta.</p>
+<h2 id="1-inicio-de-sesion-y-pantalla-principal">1. Inicio de sesión y pantalla principal</h2>
+<p>Al abrir la aplicación, la página inicial es <strong>Comparativa diaria</strong>. Puedes revisar archivos de prueba sin sesión; cuando accedes con tu correo autorizado, los XLS quedan asociados a tu cuenta y se sincronizan con el historial privado.</p>
+<ol>
+<li>Selecciona <strong>Ingresar con correo</strong> y accede con tus credenciales de usuario.</li>
+<li>Espera a que termine la recuperación del historial; mientras esté incompleto no se presentan cálculos parciales como definitivos.</li>
+<li>Para cambiar de página utiliza el menú superior de categorías: <strong>Análisis y resultados</strong>, <strong>Comisiones</strong> o <strong>Administración</strong>.</li>
+<li>Utiliza <strong>⚙ Ajustes</strong> para personalizar objetivos, perfiles, exportaciones y visualización.</li>
+<li>Selecciona <strong>Cerrar sesión</strong> cuando termines de utilizar un equipo compartido.</li>
+</ol>
+<blockquote>
+<p><strong>Atención:</strong> la pantalla obligatoria de objetivos aparece cuando faltan metas para semanas detectadas. Completa los pendientes para desbloquear la navegación.</p>
+</blockquote>
+<h2 id="2-importacion-y-administracion-de-xls">2. Importación y administración de XLS</h2>
+<p>Pulsa <strong>Cargar XLS</strong>, elige uno o varios archivos y confirma la vista previa y la fecha que solicite el importador. Los formatos admitidos incluyen XLS, XLSX y algunos archivos delimitados. Si el archivo no contiene las columnas necesarias, el programa mostrará un error explicativo.</p>
+<p>La pantalla <strong>Ajustes → Archivos XLS guardados</strong> permite revisar el catálogo, elegir <strong>Total acumulado</strong> o <strong>Elegir uno o varios archivos</strong>, y recuperar el historial cuando exista una incidencia de lectura. La aplicación evita duplicar archivos ya registrados y no utiliza registros incompletos para emitir resultados.</p>
+<ul>
+<li><strong>Con sesión:</strong> los XLS se guardan en un historial privado de la cuenta.</li>
+<li><strong>Sin sesión en modo local:</strong> los XLS se conservan en el navegador cuando el origen local admite almacenamiento persistente.</li>
+<li><strong>Eliminación de XLS:</strong> revisa cuidadosamente la selección. La opción <strong>Borrar XLS locales</strong> solamente afecta el navegador; eliminar archivos de la cuenta es una acción diferente y puede ser irreversible.</li>
+</ul>
+<h2 id="3-objetivos-de-jefatura-modulos-y-ejecutivos">3. Objetivos de Jefatura, módulos y ejecutivos</h2>
+<p>Los objetivos de <strong>Trámites</strong> y <strong>Ventas</strong> se establecen por semana operativa, de <strong>lunes a domingo</strong>. La configuración se encuentra en <strong>Ajustes → Objetivos base</strong> o tocando el nombre del perfil en las vistas que admitan edición.</p>
+<h3 id="asignacion-rapida-de-faltantes">Asignación rápida de faltantes</h3>
+<p>Al iniciar, o después de importar XLS con semanas sin metas, aparece <strong>Asignación rápida de objetivos</strong>. Cada módulo o ejecutivo se muestra <strong>una sola vez</strong>, aunque tenga varias semanas pendientes.</p>
+<ol>
+<li>Introduce la cantidad de <strong>Trámites</strong> y de <strong>Ventas</strong> para ese perfil.</li>
+<li>Usa <strong>Repetir en sus semanas</strong> para aplicar los valores a todos sus períodos pendientes.</li>
+<li>Si deseas utilizar las mismas cantidades para distintos perfiles, rellena los campos de aplicación masiva y pulsa <strong>Aplicar cantidades a todos los pendientes</strong>.</li>
+<li>Termina con <strong>Guardar todos los objetivos</strong>.</li>
+</ol>
+<p>Los valores ya registrados en otras semanas se conservan. Una meta vacía o igual a cero se considera faltante. Los objetivos históricos y las fórmulas de comisiones no se reemplazan automáticamente por una asignación rápida.</p>
+<h3 id="activar-e-inactivar-perfiles">Activar e inactivar perfiles</h3>
+<p>Desde <strong>Ajustes → Gestión de módulos y ejecutivos</strong> elige el tipo de perfil, escribe su nombre exacto y marca o desmarca <strong>Activo</strong>. También puedes hacerlo desde la ficha de objetivos de ese perfil. Guarda la modificación.</p>
+<p><strong>Para la semana operativa actual:</strong> un módulo o ejecutivo marcado como inactivo no aparece en las tablas, indicadores, filtros ni exportaciones de resultados de esa semana. Sus registros anteriores no se borran: las consultas de semanas históricas respetan la fecha de baja o reactivación que conste en el catálogo.</p>
+<p>La inactivación de un <strong>módulo</strong> no cambia automáticamente el estado guardado de sus ejecutivos; cada perfil conserva su propio estado. Aun así, las ventas registradas en un módulo inactivo quedan excluidas de los resultados de la semana actual.</p>
+<h2 id="4-analisis-y-resultados">4. Análisis y resultados</h2>
+<h3 id="comparativa-diaria">Comparativa diaria</h3>
+<p>Compara los resultados de dos fechas y observa cambios en registros, ventas totales, regulares, garantizadas, Plan Cero y Plan Dental. Confirma las fechas elegidas antes de copiar o exportar.</p>
+<h3 id="analisis-del-dia">Análisis del día</h3>
+<p>Permite analizar lo logrado en <strong>todos los lunes</strong>, <strong>todos los martes</strong> u otro día de la semana dentro de un rango. Se encuentra en <strong>Análisis y resultados → Análisis del día</strong>.</p>
+<p><strong>Primer apartado: filtros.</strong> Establece Desde/Hasta, uno o varios módulos, uno o varios ejecutivos, el día de lunes a domingo y el objetivo conjunto de ventas para ese día. Si eliges módulos y ejecutivos a la vez, se aplican ambos filtros (solo ejecutivos de los módulos elegidos).</p>
+<p><strong>Segundo apartado: módulos.</strong> Muestra las ventas totales comisionables, garantizadas, regulares, Plan Dental y Plan Cero por módulo.</p>
+<p><strong>Tercer apartado: ejecutivos.</strong> Presenta los mismos indicadores por colaborador.</p>
+<p>Cada indicador incluye <strong>acumulado</strong>, <strong>promedio por ocurrencia del día elegido</strong> y <strong>porcentaje</strong>. El denominador del Plan Cero son solamente las <strong>ventas regulares comisionables</strong>; para los demás porcentajes se usan las ventas totales comisionables. Los días seleccionados sin ventas también cuentan en el promedio.</p>
+<p><strong>Ejemplo:</strong> si los cuatro lunes de un rango se obtienen 4, 2, 0 y 6 ventas, el acumulado es <strong>12</strong> y el promedio es <strong>3 ventas por lunes</strong>. Si la meta conjunta es 5 ventas por lunes, el alcance promedio equivale a <strong>60%</strong>.</p>
+<h3 id="comparativo-de-ejecutivos-y-comparativas-semanales">Comparativo de ejecutivos y comparativas semanales</h3>
+<p>En <strong>Comparativo de ejecutivos</strong> selecciona una semana operativa o un rango personalizado. Las comisiones se calculan para cada semana por separado y después se suman. Un rango parcial no prorratea el objetivo semanal. <strong>Comparativa semanal</strong> compara dos semanas operativas en módulos y objetivos.</p>
+<h3 id="otras-paginas-de-resultados">Otras páginas de resultados</h3>
+<ul>
+<li><strong>Dashboard de Jefatura:</strong> cumplimiento consolidado, calidad, proyecciones, alertas y acciones de seguimiento.</li>
+<li><strong>Acumulado general:</strong> totales por módulo y ejecutivo dentro del período consultado.</li>
+<li><strong>Histórico individual:</strong> seguimiento diario, semanal o mensual de un colaborador.</li>
+<li><strong>Histórico por módulo:</strong> análisis operativo del módulo, tendencias, objetivos y promedios.</li>
+<li><strong>Logros semanales:</strong> revisión por semana, módulo, indicadores y folios.</li>
+</ul>
+<h2 id="5-comisiones">5. Comisiones</h2>
+<p><strong>Calculadora individual</strong> permite introducir o importar las ventas, Plan Dental, Plan Cero, activaciones y otros datos, y comparar base y simulación. <strong>Calculadora supervisor</strong> muestra los resultados del módulo, indicadores de calidad y componentes configurados de remuneración.</p>
+<p>Las comisiones utilizan el motor de cálculo del proyecto. Los registros cancelados, incompletos, rechazados o con incidencia activa pueden quedar excluidos del pago según las reglas vigentes. Antes de utilizar un resultado para seguimiento formal, revisa objetivos, incidencias, fechas y el archivo seleccionado.</p>
+<p>En <strong>Ajustes → Tarifas de comisiones</strong> y <strong>Porcentajes requeridos y límites de calidad</strong> puedes consultar y modificar parámetros habilitados. Realiza cambios solo cuando tengas autorización, ya que afectarán las simulaciones posteriores.</p>
+<h2 id="6-administracion-y-control">6. Administración y control</h2>
+<ul>
+<li><strong>Registros manuales:</strong> consulta los folios y combina filtros por fechas, módulo, ejecutivo, estatus y otros campos.</li>
+<li><strong>Gestión de incidencias:</strong> registra, consulta y actualiza incidencias; los folios con incidencias activas pueden excluirse de comisiones.</li>
+<li><strong>Actualizaciones:</strong> solicita correcciones a campos del registro y consulta el estado de las solicitudes.</li>
+<li><strong>Recordatorios:</strong> revisa avisos y tareas pendientes.</li>
+<li><strong>Visitas de coordinación:</strong> captura y consulta las visitas y sus evidencias disponibles.</li>
+</ul>
+<p>Cuando existan operaciones que afectan un folio, comprueba que la sincronización haya terminado antes de cerrar la sesión.</p>
+<h2 id="7-ajustes-de-la-aplicacion">7. Ajustes de la aplicación</h2>
+<p>Abre <strong>⚙ Ajustes</strong>. Arriba encontrarás <strong>Buscar ajustes</strong>, justo junto a <strong>Guardar ajustes y cerrar</strong>. Escribe el nombre de una función; la búsqueda filtra los botones del menú sin borrar ni modificar las configuraciones. Selecciona el resultado para abrir su apartado. Borra el término para volver a mostrar todas las secciones.</p>
+<p>Los apartados están organizados en <strong>Archivos y datos</strong>, <strong>Comisiones y calidad</strong>, <strong>Reportes y análisis</strong>, <strong>Interfaz y navegación</strong>, <strong>Avanzado</strong> y, si corresponde, <strong>Otros ajustes</strong>.</p>
+<h3 id="opciones-principales">Opciones principales</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+  <th>Apartado</th>
+  <th>Para qué sirve</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Archivos XLS guardados</td>
+  <td>Revisar, seleccionar o gestionar las fuentes del historial.</td>
+</tr>
+<tr>
+  <td>Gestión de módulos y ejecutivos</td>
+  <td>Crear perfiles, asignar módulo, establecer estado activo/inactivo.</td>
+</tr>
+<tr>
+  <td>Objetivos base</td>
+  <td>Definir metas con vigencia para Jefatura, módulos y ejecutivos.</td>
+</tr>
+<tr>
+  <td>Tarifas y calidad</td>
+  <td>Ajustar parámetros habilitados de comisiones y porcentajes.</td>
+</tr>
+<tr>
+  <td>Reportes y análisis</td>
+  <td>Personalizar textos, tablas, indicadores y exportaciones.</td>
+</tr>
+<tr>
+  <td>Apariencia y navegación</td>
+  <td>Cambiar tema, secciones, posición y página principal.</td>
+</tr>
+<tr>
+  <td>Avanzado</td>
+  <td>Reportes del portapapeles, restablecimiento, auditoría y recuperación, respaldos.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="avanzado-portapapeles">Avanzado: portapapeles</h3>
+<p>En <strong>Avanzado → Reportes del portapapeles</strong>, cambia los textos y apartados que se copian, según las opciones disponibles para cada reporte. Guarda los ajustes antes de cerrar el panel.</p>
+<h3 id="avanzado-restablecer-proyecto">Avanzado: restablecer proyecto</h3>
+<p>En <strong>Avanzado → Restablecer proyecto</strong> encontrarás el restablecimiento de ajustes y el restablecimiento completo. <strong>El restablecimiento completo puede eliminar datos permanentemente</strong>. Exporta un respaldo y lee el cuadro de confirmación antes de continuar.</p>
+<h3 id="avanzado-seguridad-auditoria-y-recuperacion">Avanzado: seguridad, auditoría y recuperación</h3>
+<p>En <strong>Avanzado → Seguridad · Auditoría y recuperación</strong> puedes consultar movimientos y la papelera de incidencias. La restauración y reactivación no son equivalentes: al restaurar un elemento, comprueba su estado antes de volver a utilizarlo.</p>
+<h2 id="8-exportar-informacion">8. Exportar información</h2>
+<p>Utiliza el <strong>menú flotante</strong> de la página activa. Según la sección, encontrarás acciones para copiar el reporte al portapapeles, descargar <strong>PDF</strong>, <strong>PNG</strong> o <strong>captura Sheets</strong> en JPEG y abrir la configuración de esa página.</p>
+<p>En <strong>Análisis del día</strong>, el texto resume el día consultado, fechas, cantidad de períodos, total, promedio y tablas elegidas. Su PDF se genera en <strong>una sola hoja carta vertical</strong>, su PNG en <strong>una sola imagen vertical</strong> y la <strong>captura Sheets</strong> en un <strong>JPEG</strong> con apariencia de hoja de cálculo realista. Si se seleccionan demasiados perfiles, reduce los filtros para mantener la legibilidad del reporte.</p>
+<p>Comprueba la vista previa y los filtros antes de compartir cualquier reporte que contenga información de clientes.</p>
+<h2 id="9-guardado-de-preferencias-y-respaldo">9. Guardado de preferencias y respaldo</h2>
+<p>Con sesión iniciada, los datos del historial autorizado están asociados a tu cuenta. En modo local, el mismo navegador puede conservar XLS, objetivos, filtros, perfiles y otras preferencias. Para recuperar datos locales debes utilizar el mismo navegador y la misma dirección local, sin borrar los datos del sitio.</p>
+<p>Para respaldar preferencias, usa <strong>Avanzado → Importar / exportar configuraciones</strong>. Los respaldos de ajustes no sustituyen una copia de tus XLS originales. Cualquier eliminación del almacenamiento local debe ser deliberada.</p>
+<h2 id="10-mensajes-habituales-y-recomendaciones">10. Mensajes habituales y recomendaciones</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+  <th>Mensaje o situación</th>
+  <th>Qué hacer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Se solicitan objetivos faltantes</td>
+  <td>Completa las cantidades pendientes; puedes usar aplicación masiva.</td>
+</tr>
+<tr>
+  <td>Un perfil inactivo no figura esta semana</td>
+  <td>Revisa su estado en Gestión de módulos y ejecutivos.</td>
+</tr>
+<tr>
+  <td>Un XLS figura como duplicado</td>
+  <td>Revisa Archivos XLS guardados antes de volver a importarlo.</td>
+</tr>
+<tr>
+  <td>Historial pendiente de lectura</td>
+  <td>Usa Reintentar historial. Evita interpretar cálculos parciales.</td>
+</tr>
+<tr>
+  <td>PDF o PNG no cabe en una página</td>
+  <td>Reduce módulos o ejecutivos seleccionados.</td>
+</tr>
+<tr>
+  <td>No se conserva una captura local</td>
+  <td>Comprueba que sigues en el mismo navegador y no se borraron sus datos.</td>
+</tr>
+<tr>
+  <td>No puedes copiar al portapapeles</td>
+  <td>Revisa permisos del navegador y vuelve a intentarlo.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Buenas prácticas:</strong> utiliza un rango de fechas claro; revisa el estado de los perfiles; conserva tus XLS originales; verifica incidencias y objetivos antes de compartir cifras; no utilices el restablecimiento completo como medida para resolver un error de visualización.</p>
+<a class="top" href="#1-inicio-de-sesion-y-pantalla-principal">Volver al inicio ↑</a></main></div></body></html>

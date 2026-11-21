@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {buildSheetsCaptureModel,paintSheetsCapture} from '../src/sheets-capture.js';
+const pkg=JSON.parse(readFileSync('package.json','utf8'));
+const html=readFileSync('index.html','utf8');
+const js=readFileSync('src/legacy-app.js','utf8');
+const manual=readFileSync('public/manual-usuario.html','utf8');
+assert.equal(pkg.version,'4.1.2');
+assert(js.includes("APP_VERSION='4.1.2'"));
+for(const id of ['exportSheets','floatSheet','daySheet'])assert(html.includes(`id="${id}"`),id);
+assert(js.includes('exportSheetsCapture'));
+assert.equal(typeof buildSheetsCaptureModel,'function');
+assert.equal(typeof paintSheetsCapture,'function');
+assert(manual.includes('captura Sheets')||manual.includes('Exportar captura Sheets'),'Manual debe mencionar la nueva exportación');
+console.log('V4.1.2: exportación JPEG tipo Sheets disponible en barra, menú flotante y Análisis del día: OK');
