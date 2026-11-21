@@ -1,0 +1,7 @@
+# Supabase Auth: dashboard-api valida el JWT del usuario en _shared.js.
+# V4: XLS no utiliza Edge Functions; usa PostgreSQL RLS + Storage privado.
+[functions.dashboard-api]
+verify_jwt = false
+
+[remotes.production]
+project_id = "feysztaielfexueulqkn"

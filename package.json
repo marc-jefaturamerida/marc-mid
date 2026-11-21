@@ -1,0 +1,20 @@
+{
+  "name": "jefatura-mid-marc",
+  "private": true,
+  "version": "4.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "node --check src/day-analysis.js && node --check src/day-analysis-export.js && node --check src/local-archives.js && node --check src/supabase-reports.js && node --check src/supabase-boot.js && node --check src/start-app.js && node --check supabase/functions/dashboard-api/_shared.js && node --check src/history-loading.js && node --check src/cloud-boot.js && node --check src/session-lifetime.js && node --check src/leadership-dashboard.js && node --check src/leadership-export.js && node --check src/legacy-app.js && node --check src/import-date.js && node --check src/daily-whatsapp-report.js && node --check src/jefatura-daily-progress.js && node --check src/weekly-admin-report.js && node --check src/module-history.js && node --check src/individual-history.js && node --check src/history-export.js && node --check src/supervisor-statement.js && node --check src/visits.js && node --check netlify/functions/incidents.js && node --check netlify/functions/files.js && node --check netlify/functions/settings.js && node --check netlify/functions/visits.js && node --check netlify/functions/sync.js && node --check netlify/functions/health.js && node --check netlify/lib/_shared.js && node --check src/goals-workflow.js && node --check src/team-registry.js && node --check src/reminders.js && node --check src/settings-transfer.js && node --check src/base-goals.js && node --check src/record-overrides.js && node --check netlify/functions/audit.js && node --check src/import-preview.js && node --check src/mobile-tables.js && node --check src/settings-search.js && node --check src/jm-enhancements.js && node --check src/audit-ui.js && node --check src/updates-ui.js && node --check src/update-request-rules.js && node --check netlify/functions/updates.js && node --check src/pdf-download.js && node --check src/page-settings-modal.js && node --check src/report-copy.js && node --check src/clipboard-settings.js && node --check netlify/functions/reset.js && node --check supabase/functions/dashboard-api/handlers/files.js && node --check supabase/functions/dashboard-api/handlers/updates.js && node --check supabase/functions/dashboard-api/handlers/visits.js && node --check supabase/functions/dashboard-api/handlers/incidents.js && node --check supabase/functions/dashboard-api/handlers/settings.js && node --check supabase/functions/dashboard-api/handlers/sync.js && node --check supabase/functions/dashboard-api/handlers/audit.js && node --check supabase/functions/dashboard-api/handlers/reset.js && node --check supabase/functions/dashboard-api/handlers/health.js && node --check supabase/functions/dashboard-api/update-request-rules.js && node --check supabase/functions/dashboard-api/visit-validation.js",
+    "test": "node tests/validate-v250.mjs && node tests/validate-v252.mjs && node tests/validate-v253.mjs && node tests/validate-v254.mjs && node tests/validate-v255.mjs && node tests/validate-v256.mjs && node tests/validate-v257.mjs && node tests/validate-v258.mjs && node tests/validate-v259.mjs && node tests/validate-v260.mjs && node tests/validate-v261.mjs && node tests/validate-v270.mjs && node tests/validate-v271.mjs && node tests/validate-v300.mjs && node tests/validate-page-settings-v300.mjs && node tests/validate-v301.mjs && node tests/validate-clipboard-v301.mjs && node tests/validate-daily-progress-v300.mjs && node tests/validate-visit-fix-v302.mjs && node tests/validate-v303.mjs && node tests/validate-v304.mjs && node tests/validate-v3041.mjs && node tests/validate-v3042.mjs && node tests/validate-v3043.mjs && node tests/validate-v3044.mjs && node tests/validate-v400.mjs && node tests/validate-v410.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.10",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
+}
