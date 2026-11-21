@@ -1,0 +1,8 @@
+export function initAuditUi(){
+ const $=id=>document.getElementById(id),status=$('jmAuditStatus'),host=$('jmAuditRows');if(!status)return;
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+ const stamp=v=>{try{return new Date(v).toLocaleString('es-MX');}catch{return String(v||'');}};
+ $('jmLoadAudit').onclick=async()=>{try{status.textContent='Consultando movimientos…';const rows=await window.APP_CLOUD.listAudit();host.innerHTML=rows.length?rows.map(e=>`<div class="jm-audit-row"><strong>${esc(e.entity_type)} · ${esc(e.operation)}</strong><span>${esc(e.entity_key)}</span><small>${stamp(e.created_at)}</small></div>`).join(''):'Sin movimientos registrados todavía.';status.textContent=rows.length+' movimientos recientes.';}catch(e){status.textContent='No disponible: '+e.message;}};
+ $('jmLoadTrash').onclick=async()=>{try{status.textContent='Consultando papelera…';const rows=await window.APP_CLOUD.listTrash();host.innerHTML=rows.length?rows.map(e=>`<div class="jm-audit-row"><strong>${esc(e.folio)}</strong><small>Eliminada ${stamp(e.deleted_at)}</small><button type="button" class="btn small" data-jm-restore="${esc(e.folio)}">Restaurar</button></div>`).join(''):'Papelera vacía.';status.textContent=rows.length+' incidencias recuperables.';}catch(e){status.textContent='No disponible: '+e.message;}};
+ host.onclick=async event=>{const button=event.target.closest('[data-jm-restore]');if(!button)return;if(!confirm('¿Restaurar esta incidencia como inactiva?'))return;try{await window.APP_CLOUD.restoreIncident(button.dataset.jmRestore);status.textContent='Restaurada como inactiva. Actualiza las incidencias para verla.';$('jmLoadTrash').click();}catch(e){status.textContent=e.message;}};
+}

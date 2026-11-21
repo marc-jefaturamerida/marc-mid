@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {cleanBaseGoals,upsertBaseGoals,effectiveBaseGoal} from '../src/base-goals.js';
+import {cleanTeamRegistry,registryUpdate,registryActiveAt,registryRowEligible,registryEntry} from '../src/team-registry.js';
+import {findMissingBaseGoals,saveQuickBaseGoals,recordsForGoalReview} from '../src/goals-workflow.js';
+let goals=cleanBaseGoals(null);
+let registry=cleanTeamRegistry(null);
+registry=registryUpdate(registry,'modules',{name:'Montejo',active:true,weeklyGoal:''},'','2026-11-16');
+registry=registryUpdate(registry,'executives',{name:'Alicia',module:'Montejo',active:true,weeklyGoal:8},'','2026-11-16');
+const row={module:'Montejo',executive:'Alicia',fecha:'2026-11-17',week:'2026-11-16'};
+let issues=findMissingBaseGoals({store:goals,registry,kind:'import',todayWeek:'2026-11-16',rows:[row],fallbackSales:(type,name,week)=>type==='executive'?8:null});
+assert.equal(issues.length,2);
+const exe=issues.find(x=>x.type==='executive');assert.equal(exe.missingSales,false);assert.equal(exe.missingRecords,true);
+assert.equal(issues.find(x=>x.type==='module').missingSales,true);
+assert.throws(()=>saveQuickBaseGoals(goals,issues,{}),/Ingresa trámites/);
+const form=Object.fromEntries(issues.map(x=>[x.key,{records:'15',sales:'10'}]));
+goals=saveQuickBaseGoals(goals,issues,form);
+assert.equal(effectiveBaseGoal(goals,'module','Montejo','2026-11-16','records').value,15);
+assert.equal(effectiveBaseGoal(goals,'module','Montejo','2026-11-16','sales').value,10);
+// Goal inherited in the catalogue is not copied into unrelated, saved quality rate.
+assert.equal(effectiveBaseGoal(goals,'executive','Alicia','2026-11-16','sales').value,null);
+assert.equal(effectiveBaseGoal(goals,'executive','Alicia','2026-11-16','records').value,15);
+// Historical vigencias remain intact; never delete existing percentage objectives.
+goals=upsertBaseGoals(goals,{type:'module',name:'Montejo',from:'2026-11-16',goals:{records:0,sales:10,p0:25}});
+issues=findMissingBaseGoals({store:goals,registry,kind:'import',todayWeek:'2026-11-16',rows:[row],fallbackSales:()=>null});
+assert.equal(issues.filter(x=>x.type==='module')[0].missingRecords,true);
+const replacement=Object.fromEntries(issues.map(x=>[x.key,{records:20,sales:12}]));
+goals=saveQuickBaseGoals(goals,issues,replacement);
+assert.equal(effectiveBaseGoal(goals,'module','Montejo','2026-11-16','p0').value,25);
+assert.equal(effectiveBaseGoal(goals,'module','Montejo','2026-11-16','records').value,20);
+assert.equal(effectiveBaseGoal(goals,'module','Montejo','2026-11-16','sales').value,10);
+// Historic before a baja counts, subsequent rows no longer count.
+registry=registryUpdate(registry,'modules',{name:'Montejo',active:false,weeklyGoal:''},'Montejo','2026-11-19');
+assert.equal(registryRowEligible(registry,row,new Date(2026,11,3)),true);
+assert.equal(registryRowEligible(registry,{...row,fecha:'2026-11-20'},new Date(2026,11,3)),false);
+assert.equal(registryEntry(registry,'executives','Alicia').active,true,'Module status must not cascade to executive');
+const historical=findMissingBaseGoals({store:cleanBaseGoals(null),registry,kind:'import',todayWeek:'2026-11-16',rows:[{...row,fecha:'2026-11-20'}]});
+assert.equal(historical.some(x=>x.type==='module'),false,'Inactive module should not reopen goals for post-baja records');
+const prior=findMissingBaseGoals({store:cleanBaseGoals(null),registry,kind:'import',todayWeek:'2026-11-16',rows:[row]});
+assert.equal(prior.some(x=>x.type==='module'),true);
+// Legacy inactive entries without statusHistory remain inactive.
+assert.equal(registryActiveAt({active:false,statusHistory:[]},'2026-11-20'),false);
+const reports=[{headers:['Módulo','Ejecutivo','Fecha'],rows:[['Montejo','Alicia','17/11/2026'],['Montejo','Alicia','20/11/2026']]}];
+const fromReports=recordsForGoalReview(reports,text=>{const [d,m,y]=text.split('/');return `${y}-${m}-${d}`});
+assert.equal(fromReports.length,2);assert.equal(fromReports[0].week,'2026-11-16');
+const main=readFileSync(new URL('../src/legacy-app.js',import.meta.url),'utf8');
+const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+for(const key of ['teamDateMode','teamWeek','teamFrom','teamTo','baseGoalActive','goalAuditOverlay','goalAuditRows','goalAuditSave'])assert.ok(html.includes(`id="${key}"`),key);
+for(const key of ['saveQuickBaseGoals','findMissingBaseGoals','registryUpdate','teamPeriodWindow','requestGoalAudit','teamEntries','buildTeamReport'])assert.ok(main.includes(key),key);
+assert.ok(main.includes('e.parts.reduce((sum,p)=>sum+(Number(p.result[k])||0),0)'), 'Weekly commissions summed');
+console.log('V3.0.4: pendientes, ceros, vigencias, perfiles, bloqueo y controles de comparación OK');

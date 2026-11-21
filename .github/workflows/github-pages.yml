@@ -1,0 +1,116 @@
+name: JEFATURA MID MARC - GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compilar y preparar Pages
+    runs-on: ubuntu-latest
+    # Mantener este entorno también en build: las variables públicas pueden
+    # estar guardadas como variables del entorno github-pages en GitHub.
+    environment: github-pages
+    permissions:
+      contents: read
+      pages: write
+    env:
+      VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+      VITE_APP_BASE: ${{ vars.APP_BASE }}
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@v4
+      - name: Verificar variables públicas (sin mostrarlas)
+        shell: bash
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo 'ERROR: Configura SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY en GitHub > Variables.'
+            exit 1
+          fi
+          if [ "$VITE_APP_BASE" != '/marc-mid/' ]; then
+            echo 'ERROR: Configura APP_BASE exactamente como /marc-mid/'
+            exit 1
+          fi
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Comprobar proyecto
+        run: npm run check && npm test
+      - name: Compilar interfaz Supabase
+        run: npm run build
+      - name: Validar archivos publicados
+        shell: bash
+        run: |
+          test -s dist/index.html || { echo 'ERROR: Falta dist/index.html'; exit 1; }
+          test -s dist/manual-usuario.html || { echo 'ERROR: Falta dist/manual-usuario.html'; exit 1; }
+          echo 'Archivos HTML encontrados.'
+      - name: Preparar GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Subir artefacto Pages de esta ejecución
+        id: pages_artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # El ID de ejecución es estable si se reintenta solo deploy,
+          # y distinto para cada publicación nueva.
+          name: github-pages-${{ github.run_id }}
+          path: dist
+          retention-days: 7
+      - name: Registrar artefacto generado
+        shell: bash
+        run: |
+          echo "Artefacto: github-pages-${GITHUB_RUN_ID}" >> "$GITHUB_STEP_SUMMARY"
+          echo "ID: ${{ steps.pages_artifact.outputs.artifact_id }}" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Publicar en GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Verificar que existe el artefacto de build
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages-${{ github.run_id }}
+          path: _pages_check
+      - name: Comprobar paquete descargado
+        shell: bash
+        run: |
+          test -s _pages_check/artifact.tar || {
+            echo 'ERROR: El artefacto Pages está ausente o vacío.'
+            exit 1
+          }
+          echo 'Artefacto disponible para desplegar.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_id }}
+      - name: Confirmar URL publicada
+        shell: bash
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          if [ -z "$PAGE_URL" ]; then
+            echo 'ERROR: Pages no devolvió una URL publicada.'
+            exit 1
+          fi
+          echo "Publicación completada: $PAGE_URL" >> "$GITHUB_STEP_SUMMARY"
