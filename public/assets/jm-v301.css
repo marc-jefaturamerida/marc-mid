@@ -1,0 +1,10 @@
+/* Jefatura Mid Marc V3.0.1 */
+.jm-alert-thresholds{border:1px solid #d6e3f0;border-radius:12px;padding:10px 12px;margin:12px 0}
+.jm-alert-thresholds summary{cursor:pointer;font-weight:750;color:#143f6c}
+.jm-alert-thresholds .history-settings-grid{margin:9px 0 13px}
+.jm-alert-thresholds strong{display:block;margin:10px 0 4px}
+.jm-tools .leader-extra-filter{display:block;width:100%;min-width:0}
+.jm-tools .leader-extra-filter select{width:100%;min-width:0}
+#achCopyCommissionable{display:block;white-space:normal;text-align:left}
+#achCopyCommissionable[hidden]{display:none!important}
+@media(max-width:600px){.jm-alert-thresholds{padding:8px}.jm-tools .floating-filters-body{max-height:54vh}}

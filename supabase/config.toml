@@ -1,0 +1,7 @@
+# V3.0.4.3: GitHub Integration publica la funcion para la rama de produccion.
+# El JWT se comprueba dentro de _shared.js mediante Supabase Auth.
+[functions.dashboard-api]
+verify_jwt = false
+
+[remotes.production]
+project_id = "feysztaielfexueulqkn"

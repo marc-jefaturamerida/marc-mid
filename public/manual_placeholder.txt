@@ -1,0 +1,1 @@
+La guía SUPABASE_DESPLIEGUE.md está en la raíz del proyecto.
